@@ -1,0 +1,14 @@
+streamlit>=1.40.0
+pandas>=2.2.3
+numpy>=2.1.0
+scipy>=1.14.0
+requests>=2.31.0
+requests-cache>=1.2.0
+plotly>=5.24.0
+orjson>=3.9.0
+python-dateutil>=2.9.0
+python-dotenv>=1.0.0
+yfinance>=0.2.40
+feedparser>=6.0.10
+fpdf2>=2.7.9
+openpyxl>=3.1.2

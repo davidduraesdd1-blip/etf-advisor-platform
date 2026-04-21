@@ -1,0 +1,82 @@
+# ── Secrets & credentials (NEVER commit these) ────────────────────────────────
+.env
+.env.*
+!.env.example
+*.env
+.streamlit/secrets.toml
+.streamlit/*.toml
+!.streamlit/config.toml.example
+
+# ── Runtime data & caches ────────────────────────────────────────────────────
+data/*.json
+data/*.jsonl
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.sqlite
+data/*.sqlite3
+data/*.tmp
+data/*.bak
+data/cache/
+!data/.gitkeep
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+env/
+ENV/
+.venv/
+
+# ── IDEs / editors ───────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/settings.json.example
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── OneDrive temp files ──────────────────────────────────────────────────────
+~$*
+
+# ── Test / coverage ──────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Git internals ────────────────────────────────────────────────────────────
+.git-rewrite/

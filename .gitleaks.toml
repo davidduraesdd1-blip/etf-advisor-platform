@@ -1,0 +1,19 @@
+title = "ETF Advisor Platform - Gitleaks Config"
+
+[allowlist]
+description = "Allowlist for test/demo/placeholder values"
+paths = [
+    ".streamlit/secrets.toml.example",
+    "requirements.txt",
+    ".env.example",
+    "docs/BUILD_PACKAGE.md",
+]
+regexes = [
+    "DEMO_",
+    "test_key_",
+    "placeholder_",
+    '''your[_-]?api[_-]?key[_-]?here''',
+    '''sk-ant-example''',
+    '''REPLACE_WITH_YOUR_KEY''',
+    '''<your-.*>''',
+]
