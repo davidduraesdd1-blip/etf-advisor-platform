@@ -31,8 +31,18 @@ DEMO_CLIENTS: list[dict] = [
         "drift_pct":             0.8,
         "rebalance_needed":      False,
         "notes": (
-            "Long-term client; income-focused. Recently added 3% crypto "
-            "allocation after explicit client request. Quarterly rebalance."
+            "Beatrice retired from 38 years in public-school administration. "
+            "Income-first: ~$55K/yr drawdown target. Explicitly asked about "
+            "crypto last January after her grandson mentioned Bitcoin ETFs "
+            "at Thanksgiving. Comfortable only with a small allocation in "
+            "the lowest-expense BTC spot funds — I've kept her in IBIT and "
+            "BITB because of the sub-25bps fees. Quarterly reviews; her "
+            "daughter joins the call."
+        ),
+        "situation_today": (
+            "Portfolio is on target. She wants to know whether to top up "
+            "the crypto sleeve from 3% to 4% given year-end tax planning. "
+            "Hold the line at 3% — that's inside her stated comfort zone."
         ),
     },
     {
@@ -47,8 +57,17 @@ DEMO_CLIENTS: list[dict] = [
         "drift_pct":             6.2,
         "rebalance_needed":      True,
         "notes": (
-            "20-year horizon. Crypto sleeve drifted above target after "
-            "recent rally — recommend rebalance at next review."
+            "Marcus is a mechanical engineer at a regional utility, 20-year "
+            "horizon to target retirement. Moderate risk by his own "
+            "assessment. Moved to a 14% crypto sleeve in 2025 after reading "
+            "the BlackRock tokenization paper. Prefers a diversified basket "
+            "over single-ETF concentration. Bi-monthly rebalance cadence."
+        ),
+        "situation_today": (
+            "His sleeve has drifted to ~16% after BTC's recent rally — 6.2% "
+            "drift flagged. Recommend rebalancing back to 14% target. The "
+            "basket construction currently overweights FBTC which has "
+            "outperformed since last rebalance."
         ),
     },
     {
@@ -63,9 +82,19 @@ DEMO_CLIENTS: list[dict] = [
         "drift_pct":             2.1,
         "rebalance_needed":      False,
         "notes": (
-            "Self-directed background; understands tail risk. "
-            "Bi-weekly rebalance cadence. Client prefers diversified basket "
-            "over concentrated BTC spot."
+            "Priya is a senior engineer at a derivatives trading firm. She "
+            "understands the volatility profile and has explicitly signed "
+            "off on a 42% crypto allocation as part of her long-horizon "
+            "growth sleeve. Bi-weekly rebalance cadence. Prefers multi-ETF "
+            "diversification over single-issuer concentration. She watches "
+            "the EDGAR filings herself and will ask about new spot "
+            "approvals (ETH, SOL) the moment they file."
+        ),
+        "situation_today": (
+            "Sleeve is on target. No rebalance needed this week. She's "
+            "asked whether we'd add Solana exposure once a spot SOL ETF "
+            "clears the SEC — the daily scanner flagged a new S-1 filing "
+            "two weeks ago. Confirm it's on our watchlist, no action today."
         ),
     },
 ]

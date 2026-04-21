@@ -62,9 +62,27 @@ def _fast_monte_carlo(portfolio, n_simulations=None, horizon_days=365,
 
 import integrations.data_feeds as _df      # noqa: E402
 import core.portfolio_engine as _pe        # noqa: E402
+import integrations.edgar_nport as _en     # noqa: E402
 
 _df.get_etf_prices = _empty_prices
 _pe.get_live_risk_free_rate = _fake_rfr
+
+
+def _empty_composition(ticker: str) -> dict:
+    return {
+        "ticker":          ticker.upper(),
+        "supported":       True,
+        "source":          "unavailable",
+        "filing_date":     None,
+        "accession":       None,
+        "holdings":        [],
+        "holdings_count":  0,
+        "total_value_usd": 0.0,
+        "note":            "smoke-test stub",
+    }
+
+
+_en.get_etf_composition = _empty_composition
 
 # Only stub MC for Streamlit smoke tests, NOT for the deterministic
 # portfolio-engine tests that validate actual math. We detect via a
@@ -76,3 +94,22 @@ _pe.get_live_risk_free_rate = _fake_rfr
 # Also ensure EDGAR_CONTACT_EMAIL default-placeholder doesn't accidentally
 # get exercised during any test that tries to run the live scanner.
 os.environ.setdefault("EDGAR_CONTACT_EMAIL", "ops@test.example")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Test isolation — reset module-level state between EVERY test.
+# Module caches accumulate across tests and can produce cross-test hangs
+# or false positives. Resetting here is zero-cost for tests that don't
+# touch these modules.
+# ═══════════════════════════════════════════════════════════════════════════
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _reset_module_state_between_tests():
+    from integrations.data_feeds import reset_circuit_breaker
+    from core.data_source_state import reset_all as reset_dss
+    reset_circuit_breaker()
+    reset_dss()
+    yield

@@ -147,13 +147,16 @@ def cornish_fisher_var(
     Cornish-Fisher modified parametric VaR (Favre & Galeano 2002).
     Returns a positive number representing potential loss %.
 
-    Parameters calibrated for illiquid RWA distributions — retained as-is
-    per planning-side Risk 1 directive. Day-3+ retune target:
-        S = -0.25  (crypto ETFs less skewed than RWA)
-        K = 2.5    (heavier-tailed than equity, lighter than RWA)
+    Day-4 retune (per planning-side Q3 direction):
+        S:  -0.40 → -0.25    (ETFs less prone to regulatory-shutdown tails than RWA)
+        K:   1.00 →  2.50    (genuinely fatter-tailed than equity indices)
+    Rationale: ETFs sit between equity indices (S≈-0.10, K≈1.0) and
+    illiquid tokenized RWA (S≈-0.40, K≈1.0 empirical from Moody's RWA
+    framework). Post-demo: proper 3-year calibration fit using BTC spot
+    history + ETF tracking-error extrapolation.
     """
-    S = -0.4   # left skew (illiquid RWA calibration — flagged for Day-3 retune)
-    K = 1.0    # excess kurtosis (fat tails)
+    S = -0.25  # Day-4 retuned for crypto ETFs
+    K = 2.5    # Day-4 retuned for crypto ETFs
 
     z_g = {0.90: 1.282, 0.95: 1.645, 0.99: 2.326}.get(confidence, 1.645)
     z_cf = (
@@ -486,11 +489,13 @@ def compute_portfolio_metrics(
     sortino = excess_return / max(downside_vol, 0.01)
 
     # Magdon-Ismail max-drawdown approximation
-    # E[MDD] ≈ σ × sqrt(T) × f, with f=3.0 for illiquid assets (verbatim).
-    # Will retune to f=2.5 in Phase 2 — ETFs have less drag than RWA.
+    # E[MDD] ≈ σ × sqrt(T) × f, with f retuned Day-4 to 2.7 for crypto ETFs
+    # (between equity 2.3-2.5 and illiquid RWA 3.0). Rationale: ETFs
+    # recover faster than locked-up RWA but drawdowns are still persistent
+    # in risk-off regimes — see port_log.md Phase 3 entry.
     tier_meta = PORTFOLIO_TIERS.get(tier_name, {})
     max_drawdown_ceiling = tier_meta.get("max_drawdown_pct", 60)
-    max_drawdown = min(portfolio_vol * 3.0, max_drawdown_ceiling)
+    max_drawdown = min(portfolio_vol * 2.7, max_drawdown_ceiling)
 
     calmar = weighted_return / max(max_drawdown, 0.01)
 
@@ -498,9 +503,11 @@ def compute_portfolio_metrics(
     var_95 = cornish_fisher_var(weighted_return, portfolio_vol, 0.95)
     var_99 = cornish_fisher_var(weighted_return, portfolio_vol, 0.99)
 
-    # CVaR — Student-t(5) multipliers (verbatim; flagged for retune)
-    cvar_95 = var_95 * 1.40
-    cvar_99 = var_99 * 1.48
+    # CVaR — Day-4 retuned multipliers for crypto ETFs (was 1.40 / 1.48).
+    # Rationale: between Student-t(5) illiquid-RWA calibration and
+    # Student-t(7) equity calibration. See port_log.md Phase 3 entry.
+    cvar_95 = var_95 * 1.35
+    cvar_99 = var_99 * 1.42
 
     weighted_avg_vol = float(np.dot(weights, vols))
     diversification_r = weighted_avg_vol / max(portfolio_vol, 0.01)

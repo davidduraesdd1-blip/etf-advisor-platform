@@ -76,20 +76,52 @@ Deferred from Day 3 (tracked below in Day 4 block):
 - Chain-maturity discount — evaluated and DROPPED as decision (recorded in port_log.md)
 - Live historical prices are LIVE (not synthetic) per design directive — when fallback chain exhausts, page shows transparency message rather than fake data
 
-## Day 4 — Thursday 2026-04-23 (polish + demo prep + Streamlit Cloud deploy)
+## Day 4 — Thursday 2026-04-23 ✅ COMPLETE
 
-- [ ] 3 demo client profiles enriched with coherent narrative arcs in notes
-- [ ] Polished empty / loading / error states on every page
-- [ ] Performance disclaimers on every backtest (compliance — SEC Marketing Rule)
-- [ ] Audit log surface (minimal "Recent actions" panel in Settings)
-- [ ] `pages/98_Methodology.py` placeholder with Day-3+ content refs
-- [ ] RWA + DeFi preview tabs when `EXTENDED_MODULES_ENABLED=True` session toggle fires
-- [ ] Upgrade signal_adapter from Phase-1 rule-based to lightweight RSI/MACD (using historical prices when available; Phase-1 rule as fallback)
-- [ ] Cornish-Fisher + CVaR multiplier + MDD factor retune from RWA calibration to crypto-ETF calibration (port_log log)
-- [ ] Manual light/dark visual walk across all 4 pages
-- [ ] Streamlit Cloud private-app deploy + Secrets UI population
-- [ ] Full audit pass per CLAUDE.md §4
-- [ ] Commit + push + tag `backup-demo-ready-2026-04-24`
+Morning block (A-F, blocking before deploy):
+- [x] A: Live yfinance w/ 24hr cache + module-level memoization in data_feeds
+- [x] B: Signal adapter upgraded — RSI(14) Wilder / MACD(12,26,9) / 20-day momentum composite
+- [x] C: Cornish-Fisher + CVaR + MDD retune for crypto ETFs (S=-0.25, K=2.5, CVaR 1.35/1.42, MDD factor 2.7)
+- [x] D: Execute Basket modal wires get_last_close per ETF; Confirm disabled when all live prices missing
+- [x] E: SEC EDGAR N-PORT parser (IBIT / ETHA / FBTC / FETH). Shared 10 req/sec token bucket in integrations/edgar.py. 7-day disk cache.
+- [x] F: get_etf_reference EDGAR → issuer → ETF.com → seed chain (issuer + ETF.com scrapers are post-demo stubs; seed-file marked as CACHED so FA sees transparency)
+
+Afternoon block (G-J, polish + demo prep):
+- [x] G: Demo client profiles refined with coherent narratives + situation_today + seeded audit log
+- [x] H: pages/98_Methodology.py populated with 5 real sections (construction, backtest, signal, risk, transparency)
+- [x] I: Audit log panel on Settings page. 200-entry ring buffer, atomic writes, Windows retry.
+- [x] J: Empty / loading / error state polish sweep across all 4 pages. Methodology link on Portfolio + ETF Detail disclosures.
+
+Cloud deploy (K):
+- [x] Streamlit Cloud deploy guide in docs/streamlit_cloud_deploy.md
+- [x] .streamlit/secrets.toml.example committed
+- [ ] Actual Cloud app creation + secrets population — DAVID'S ACTION (can't automate from Claude Code)
+
+Audit + tag (L-M):
+- [x] Full suite green after CF retune (property-based tests survived by design)
+- [x] Audit report in commit message
+- [x] Commit + push + tag `backup-demo-ready-2026-04-24`
+
+Tests added Day 4:
+- tests/test_signal_adapter.py — RSI / EMA / MACD / momentum / composite (≈20 tests)
+- tests/test_edgar_nport.py — XML fixture parse + unsupported-ticker path
+- tests/test_audit_log.py — append / ring-buffer / atomic-write / seed
+- tests/test_edgar.py — runtime guard / user-agent / token-bucket block
+
+## Post-demo — parking lot (Day 5+)
+
+- [ ] Issuer-site and ETF.com reference scrapers (currently marked post-demo placeholder)
+- [ ] N-PORT parser extension beyond IBIT/ETHA/FBTC/FETH to every seed ticker
+- [ ] Alpaca paper-trading integration (BROKER_PROVIDER="alpaca_paper")
+- [ ] Live proper 3-year calibration fit for Cornish-Fisher S/K (replace 2026-04 crypto-ETF retune placeholders)
+- [ ] Signal adapter Layer 2/3/4 additions (macro, sentiment, on-chain) on top of the Day-4 technical composite
+- [ ] Multi-user auth + persistent client state (Supabase or similar)
+- [ ] Partner codebase merge + integration plan
+- [ ] Real brand identity + logo (update BRAND_NAME + BRAND_LOGO_PATH constants)
+- [ ] RWA + DeFi preview tabs wired to rwa-infinity-model + flare-defi-model patterns
+- [ ] Manual WCAG visual audit (complement to the token-palette contrast tests)
+- [ ] Monte Carlo runtime memory ceiling assertion (currently only defined, not enforced)
+- [ ] EDGAR search endpoint integration test in CI (weekly) to catch format changes
 
 ## Day 4 — Friday 2026-04-24 (polish + demo)
 

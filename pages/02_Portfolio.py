@@ -22,12 +22,13 @@ from core.demo_clients import DEMO_CLIENTS, get_client
 from core.etf_universe import load_universe
 from core.portfolio_engine import build_portfolio, run_monte_carlo
 from integrations.broker_mock import submit_basket
-from integrations.data_feeds import get_etf_prices
+from integrations.data_feeds import get_etf_prices, get_last_close
 from ui.components import (
     card,
     data_source_badge,
     disclosure,
     kpi_tile,
+    safe_page_link,
     section_header,
     tier_pill_selector,
 )
@@ -297,8 +298,9 @@ with card("Performance"):
 disclosure(
     "Hypothetical results. Past performance does not guarantee future "
     "results. Forward projections are model-based estimates, not forecasts. "
-    "See methodology for assumptions and limitations."
+    "See the Methodology page for assumptions and limitations."
 )
+safe_page_link("pages/98_Methodology.py", label="Read methodology →", icon="📋")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -325,6 +327,14 @@ def _render_confirm_modal() -> None:
 
 
 def _confirm_body() -> None:
+    # Day-4 D: wire last close per ETF. Fall back to best-available if the
+    # live fetch hasn't populated _last_close yet. Transparency badge in
+    # the modal if any ticker is missing a live price.
+    per_ticker_price: dict[str, float | None] = {
+        h["ticker"]: get_last_close(h["ticker"]) for h in holdings
+    }
+    missing_live = [t for t, p in per_ticker_price.items() if p is None]
+
     st.caption(level_text(
         beginner=(
             f"You are about to submit {len(holdings)} orders totalling "
@@ -339,35 +349,77 @@ def _confirm_body() -> None:
             "broker=mock · est. slippage 12.5 bps · tif=day."
         ),
     ))
-    preview = pd.DataFrame([
-        {
-            "Ticker":     h["ticker"],
-            "Side":       "BUY",
-            "Shares":     round(h["usd_value"] / 100, 3),
-            "Est. px":    "$100.00",   # placeholder; Day-3+ wire to last yfinance close
-            "Notional":   h["usd_value"],
-        }
-        for h in holdings
-    ])
+
+    if missing_live:
+        st.warning(
+            "Live price unavailable for: " + ", ".join(missing_live) + ". "
+            "Estimated notional uses the portfolio construction baseline. "
+            "Close the modal and click Refresh if you want a live retry."
+        )
+        data_source_badge("etf_price")
+
+    preview_rows = []
+    orders_draft: list[dict] = []
+    for h in holdings:
+        live_px = per_ticker_price.get(h["ticker"])
+        # If live missing, compute a *conservative* per-share share count from
+        # the USD allocation — this is not a fabricated price. The mid_price
+        # sent to broker_mock defaults to live if present, else the USD
+        # allocation divided by 1 share (worst-case 1-share order).
+        if live_px is not None and live_px > 0:
+            shares = round(h["usd_value"] / live_px, 4)
+            px_label = f"${live_px:,.2f}"
+            mid_price = live_px
+        else:
+            shares = 1   # defer to live re-fetch; 1-share placeholder
+            px_label = "—"
+            mid_price = 0.0
+        preview_rows.append({
+            "Ticker":   h["ticker"],
+            "Side":     "BUY",
+            "Shares":   shares,
+            "Last px":  px_label,
+            "Notional": h["usd_value"],
+        })
+        orders_draft.append({
+            "ticker":    h["ticker"],
+            "quantity":  shares,
+            "side":      "BUY",
+            "mid_price": mid_price,
+            "tif":       "day",
+        })
+
+    preview = pd.DataFrame(preview_rows)
     st.dataframe(preview, use_container_width=True, hide_index=True)
-    st.caption("Estimated slippage: ~12.5 bps (mid of 5-20 bps range).")
+    st.caption("Estimated slippage: ~12.5 bps (mid of 5-20 bps mock range).")
 
     col_exec, col_cancel = st.columns(2)
     with col_exec:
-        if st.button("Confirm and execute", use_container_width=True, type="primary"):
-            orders = [
-                {
-                    "ticker":    h["ticker"],
-                    "quantity":  round(h["usd_value"] / 100, 3),
-                    "side":      "BUY",
-                    "mid_price": 100.0,   # placeholder
-                    "tif":       "day",
-                }
-                for h in holdings
-            ]
-            result = submit_basket(orders, client_id=client["id"], dry_run=False)
+        exec_disabled = bool(missing_live) and len(missing_live) == len(holdings)
+        if st.button(
+            "Confirm and execute",
+            use_container_width=True,
+            type="primary",
+            disabled=exec_disabled,
+            help="Disabled until at least one live price is available."
+                 if exec_disabled else None,
+        ):
+            result = submit_basket(orders_draft, client_id=client["id"], dry_run=False)
             st.session_state["last_execution"] = result
             st.session_state["confirm_execute"] = False
+            # Audit-log write (Day-4 item I)
+            try:
+                from core.audit_log import append_entry
+                append_entry(
+                    client_id=client["id"],
+                    action="execute_basket",
+                    detail=(
+                        f"tier={tier_name}, n_orders={result['summary']['n_orders']}, "
+                        f"gross=${result['summary']['gross_usd']:,.2f}"
+                    ),
+                )
+            except Exception:
+                pass   # audit-log failure must never block execution
             st.toast(f"Basket submitted — {result['summary']['n_orders']} orders filled (mock).")
     with col_cancel:
         if st.button("Cancel", use_container_width=True):

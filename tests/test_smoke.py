@@ -35,6 +35,10 @@ def _fast_mc(monkeypatch):
     yield
 
 
+# Test-isolation reset fixture moved to conftest.py so it applies across
+# all test files.
+
+
 def _parses(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
     ast.parse(source, filename=str(path))

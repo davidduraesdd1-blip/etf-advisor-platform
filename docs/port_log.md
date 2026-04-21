@@ -115,6 +115,41 @@ post-hoc renormalization to preserve category total.
 nudge" per Day-3 directive. Numerical effect: +2pp / 0 / -2pp depending
 on issuer tier. Lands inside build_portfolio, not inside scoring.
 
+## Phase 3 — Day 4 (Thursday 2026-04-23) — calibration retune + live data wiring
+
+**cornish_fisher_var — RETUNED** per planning-side Day-4 Q3 direction.
+  S: -0.40 → -0.25 (ETFs less prone to regulatory-shutdown tails than RWA)
+  K:  1.00 →  2.50 (genuinely fatter-tailed than equity indices)
+  Rationale (from planning brief): "ETFs sit between equity indices
+  (S≈-0.10, K≈1.0) and illiquid tokenized RWA (S≈-0.40, K≈1.0 empirical
+  from Moody's RWA framework)". Post-demo: proper 3-year calibration fit
+  using BTC spot history + ETF tracking-error extrapolation.
+
+**CVaR multipliers — RETUNED.**
+  95%: 1.40 → 1.35
+  99%: 1.48 → 1.42
+  Rationale: between Student-t(5) illiquid-RWA calibration and Student-t(7)
+  equity calibration. Crypto-ETF tails narrower than RWA, wider than equity.
+
+**Magdon-Ismail MDD factor — RETUNED.**
+  f: 3.0 → 2.7
+  Rationale: ETFs recover faster than locked-up RWA (no redemption
+  windows, no custody-unwinding friction) but drawdowns are still more
+  persistent than equity index drawdowns in risk-off regimes.
+
+**signal_adapter.composite_signal — UPGRADED** from Phase-1 rule-based to
+  technical composite (Day-4 item B).
+  New primitives: rsi(closes, period=14) Wilder's smoothing, macd(closes,
+  12, 26, 9), momentum(closes, lookback=20), ema(values, period).
+  Composite: 0.45·RSI_score + 0.35·MACD_score + 0.20·Momentum_score.
+  Thresholds: BUY ≥ +0.30, SELL ≤ -0.30.
+  Phase-1 rule preserved as the `_phase1_fallback` path; labeled
+  `source='phase1_fallback'` in the returned dict so UI can surface.
+  Indicator math written from canonical textbook formulations — no
+  direct port from crypto-signal-app was needed (the source files there
+  had scoring helpers around already-computed indicator values, not the
+  indicator math itself).
+
 ## Dropped entirely (not ported)
 
 **CATEGORY_CORRELATIONS** (17×17 matrix) — RWA asset classes only.

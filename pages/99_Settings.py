@@ -19,6 +19,7 @@ from config import (
     ETF_PRICE_SOURCE,
     ETF_REFERENCE_SOURCE,
 )
+from core.audit_log import recent_entries
 from core.data_source_state import snapshot as dss_snapshot
 from core.demo_clients import DEMO_CLIENTS
 from core.etf_universe import SCANNER_STALE_HOURS, get_scanner_health
@@ -166,6 +167,34 @@ with card("Data-source state"):
         ], use_container_width=True, hide_index=True)
     else:
         st.caption("No categories touched yet this session.")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Recent actions (audit log)
+# ═══════════════════════════════════════════════════════════════════════════
+
+with card("Recent actions"):
+    st.caption(level_text(
+        beginner="Everything the advisor or the app has done on your clients' accounts recently.",
+        intermediate="Session + historical actions. Last 50 shown.",
+        advanced="Ring-buffered at 200 entries, oldest-first trim, atomic writes.",
+    ))
+    entries = recent_entries(limit=50)
+    if entries:
+        import pandas as _pd
+        df = _pd.DataFrame([
+            {
+                "When":    e.get("iso", "")[:19].replace("T", " "),
+                "User":    e.get("user", ""),
+                "Client":  e.get("client", ""),
+                "Action":  e.get("action", ""),
+                "Detail":  e.get("detail", ""),
+            }
+            for e in entries
+        ])
+        st.dataframe(df, use_container_width=True, hide_index=True)
+    else:
+        st.caption("No actions recorded yet this session.")
 
 
 # ═══════════════════════════════════════════════════════════════════════════

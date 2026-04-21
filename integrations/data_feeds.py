@@ -36,7 +36,11 @@ from config import (
     YF_CIRCUIT_BREAKER_THRESHOLD,
     YF_CIRCUIT_BREAKER_WINDOW_SEC,
 )
-from core.data_source_state import register_fetch_attempt
+from core.data_source_state import (
+    mark_cache_hit,
+    mark_static_fallback,
+    register_fetch_attempt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +49,15 @@ logger = logging.getLogger(__name__)
 _KNOWN_HISTORY_TICKERS: frozenset[str] = frozenset(
     e["ticker"] for e in ETF_UNIVERSE_SEED
 )
+
+# Day-4 Risk 2 mitigation: module-level memo of last-good fetch per ticker.
+# Keyed on (ticker, period, interval). Reduces yfinance hits during rapid
+# tier-switching in the UI. TTL respects CACHE_TTL["etf_price_market"].
+_yf_memo: dict[tuple[str, str, str], dict] = {}
+
+# Last-close cache for the Execute Basket modal (Day-4 item D). Populated
+# automatically by get_etf_prices; read by get_last_close().
+_last_close: dict[str, float] = {}
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Circuit breaker state (session-scoped, in-memory)
@@ -143,12 +156,24 @@ def get_etf_prices(
 
 
 def _fetch_single_ticker(ticker: str, period: str, interval: str) -> dict:
+    # Module-level memo — Day-4 Risk 2 mitigation for yfinance dev throttling.
+    memo_key = (ticker.upper(), period, interval)
+    memo_hit = _yf_memo.get(memo_key)
+    if memo_hit is not None:
+        age_sec = int(time.monotonic() - memo_hit["_mono"])
+        ttl = CACHE_TTL.get("etf_price_market", 300)
+        if age_sec < ttl:
+            return {k: v for k, v in memo_hit.items() if not k.startswith("_")}
+
     source = get_active_price_source()
     if source == "yfinance":
         data = _fetch_yfinance(ticker, period, interval)
         if data:
             register_fetch_attempt("etf_price", "yfinance", success=True)
-            return {"source": "yfinance", "prices": data}
+            _update_last_close(ticker, data)
+            result = {"source": "yfinance", "prices": data}
+            _yf_memo[memo_key] = {**result, "_mono": time.monotonic()}
+            return result
         register_fetch_attempt("etf_price", "yfinance", success=False,
                                note=f"{ticker}: empty or failed")
         _record_failure(ticker)
@@ -159,7 +184,10 @@ def _fetch_single_ticker(ticker: str, period: str, interval: str) -> dict:
         if data:
             register_fetch_attempt("etf_price", "stooq", success=True,
                                    note="fallback chain: primary yfinance unavailable")
-            return {"source": "stooq", "prices": data}
+            _update_last_close(ticker, data)
+            result = {"source": "stooq", "prices": data}
+            _yf_memo[memo_key] = {**result, "_mono": time.monotonic()}
+            return result
         register_fetch_attempt("etf_price", "stooq", success=False,
                                note=f"{ticker}: stooq returned empty")
 
@@ -167,11 +195,31 @@ def _fetch_single_ticker(ticker: str, period: str, interval: str) -> dict:
     if data:
         register_fetch_attempt("etf_price", "alphavantage", success=True,
                                note="fallback chain: yfinance + stooq unavailable")
-        return {"source": "alphavantage", "prices": data}
+        _update_last_close(ticker, data)
+        result = {"source": "alphavantage", "prices": data}
+        _yf_memo[memo_key] = {**result, "_mono": time.monotonic()}
+        return result
 
     register_fetch_attempt("etf_price", "none", success=False,
                            note=f"{ticker}: all live sources exhausted")
     return {"source": "unavailable", "prices": []}
+
+
+def _update_last_close(ticker: str, prices: list[dict]) -> None:
+    """Persist the most recent close for the Execute Basket modal."""
+    if not prices:
+        return
+    try:
+        last = float(prices[-1].get("close", 0))
+        if last > 0:
+            _last_close[ticker.upper()] = last
+    except (ValueError, TypeError, KeyError):
+        pass
+
+
+def get_last_close(ticker: str) -> float | None:
+    """Return the most recently cached close for a ticker, or None."""
+    return _last_close.get(ticker.upper())
 
 
 def _fetch_yfinance(ticker: str, period: str, interval: str) -> list[dict]:
@@ -283,20 +331,102 @@ def _df_to_rows(df: Any) -> list[dict]:
 # Reference data (holdings / AUM / expense ratio)
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Phase-1: returns the seed expense_ratio_bps dict baked into etf_universe.py.
-# Day-3 will wire this to EDGAR N-PORT parsing. Stub here so the fallback
-# chain shape is locked in from Day 2.
+# Day-4: live reference-data chain — EDGAR → issuer → ETF.com → seed.
+# Each step calls register_fetch_attempt so the UI can render the right
+# data_source_badge state per the transparency requirement.
 
-def get_etf_reference(ticker: str) -> dict | None:
+# 24hr memoization for reference data (changes rarely).
+_ref_memo: dict[str, dict] = {}
+_REF_MEMO_TTL = 86400
+
+
+def get_etf_reference(ticker: str) -> dict:
     """
-    Fetch reference data for a single ETF.
-    Phase-1 placeholder: returns the seed entry + known expense ratio.
-    Day-3 wires EDGAR / issuer / ETF.com in that fallback order.
+    Return reference data for a single ETF.
+
+    Shape:
+      {
+        "ticker":        str,
+        "name":          str,
+        "issuer":        str,
+        "category":      str,
+        "expense_ratio_bps": float | None,
+        "inception_date":    str | None,
+        "aum_usd":       float | None,
+        "source":        "edgar" | "issuer" | "etfcom" | "seed" | "unavailable",
+        "note":          str,
+      }
+
+    Live-first with graceful degradation. Never returns fabricated data —
+    missing fields come back as None and the UI surfaces the state via
+    data_source_badge.
     """
-    for etf in ETF_UNIVERSE_SEED:
-        if etf["ticker"].upper() == ticker.upper():
-            return dict(etf)
-    return None
+    tkr = ticker.upper()
+    now = time.monotonic()
+
+    # Memo hit
+    cached = _ref_memo.get(tkr)
+    if cached and (now - cached.get("_mono", 0)) < _REF_MEMO_TTL:
+        return {k: v for k, v in cached.items() if not k.startswith("_")}
+
+    seed_entry = next((e for e in ETF_UNIVERSE_SEED if e["ticker"].upper() == tkr), None)
+    base: dict = {
+        "ticker":            tkr,
+        "name":              seed_entry.get("name", tkr) if seed_entry else tkr,
+        "issuer":            seed_entry.get("issuer", "") if seed_entry else "",
+        "category":          seed_entry.get("category", "") if seed_entry else "",
+        "expense_ratio_bps": None,
+        "inception_date":    None,
+        "aum_usd":           None,
+        "source":            "unavailable",
+        "note":              "",
+    }
+
+    # ── Primary: EDGAR (via the shared N-PORT composition cache) ─────────────
+    try:
+        from integrations.edgar_nport import get_etf_composition
+        comp = get_etf_composition(tkr)
+        if comp.get("source") == "edgar_live":
+            base["aum_usd"] = comp.get("total_value_usd") or None
+            base["source"] = "edgar"
+            base["note"] = f"AUM derived from EDGAR N-PORT filing {comp.get('filing_date')}"
+            register_fetch_attempt("etf_reference", "edgar", success=True)
+            _ref_memo[tkr] = {**base, "_mono": now}
+            return base
+        register_fetch_attempt("etf_reference", "edgar", success=False,
+                               note=f"N-PORT returned source={comp.get('source')}")
+    except Exception as exc:
+        logger.info("EDGAR reference path failed for %s: %s", tkr, exc)
+        register_fetch_attempt("etf_reference", "edgar", success=False,
+                               note=f"{type(exc).__name__}")
+
+    # ── Secondary: issuer-site scrape (not wired in Day 4 — placeholder) ─────
+    # Post-demo: implement per-issuer scrapers. For now, the issuer chain
+    # records a miss and moves on. This keeps the architecture honest.
+    register_fetch_attempt("etf_reference", "issuer", success=False,
+                           note="issuer-site scraper lands post-demo")
+
+    # ── Tertiary: ETF.com (not wired in Day 4 — placeholder) ─────────────────
+    register_fetch_attempt("etf_reference", "etfcom", success=False,
+                           note="ETF.com scraper lands post-demo")
+
+    # ── Final: seed-file + mark as CACHED transparency state ─────────────────
+    if seed_entry:
+        # Seed expense_ratio comes from etf_universe._EXPENSE_RATIO_BPS
+        from core.etf_universe import _EXPENSE_RATIO_BPS
+        base["expense_ratio_bps"] = _EXPENSE_RATIO_BPS.get(tkr)
+        base["source"] = "seed"
+        base["note"] = "Live EDGAR reference unavailable — showing seed-file defaults."
+        mark_cache_hit("etf_reference", age_seconds=0,
+                       source_name="seed",
+                       note="seed-file fallback after live EDGAR miss")
+        _ref_memo[tkr] = {**base, "_mono": now}
+        return base
+
+    mark_static_fallback("etf_reference",
+                         note=f"No live or seed data for {tkr}")
+    base["note"] = "No data available for this ticker."
+    return base
 
 
 # ═══════════════════════════════════════════════════════════════════════════

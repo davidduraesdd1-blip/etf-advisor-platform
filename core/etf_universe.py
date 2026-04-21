@@ -41,6 +41,11 @@ from config import (
     ETF_UNIVERSE_SEED,
 )
 from core.data_source_state import register_fetch_attempt
+from integrations.edgar import (
+    assert_edgar_configured as _assert_edgar_shared,
+    take_token as _edgar_take_token_shared,
+    user_agent as _edgar_user_agent_shared,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,50 +67,19 @@ _CRYPTO_KEYWORDS = (
 )
 _CRYPTO_FORM_TYPES = ("N-1A", "497", "S-1")
 
-# ── EDGAR token bucket (in-memory, simple) ───────────────────────────────────
-_edgar_tokens: dict[str, Any] = {
-    "tokens": float(EDGAR_REQS_PER_SEC),
-    "last_refill": time.time(),
-}
-
+# EDGAR rate limiting + User-Agent + runtime guard all live in integrations.edgar now.
+# Thin wrappers retained so tests that monkeypatch these names still work.
 
 def _edgar_take_token() -> None:
-    """Simple token-bucket limiter — blocks the caller if bucket is empty."""
-    now = time.time()
-    elapsed = now - _edgar_tokens["last_refill"]
-    _edgar_tokens["tokens"] = min(
-        float(EDGAR_REQS_PER_SEC),
-        _edgar_tokens["tokens"] + elapsed * EDGAR_REQS_PER_SEC,
-    )
-    _edgar_tokens["last_refill"] = now
-
-    while _edgar_tokens["tokens"] < 1.0:
-        sleep_for = (1.0 - _edgar_tokens["tokens"]) / EDGAR_REQS_PER_SEC
-        time.sleep(sleep_for)
-        now2 = time.time()
-        elapsed = now2 - _edgar_tokens["last_refill"]
-        _edgar_tokens["tokens"] = min(
-            float(EDGAR_REQS_PER_SEC),
-            _edgar_tokens["tokens"] + elapsed * EDGAR_REQS_PER_SEC,
-        )
-        _edgar_tokens["last_refill"] = now2
-    _edgar_tokens["tokens"] -= 1.0
+    _edgar_take_token_shared()
 
 
 def _edgar_user_agent() -> str:
-    """SEC-policy-compliant User-Agent header."""
-    return f"ETF-Advisor-Platform {EDGAR_CONTACT_EMAIL}"
+    return _edgar_user_agent_shared()
 
 
 def _assert_edgar_configured() -> None:
-    """Planning-side Mod 2 runtime guard — fail loudly on placeholder email."""
-    if EDGAR_CONTACT_EMAIL == _EDGAR_PLACEHOLDER or not EDGAR_CONTACT_EMAIL.strip():
-        raise RuntimeError(
-            "EDGAR_CONTACT_EMAIL is still the placeholder "
-            f"({EDGAR_CONTACT_EMAIL!r}). SEC requires an identifiable contact "
-            "email in the User-Agent header. Update config.py before running "
-            "daily_scanner() against live EDGAR."
-        )
+    _assert_edgar_shared()
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -18,11 +18,13 @@ from core.etf_universe import load_universe
 from core.portfolio_engine import build_portfolio, run_monte_carlo
 from core.signal_adapter import composite_signal
 from integrations.data_feeds import get_etf_prices
+from integrations.edgar_nport import SUPPORTED_TICKERS as NPORT_TICKERS, get_etf_composition
 from ui.components import (
     card,
     data_source_badge,
     disclosure,
     kpi_tile,
+    safe_page_link,
     section_header,
     signal_badge,
 )
@@ -46,7 +48,21 @@ universe = load_universe()
 tickers = [u["ticker"] for u in universe]
 chosen = st.selectbox("Ticker", options=tickers, index=0)
 etf = next(u for u in universe if u["ticker"] == chosen)
-sig = composite_signal(etf)
+
+# Fetch live price history so signal_adapter can run its Day-4 upgrade
+# path (RSI + MACD + momentum). If history is unavailable the adapter
+# falls back to Phase-1 internally and labels the source accordingly.
+price_bundle = get_etf_prices([chosen], period="1y", interval="1d")
+close_series: list[float] = []
+for row in price_bundle.get(chosen, {}).get("prices", []):
+    try:
+        c = float(row.get("close"))
+        if c > 0:
+            close_series.append(c)
+    except (TypeError, ValueError):
+        continue
+
+sig = composite_signal(etf, closes=close_series if len(close_series) >= 35 else None)
 
 
 # Header row: ticker info + signal
@@ -56,11 +72,46 @@ with col_id:
     st.caption(f"{etf['issuer']} · {etf['category']}")
 with col_sig:
     signal_badge(sig["signal"])
+    src_label = {
+        "technical_composite": "RSI + MACD + momentum",
+        "phase1_fallback":     "category defaults (no live history)",
+    }.get(sig.get("source", ""), sig.get("source", ""))
     st.caption(level_text(
         beginner=sig["plain_english"],
-        intermediate=f"{sig['signal']} · score {sig['score']}",
-        advanced=f"{sig['signal']} · score {sig['score']} · Phase-1 rule-based",
+        intermediate=f"{sig['signal']} · score {sig['score']} · {src_label}",
+        advanced=f"{sig['signal']} · score {sig['score']} · source={sig.get('source','')}",
     ))
+
+# Technical-indicator breakdown when the composite path was taken.
+if sig.get("source") == "technical_composite" and sig.get("components"):
+    comps = sig["components"]
+    with card("Signal components"):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            kpi_tile("RSI(14)", f"{comps['rsi_value']:.1f}",
+                     delta=f"score {comps['rsi_score']:+.2f}")
+        with c2:
+            kpi_tile("MACD histogram", f"{comps['macd_hist']:.3f}",
+                     delta=f"score {comps['macd_score']:+.2f}")
+        with c3:
+            kpi_tile("Momentum (20d)", f"{comps['mom_pct']:.1f}%",
+                     delta=f"score {comps['mom_score']:+.2f}")
+        st.caption(level_text(
+            beginner=(
+                "Three simple checks: is the price cheap or expensive "
+                "relative to its recent range (RSI), is the trend turning "
+                "up or down (MACD), and how much has it moved in the last "
+                "month (momentum)?"
+            ),
+            intermediate=(
+                "Weighted composite: 45% RSI + 35% MACD histogram + 20% "
+                "20-day momentum. Thresholds: BUY ≥ +0.30, SELL ≤ −0.30."
+            ),
+            advanced=(
+                "RSI(14) Wilder's smoothing · MACD(12,26,9) · "
+                "simple 20-period momentum. Per-indicator scores in [−1,+1]."
+            ),
+        ))
 
 
 # KPI tiles
@@ -124,21 +175,65 @@ with card("Historical returns"):
         with c4: kpi_tile("Data points", f"{len(df):,}")
 
 
-# Composition (Phase-1: category-level; Phase-2 ETFs will have real N-PORT holdings)
+# Composition — live from SEC EDGAR N-PORT when available (IBIT/ETHA/FBTC/FETH).
+# Non-supported tickers fall back to a category-level summary. Transparency
+# badge shows LIVE / FALLBACK_LIVE / CACHED state per Day-4 design directive.
 with card("Composition"):
-    category = etf.get("category", "")
-    if category == "btc_spot":
-        st.write("100% Bitcoin (spot) — custodied by the issuer.")
-    elif category == "eth_spot":
-        st.write("100% Ethereum (spot) — custodied by the issuer.")
-    elif category == "btc_futures":
-        st.write("Bitcoin futures contracts (CME). No spot BTC holdings.")
+    data_source_badge("etf_composition")
+
+    if chosen in NPORT_TICKERS:
+        comp = get_etf_composition(chosen)
+        if comp["source"] == "edgar_live":
+            st.caption(
+                f"Live from SEC EDGAR N-PORT filing · "
+                f"dated {comp['filing_date']} · accession {comp['accession']}"
+            )
+        elif comp["source"] == "cached":
+            st.info(comp["note"])
+        else:
+            st.info(comp["note"])
+
+        if comp["holdings"]:
+            import pandas as _pd
+            df = _pd.DataFrame([
+                {
+                    "Name":       h.get("name", ""),
+                    "Asset cat":  h.get("asset_cat", ""),
+                    "Balance":    h.get("balance"),
+                    "Value USD":  h.get("value_usd", 0),
+                    "% of fund":  h.get("pct_value"),
+                }
+                for h in comp["holdings"]
+            ])
+            st.dataframe(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Value USD": st.column_config.NumberColumn(format="$%,.0f"),
+                    "% of fund": st.column_config.NumberColumn(format="%.2f%%"),
+                },
+            )
+            st.caption(f"Total holdings: {comp['holdings_count']}")
     else:
-        st.write("Thematic / multi-asset. Holdings available from the issuer's site.")
+        category = etf.get("category", "")
+        if category == "btc_spot":
+            st.write("Summary view: Bitcoin spot exposure, custodied by the issuer.")
+        elif category == "eth_spot":
+            st.write("Summary view: Ethereum spot exposure, custodied by the issuer.")
+        elif category == "btc_futures":
+            st.write("Summary view: Bitcoin futures (CME). No spot BTC holdings.")
+        else:
+            st.write("Summary view: thematic / multi-asset exposure.")
+        st.caption(
+            "Live EDGAR N-PORT holdings are wired for IBIT / ETHA / FBTC / FETH "
+            "in the demo scope. Full issuer coverage lands post-demo."
+        )
+
     st.caption(level_text(
         beginner="This shows what the fund holds under the hood.",
-        intermediate="Holdings update as SEC EDGAR N-PORT filings arrive (quarterly).",
-        advanced="Day-4 wires get_etf_reference() → EDGAR / issuer / ETF.com fallback chain for live holdings.",
+        intermediate="Holdings come from SEC EDGAR N-PORT filings (quarterly cadence).",
+        advanced="EDGAR N-PORT parser with 7-day disk cache; token-bucket rate-limited; fallback chain marks CACHED state in data_source_state.",
     ))
 
 
@@ -180,6 +275,7 @@ with card("Forward projection"):
 
 disclosure(
     "Hypothetical results. Past performance does not guarantee future "
-    "results. Signal shown is a Phase-1 rule-based composite; full "
-    "coin-level indicator wiring lands Day 4+."
+    "results. Technical signals are model-based estimates, not forecasts. "
+    "See the Methodology page for assumptions and indicator definitions."
 )
+safe_page_link("pages/98_Methodology.py", label="Read methodology →", icon="📋")

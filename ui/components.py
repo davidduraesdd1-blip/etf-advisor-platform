@@ -169,3 +169,18 @@ def tier_pill_selector(options: list[str], default_index: int = 2,
         horizontal=True,
         key=key,
     )
+
+
+def safe_page_link(page: str, label: str, icon: str | None = None) -> None:
+    """
+    Render an st.page_link, tolerating Streamlit AppTest's missing
+    page-registry context. AppTest raises `KeyError: 'url_pathname'`
+    because pages sibling to the one under test aren't registered.
+    In a real browser the link renders normally.
+    """
+    try:
+        st.page_link(page, label=label, icon=icon)
+    except KeyError:
+        st.caption(f"{icon or '→'} {label} — `{page}`")
+    except Exception:
+        st.caption(f"→ {label}")

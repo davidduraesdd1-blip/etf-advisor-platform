@@ -10,6 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from config import BRAND_NAME, DEMO_MODE
+from core.audit_log import seed_demo_entries
 from core.demo_clients import DEMO_CLIENTS
 from ui.components import (
     card,
@@ -40,6 +41,12 @@ if not DEMO_MODE:
         "real client-data integration to render useful data."
     )
     st.stop()
+
+# Seed the audit log with illustrative history on first visit.
+try:
+    seed_demo_entries(DEMO_CLIENTS)
+except Exception:
+    pass   # Seed failure is not demo-blocking
 
 # Data-source transparency — consume this page's primary data. In demo
 # mode clients are local; prices come from data_feeds which registers
@@ -94,11 +101,26 @@ with card("Open client portfolio"):
     )
     chosen_id = client_options[chosen]
     c = next(x for x in DEMO_CLIENTS if x["id"] == chosen_id)
+    situation = c.get("situation_today", "")
     st.caption(level_text(
-        beginner=f"Open {c['name']}'s portfolio to see allocation, performance, and the Execute Basket workflow.",
-        intermediate=f"Tier: {c['assigned_tier']} · Drift {c['drift_pct']}% · Crypto sleeve {c['crypto_allocation_pct']}%.",
-        advanced=f"Drift {c['drift_pct']}% · last rebalance {c['last_rebalance_iso'][:10]} · notes: {c['notes']}",
+        beginner=(
+            f"Open {c['name']}'s portfolio to see allocation, performance, "
+            f"and the Execute Basket workflow."
+        ),
+        intermediate=(
+            f"Tier: {c['assigned_tier']} · Drift {c['drift_pct']}% · "
+            f"Crypto sleeve {c['crypto_allocation_pct']}%. "
+            + (f"Today: {situation}" if situation else "")
+        ),
+        advanced=(
+            f"Drift {c['drift_pct']}% · last rebalance {c['last_rebalance_iso'][:10]} · "
+            f"tier {c['assigned_tier']} · ${c['total_portfolio_usd']:,.0f} total."
+        ),
     ))
+    if situation:
+        with st.expander("Client context"):
+            st.write(c.get("notes", ""))
+            st.info(f"**Today:** {situation}")
     # Stash the client selection in session_state so the Portfolio page can read it
     if st.button(f"Open {c['name']}'s portfolio →", use_container_width=True):
         st.session_state["active_client_id"] = chosen_id

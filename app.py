@@ -21,7 +21,7 @@ from config import (
     USER_LEVELS,
 )
 from ui.theme import apply_theme, current_theme, toggle_theme
-from ui.components import card, disclosure
+from ui.components import card, disclosure, safe_page_link
 
 
 # ─── Page config ──────────────────────────────────────────────────────────────
@@ -106,15 +106,15 @@ def _render_home() -> None:
     with col1:
         with card("Dashboard"):
             st.write("Client list, rebalance flags, recent actions.")
-            st.page_link("pages/01_Dashboard.py", label="Open dashboard →")
+            safe_page_link("pages/01_Dashboard.py", label="Open dashboard →")
     with col2:
         with card("Portfolio"):
             st.write("Build a risk-tiered ETF basket for a client.")
-            st.page_link("pages/02_Portfolio.py", label="Open portfolio →")
+            safe_page_link("pages/02_Portfolio.py", label="Open portfolio →")
     with col3:
         with card("ETF detail"):
             st.write("Drill into a single ETF: signal, holdings, backtest.")
-            st.page_link("pages/03_ETF_Detail.py", label="Open ETF detail →")
+            safe_page_link("pages/03_ETF_Detail.py", label="Open ETF detail →")
 
     disclosure(
         "Hypothetical results. Past performance does not guarantee future "
