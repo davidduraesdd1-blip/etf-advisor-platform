@@ -281,18 +281,72 @@ class TestMonteCarloDeterminismLock:
 # ETH correlation guard (planning-side Risk 2)
 # ═══════════════════════════════════════════════════════════════════════════
 
-class TestEthCorrelationGuard:
-    def test_eth_ticker_emits_warning(self, caplog):
+class TestPhase2GuardRemoval:
+    """Day-3: Phase-1 ETH correlation guard is gone. No warnings expected."""
+
+    def test_eth_ticker_no_longer_emits_phase1_warning(self, caplog):
         import logging
         caplog.set_level(logging.WARNING, logger="core.portfolio_engine")
         build_portfolio("Moderate", MINIMAL_UNIVERSE, 100_000)
         warnings = [r for r in caplog.records if "PHASE 1 GUARD" in r.message]
-        assert warnings, "Expected PHASE 1 GUARD warning for ETH-correlated ETF"
+        assert not warnings, (
+            "PHASE 1 GUARD warning still emitted — it was removed on Day 3 "
+            "when pairwise correlation shipped. Check portfolio_engine.py."
+        )
 
-    def test_btc_only_universe_no_warning(self, caplog):
-        import logging
-        btc_only = [u for u in MINIMAL_UNIVERSE if u["category"] == "btc_spot"]
-        caplog.set_level(logging.WARNING, logger="core.portfolio_engine")
-        build_portfolio("Ultra Conservative", btc_only, 100_000)
-        warnings = [r for r in caplog.records if "PHASE 1 GUARD" in r.message]
-        assert not warnings, "Unexpected guard warning for BTC-only universe"
+
+class TestPhase2PairwiseCorrelation:
+    """Day-3 Phase 2: full pairwise covariance + issuer-tier preference."""
+
+    def test_covariance_matrix_is_symmetric(self):
+        from core.portfolio_engine import _build_covariance_matrix
+        holdings = [
+            {"ticker": "IBIT", "category": "btc_spot", "volatility_pct": 55.0,
+             "issuer": "BlackRock"},
+            {"ticker": "ETHA", "category": "eth_spot", "volatility_pct": 70.0,
+             "issuer": "BlackRock"},
+            {"ticker": "DEFI", "category": "btc_futures", "volatility_pct": 58.0,
+             "issuer": "Hashdex"},
+        ]
+        cov = _build_covariance_matrix(holdings)
+        for i in range(len(holdings)):
+            for j in range(len(holdings)):
+                assert abs(cov[i, j] - cov[j, i]) < 1e-9
+
+    def test_same_category_correlation_exceeds_cross_category(self):
+        """btc_spot <-> btc_spot should correlate higher than btc_spot <-> eth_spot."""
+        from core.portfolio_engine import _pair_corr
+        assert _pair_corr("btc_spot", "btc_spot") > _pair_corr("btc_spot", "eth_spot")
+        assert _pair_corr("eth_spot", "eth_spot") > _pair_corr("btc_spot", "eth_spot")
+
+    def test_same_issuer_gets_corr_boost(self):
+        from core.portfolio_engine import _build_covariance_matrix
+        same_issuer = [
+            {"ticker": "IBIT", "category": "btc_spot", "volatility_pct": 55.0, "issuer": "BlackRock"},
+            {"ticker": "FBTC_fake", "category": "btc_spot", "volatility_pct": 55.0, "issuer": "BlackRock"},
+        ]
+        diff_issuer = [
+            {"ticker": "IBIT", "category": "btc_spot", "volatility_pct": 55.0, "issuer": "BlackRock"},
+            {"ticker": "FBTC", "category": "btc_spot", "volatility_pct": 55.0, "issuer": "Fidelity"},
+        ]
+        cov_same = _build_covariance_matrix(same_issuer)
+        cov_diff = _build_covariance_matrix(diff_issuer)
+        assert cov_same[0, 1] >= cov_diff[0, 1]
+
+
+class TestIssuerTierNudge:
+    def test_tier_a_issuer_gets_positive_nudge(self):
+        from core.portfolio_engine import _issuer_tier_nudge
+        assert _issuer_tier_nudge({"ticker": "IBIT", "issuer": "BlackRock"}) > 0
+        assert _issuer_tier_nudge({"ticker": "FBTC", "issuer": "Fidelity"}) > 0
+
+    def test_tier_c_legacy_etfs_get_negative_nudge(self):
+        from core.portfolio_engine import _issuer_tier_nudge
+        assert _issuer_tier_nudge({"ticker": "GBTC", "issuer": "Grayscale"}) < 0
+        assert _issuer_tier_nudge({"ticker": "ETHE", "issuer": "Grayscale"}) < 0
+        assert _issuer_tier_nudge({"ticker": "DEFI", "issuer": "Hashdex"}) < 0
+
+    def test_tier_b_gets_neutral_nudge(self):
+        from core.portfolio_engine import _issuer_tier_nudge
+        assert _issuer_tier_nudge({"ticker": "BITB", "issuer": "Bitwise"}) == 0
+        assert _issuer_tier_nudge({"ticker": "HODL", "issuer": "VanEck"}) == 0

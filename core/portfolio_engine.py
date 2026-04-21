@@ -45,6 +45,11 @@ from config import (
     MONTE_CARLO_PATHS_RETAIN,
     PORTFOLIO_TIERS,
 )
+from core.data_source_state import (
+    mark_cache_hit,
+    mark_static_fallback,
+    register_fetch_attempt,
+)
 from core.risk_tiers import (
     MAX_ETFS_PER_CATEGORY,
     MAX_SINGLE_POSITION_PCT,
@@ -82,6 +87,13 @@ def get_live_risk_free_rate() -> float:
     """
     now = time.time()
     if _rfr_cache["rate"] is not None and now - _rfr_cache["ts"] < _RFR_CACHE_TTL:
+        age_seconds = int(now - _rfr_cache["ts"])
+        # Still fresh — classify as LIVE if last successful fetch was from FRED
+        # primary; CACHED if cache is older than 15 min so UI can show the age.
+        if age_seconds < 900:
+            return float(_rfr_cache["rate"])
+        mark_cache_hit("risk_free_rate", age_seconds=age_seconds,
+                       note="FRED cache still valid; next refresh on TTL expiry.")
         return float(_rfr_cache["rate"])
 
     try:
@@ -108,12 +120,17 @@ def get_live_risk_free_rate() -> float:
             if 0 < val < 20:
                 _rfr_cache["rate"] = val
                 _rfr_cache["ts"] = now
+                register_fetch_attempt("risk_free_rate", "fred", success=True)
                 return val
     except Exception as exc:
         logger.debug("FRED risk-free rate fetch failed: %s", exc)
+        register_fetch_attempt("risk_free_rate", "fred", success=False,
+                               note=f"FRED fetch error: {type(exc).__name__}")
 
     _rfr_cache["rate"] = RISK_FREE_RATE_FALLBACK
     _rfr_cache["ts"] = now
+    mark_static_fallback("risk_free_rate",
+                         note=f"FRED unavailable — using static {RISK_FREE_RATE_FALLBACK}% fallback.")
     return RISK_FREE_RATE_FALLBACK
 
 
@@ -152,27 +169,83 @@ def cornish_fisher_var(
 # Portfolio construction
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _phase1_eth_correlation_guard(universe: list[dict]) -> None:
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 2: pairwise correlation matrix + issuer-tier preference weighting
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Issuer tiers (Day-3 Phase-2 directive).
+# Tier A +2% allocation nudge, Tier C -2% nudge, Tier B neutral.
+_ISSUER_TIER_A: frozenset[str] = frozenset({"BlackRock", "Fidelity"})
+_ISSUER_TIER_C_TICKERS: frozenset[str] = frozenset({
+    "GBTC",   # Grayscale legacy high-fee BTC (150 bps)
+    "ETHE",   # Grayscale legacy high-fee ETH (250 bps)
+    "DEFI",   # Hashdex futures-based, not spot — structural Tier C
+})
+# Everything else → Tier B (neutral).
+
+_TIER_A_NUDGE: float = +2.0
+_TIER_B_NUDGE: float =  0.0
+_TIER_C_NUDGE: float = -2.0
+
+
+def _issuer_tier_nudge(etf: dict) -> float:
+    """Return the issuer-tier allocation nudge (pct points) for an ETF."""
+    if etf.get("ticker") in _ISSUER_TIER_C_TICKERS:
+        return _TIER_C_NUDGE
+    if etf.get("issuer") in _ISSUER_TIER_A:
+        return _TIER_A_NUDGE
+    return _TIER_B_NUDGE
+
+
+# Category-pair correlation targets (Phase-2 pairwise model).
+# Applied on top of each ETF's individual volatility to build the full NxN cov matrix.
+_CATEGORY_PAIR_CORR: dict[tuple[str, str], float] = {
+    ("btc_spot",    "btc_spot"):    0.97,    # same-underlying spot, different issuers
+    ("eth_spot",    "eth_spot"):    0.95,
+    ("btc_futures", "btc_futures"): 0.95,
+    ("thematic",    "thematic"):    0.85,
+
+    ("btc_spot",    "eth_spot"):    0.75,    # BTC↔ETH cluster crossover
+    ("btc_spot",    "btc_futures"): 0.92,    # same-underlying different structure
+    ("btc_spot",    "thematic"):    0.72,
+    ("eth_spot",    "btc_futures"): 0.72,
+    ("eth_spot",    "thematic"):    0.74,
+    ("btc_futures", "thematic"):    0.70,
+}
+
+
+def _pair_corr(cat_i: str, cat_j: str) -> float:
+    """Lookup pairwise correlation between two categories (symmetric)."""
+    if cat_i == cat_j:
+        return _CATEGORY_PAIR_CORR.get((cat_i, cat_j), 0.90)
+    key = (cat_i, cat_j) if (cat_i, cat_j) in _CATEGORY_PAIR_CORR else (cat_j, cat_i)
+    return _CATEGORY_PAIR_CORR.get(key, 0.70)
+
+
+def _build_covariance_matrix(holdings: list[dict]) -> np.ndarray:
     """
-    Planning-side Risk 2: Phase-1 uses a single correlation_with_btc field
-    which miscalibrates ETH-based ETFs. Warn loudly whenever such tickers
-    are in the universe so UI layer knows the output is not client-ready.
-    Remove this guard when Phase 2 pairwise correlation lands.
+    Phase-2 pairwise covariance: cov[i,j] = corr(cat_i, cat_j) * vol_i * vol_j.
+
+    Same-issuer holdings within a category get a small extra correlation
+    boost (+0.02) — operational overlap (custodian, rehypothecation path).
     """
-    eth_like = [
-        u["ticker"] for u in universe
-        if u.get("ticker", "").upper().startswith("ETH")
-        or "ethereum" in str(u.get("name", "")).lower()
-    ]
-    if eth_like:
-        logger.warning(
-            "PHASE 1 GUARD: universe contains ETH-correlated ETFs (%s). "
-            "Phase-1 portfolio engine uses correlation_with_btc uniformly, "
-            "which miscalibrates ETH-based tickers. Output is NOT "
-            "client-display-ready. Remove guard when Phase 2 pairwise "
-            "correlation ships.",
-            eth_like,
-        )
+    n = len(holdings)
+    cov = np.zeros((n, n))
+    vols = np.array([h["volatility_pct"] for h in holdings], dtype=float)
+    cats = [h["category"] for h in holdings]
+    issuers = [h.get("issuer", "") for h in holdings]
+
+    for i in range(n):
+        cov[i, i] = vols[i] ** 2
+        for j in range(i + 1, n):
+            base = _pair_corr(cats[i], cats[j])
+            # Same-issuer boost within the same category
+            if cats[i] == cats[j] and issuers[i] and issuers[i] == issuers[j]:
+                base = min(0.99, base + 0.02)
+            cov_ij = base * vols[i] * vols[j]
+            cov[i, j] = cov_ij
+            cov[j, i] = cov_ij
+    return cov
 
 
 def _select_etfs_for_category(
@@ -244,7 +317,9 @@ def build_portfolio(
     if not universe:
         return _empty_portfolio(tier_name, portfolio_value_usd)
 
-    _phase1_eth_correlation_guard(universe)
+    # Phase-1 ETH correlation guard removed on Day 3 — pairwise correlation
+    # model (Phase 2) handles ETH-based ETFs correctly without a blanket
+    # warning. See docs/port_log.md for the disposition record.
 
     tier_meta = PORTFOLIO_TIERS.get(tier_name)
     if tier_meta is None:
@@ -266,8 +341,18 @@ def build_portfolio(
             continue
 
         per_asset_weight = cat_weight / len(chosen)
+
+        # Phase-2 issuer-tier preference nudge: apply +/- within the
+        # category, then renormalize so the category total still equals cat_weight.
+        raw_weights: list[float] = []
         for etf in chosen:
-            weight = min(per_asset_weight, MAX_SINGLE_POSITION_PCT)
+            nudge = _issuer_tier_nudge(etf)
+            raw = max(0.5, per_asset_weight + nudge)   # floor to keep it positive
+            raw_weights.append(raw)
+        scale = cat_weight / sum(raw_weights) if sum(raw_weights) > 0 else 0
+        adjusted = [min(w * scale, MAX_SINGLE_POSITION_PCT) for w in raw_weights]
+
+        for etf, weight in zip(chosen, adjusted):
             usd_val = portfolio_value_usd * weight / 100
             holdings.append({
                 "ticker":               etf["ticker"],
@@ -280,6 +365,7 @@ def build_portfolio(
                 "volatility_pct":       float(etf.get("volatility", 0.0)),
                 "correlation_with_btc": float(etf.get("correlation_with_btc", 1.0)),
                 "expense_ratio_bps":    etf.get("expense_ratio_bps"),
+                "issuer_tier_nudge":    _issuer_tier_nudge(etf),
             })
             used_weight_pct += weight
 
@@ -357,11 +443,15 @@ def compute_portfolio_metrics(
     var_99_pct, cvar_95_pct, cvar_99_pct, diversification_ratio,
     excess_return_pct, n_holdings.
 
-    Phase 1 correlation model (simplified; Phase 2 introduces full pairwise):
-      same category → 0.85
-      cross category, both BTC-linked → approximate from correlation_with_btc
-      cross category, one ETH-linked → 0.55 (ETH/BTC historic average)
-      else → 0.30
+    Phase-2 correlation model: full pairwise via _build_covariance_matrix.
+    Retuned cluster targets per Day-3 directive:
+      btc_spot internal:    0.97
+      eth_spot internal:    0.95
+      btc_futures internal: 0.95
+      thematic internal:    0.85
+      btc_spot ↔ eth_spot:  0.75  (BTC↔ETH cluster crossover)
+      btc_spot ↔ futures:   0.92  (same underlying, different structure)
+      Same-issuer within category: +0.02 boost (operational overlap).
     """
     if not holdings:
         return _empty_metrics()
@@ -370,31 +460,13 @@ def compute_portfolio_metrics(
     weights = np.array([h["weight_pct"] / 100 for h in holdings])
     returns = np.array([h["expected_return_pct"] for h in holdings], dtype=float)
     vols    = np.array([h["volatility_pct"] for h in holdings], dtype=float)
-    cats    = [h["category"] for h in holdings]
-    corr_btc = np.array([h["correlation_with_btc"] for h in holdings], dtype=float)
 
     # Portfolio expected return
     weighted_return = float(np.dot(weights, returns))
     annual_return_usd = portfolio_value * weighted_return / 100
 
-    # Covariance matrix — Phase-1 simplified buckets
-    cov_matrix = np.zeros((n, n))
-    for i in range(n):
-        for j in range(n):
-            if i == j:
-                cov_matrix[i, j] = vols[i] ** 2
-                continue
-            if cats[i] == cats[j]:
-                corr = 0.85
-            else:
-                eth_i = cats[i] == "eth_spot"
-                eth_j = cats[j] == "eth_spot"
-                if eth_i or eth_j:
-                    corr = 0.55     # ETH/BTC historic cross-correlation
-                else:
-                    corr = float(corr_btc[i] * corr_btc[j])
-                    corr = max(-0.95, min(0.95, corr))
-            cov_matrix[i, j] = corr * vols[i] * vols[j]
+    # Covariance matrix — Phase-2 pairwise
+    cov_matrix = _build_covariance_matrix(holdings)
 
     portfolio_var = float(weights @ cov_matrix @ weights)
     portfolio_vol = math.sqrt(max(portfolio_var, 0))

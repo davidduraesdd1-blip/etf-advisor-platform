@@ -52,13 +52,20 @@ SENTRY_DSN: str | None = os.environ.get("SENTRY_DSN")
 # ── Design tokens (CLAUDE.md §8) ──────────────────────────────────────────────
 COLORS: dict[str, str] = {
     "primary": "#00d4aa",   # teal
-    "success": "#22c55e",   # green
-    "danger": "#ef4444",    # red
+    "success": "#22c55e",   # green (brand; used on dark backgrounds)
+    "danger": "#ef4444",    # red (brand; used on dark backgrounds)
     "warning": "#f59e0b",   # amber
     "dark_bg": "#0d0e14",
     "dark_card": "#111827",
     "light_bg": "#f1f5f9",
     "light_card": "#ffffff",
+
+    # Darker variants used specifically for badge text on tinted-white
+    # backgrounds in light mode so WCAG AA contrast is met (3:1 for
+    # non-text UI). The brand greens/reds above are kept for dark mode.
+    "success_on_light": "#15803d",   # WCAG AA vs tinted white
+    "danger_on_light":  "#b91c1c",
+    "warning_on_light": "#b45309",
 }
 
 # Typography clamp() floors — never cross these minimums.
@@ -175,10 +182,14 @@ BENCHMARK_DEFAULT: dict[str, float] = {
 EDGAR_REQS_PER_SEC: int = 10              # SEC hard cap
 YFINANCE_TICKERS_PER_CALL: int = 50       # batch ceiling to be safe
 
-# ── SEC EDGAR identifier (Day-2 Mod 2) ───────────────────────────────────────
-# SEC requires an identifiable User-Agent with contact email for all programmatic
-# access. daily_scanner() raises RuntimeError if this is still the placeholder.
-EDGAR_CONTACT_EMAIL: str = "REPLACE_BEFORE_DEPLOY@example.com"
+# ── SEC EDGAR identifier (Day-2 Mod 2 / Day-3 Q2 env override) ───────────────
+# SEC requires an identifiable User-Agent with contact email for all
+# programmatic access. daily_scanner() raises RuntimeError if this is still
+# the placeholder. .env override takes precedence over repo-committed default.
+EDGAR_CONTACT_EMAIL: str = os.environ.get(
+    "EDGAR_CONTACT_EMAIL",
+    "REPLACE_BEFORE_DEPLOY@example.com",
+)
 
 # ── Monte Carlo memory ceiling (Day-2 Mod 4 / Risk 4) ────────────────────────
 # Compute with full sample count for accurate math; retain far fewer paths for

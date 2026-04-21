@@ -37,16 +37,59 @@
 - [ ] Commit + push + tag `backup-pre-day3-2026-04-22`
 - [ ] Audit pass + report
 
-## Day 3 — Thursday 2026-04-23 (advisor UI)
+## Day 3 — Wednesday 2026-04-22 ✅ COMPLETE
 
-- [ ] Dashboard page: mock client list, sortable/filterable, status column, rebalance flags
-- [ ] Portfolio page: allocation chart (pie + bar), performance panel (1Y/3Y/5Y/since-inception), "Execute basket" CTA with confirmation modal
-- [ ] ETF detail page: signal badge, composition breakdown, backtest card, underlying-coin indicator panel
-- [ ] Settings page: broker routing dropdown, monitoring preferences, auto-execute toggle, `EXTENDED_MODULES_ENABLED` dev toggle
-- [ ] Beginner/Intermediate/Advanced scaling across every page (plain-English → condensed → raw metrics)
-- [ ] Dark + light theme audit on every view
-- [ ] Commit + push + tag `backup-pre-day4-2026-04-23`
-- [ ] Audit pass + report
+Morning block (Phase 2 + scanner health + data_source_state):
+- [x] config.py EDGAR env override + .env.example
+- [x] portfolio_engine Phase 2 — full pairwise correlation matrix
+- [x] Issuer-tier nudge (+2 / 0 / -2 pp) replacing Phase-1 institutional-backing idea
+- [x] Chain-maturity discount evaluated and dropped (ETFs not chain-scoped)
+- [x] Phase-1 ETH correlation guard removed (call site + function)
+- [x] core/etf_universe.py scanner health persistence (atomic write, 5-attempt retry)
+- [x] core/data_source_state.py — 4-state tracker (LIVE / FALLBACK_LIVE / CACHED / STATIC)
+- [x] data_feeds.py register_fetch_attempt wiring on every fetch
+
+UI block:
+- [x] ui/components.py data_source_badge() + tier_pill_selector()
+- [x] ui/theme.py badge + banner + footnote CSS (dark + light)
+- [x] ui/level_helpers.py level_text() + is_beginner/intermediate/advanced
+- [x] core/demo_clients.py — 3 fictional personas explicitly labeled DEMO
+- [x] pages/01_Dashboard.py — client roster table + open-portfolio nav
+- [x] pages/02_Portfolio.py — tier pills + allocation chart + perf panel + MC fan + Execute Basket modal
+- [x] pages/03_ETF_Detail.py — signal badge + KPIs + composition + historical returns
+- [x] pages/99_Settings.py — broker routing + auto-execute toggles + scanner health + DSS snapshot
+- [x] integrations/broker_mock.py estimated_slippage_bps field + Alpaca Pro TODO
+
+Tests:
+- [x] tests/test_portfolio_engine.py — Phase 2 pairwise + issuer-tier nudge + guard removal
+- [x] tests/test_etf_universe.py — scanner health write/read/stale threshold (4 new tests)
+- [x] tests/test_data_source_state.py — full 4-state cascade + recovery + snapshot
+- [x] tests/test_theme_contrast.py — WCAG AA for token palette + 3 badge states in both themes
+- [x] Determinism canary re-confirmed (seed=42 still bit-stable after Phase 2 math changes)
+
+Close:
+- [x] Commit + push + tag `backup-pre-day4-2026-04-23`
+- [x] Audit report in commit message (findings + fixes + performance + security)
+- [x] docs/port_log.md updated with Phase 2 entries
+
+Deferred from Day 3 (tracked below in Day 4 block):
+- Chain-maturity discount — evaluated and DROPPED as decision (recorded in port_log.md)
+- Live historical prices are LIVE (not synthetic) per design directive — when fallback chain exhausts, page shows transparency message rather than fake data
+
+## Day 4 — Thursday 2026-04-23 (polish + demo prep + Streamlit Cloud deploy)
+
+- [ ] 3 demo client profiles enriched with coherent narrative arcs in notes
+- [ ] Polished empty / loading / error states on every page
+- [ ] Performance disclaimers on every backtest (compliance — SEC Marketing Rule)
+- [ ] Audit log surface (minimal "Recent actions" panel in Settings)
+- [ ] `pages/98_Methodology.py` placeholder with Day-3+ content refs
+- [ ] RWA + DeFi preview tabs when `EXTENDED_MODULES_ENABLED=True` session toggle fires
+- [ ] Upgrade signal_adapter from Phase-1 rule-based to lightweight RSI/MACD (using historical prices when available; Phase-1 rule as fallback)
+- [ ] Cornish-Fisher + CVaR multiplier + MDD factor retune from RWA calibration to crypto-ETF calibration (port_log log)
+- [ ] Manual light/dark visual walk across all 4 pages
+- [ ] Streamlit Cloud private-app deploy + Secrets UI population
+- [ ] Full audit pass per CLAUDE.md §4
+- [ ] Commit + push + tag `backup-demo-ready-2026-04-24`
 
 ## Day 4 — Friday 2026-04-24 (polish + demo)
 

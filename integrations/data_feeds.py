@@ -36,6 +36,7 @@ from config import (
     YF_CIRCUIT_BREAKER_THRESHOLD,
     YF_CIRCUIT_BREAKER_WINDOW_SEC,
 )
+from core.data_source_state import register_fetch_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -146,21 +147,30 @@ def _fetch_single_ticker(ticker: str, period: str, interval: str) -> dict:
     if source == "yfinance":
         data = _fetch_yfinance(ticker, period, interval)
         if data:
+            register_fetch_attempt("etf_price", "yfinance", success=True)
             return {"source": "yfinance", "prices": data}
+        register_fetch_attempt("etf_price", "yfinance", success=False,
+                               note=f"{ticker}: empty or failed")
         _record_failure(ticker)
-        # Fall through to Stooq if still on yfinance (breaker may have tripped)
         source = get_active_price_source()
 
     if source == "stooq":
         data = _fetch_stooq(ticker, period)
         if data:
+            register_fetch_attempt("etf_price", "stooq", success=True,
+                                   note="fallback chain: primary yfinance unavailable")
             return {"source": "stooq", "prices": data}
+        register_fetch_attempt("etf_price", "stooq", success=False,
+                               note=f"{ticker}: stooq returned empty")
 
-    # Final fallback: Alpha Vantage (rate-limited — last resort)
     data = _fetch_alphavantage(ticker)
     if data:
+        register_fetch_attempt("etf_price", "alphavantage", success=True,
+                               note="fallback chain: yfinance + stooq unavailable")
         return {"source": "alphavantage", "prices": data}
 
+    register_fetch_attempt("etf_price", "none", success=False,
+                           note=f"{ticker}: all live sources exhausted")
     return {"source": "unavailable", "prices": []}
 
 

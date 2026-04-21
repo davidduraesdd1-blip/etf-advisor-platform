@@ -25,17 +25,30 @@ CLAUDE.md governance: Sections 10 (data sources), 12 (refresh rates), 13 (univer
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
+import tempfile
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from config import (
+    DATA_DIR,
     EDGAR_CONTACT_EMAIL,
     EDGAR_REQS_PER_SEC,
     ETF_UNIVERSE_SEED,
 )
+from core.data_source_state import register_fetch_attempt
 
 logger = logging.getLogger(__name__)
+
+# Scanner health persistence — tracked for Settings-page visibility
+# (Day-3 item B). Stale-threshold warning fires at 48hr given EDGAR's
+# known 24-48hr full-text index lag.
+SCANNER_HEALTH_PATH: Path = DATA_DIR / "scanner_health.json"
+SCANNER_STALE_HOURS: int = 48
 
 # ── EDGAR endpoints ──────────────────────────────────────────────────────────
 _EDGAR_SEARCH_URL = "https://efts.sec.gov/LATEST/search-index"
@@ -226,7 +239,20 @@ def daily_scanner(days_back: int = 7) -> list[dict]:
         else:
             dedup[key] = m
 
-    return list(dedup.values())
+    results = list(dedup.values())
+
+    # Scanner health + data-source-state book-keeping
+    try:
+        write_scanner_health(
+            n_matches=len(results),
+            keywords_queried=list(_CRYPTO_KEYWORDS),
+            forms_queried=list(_CRYPTO_FORM_TYPES),
+        )
+    except Exception as exc:
+        logger.warning("write_scanner_health failed: %s", exc)
+    register_fetch_attempt("edgar_scanner", "edgar", success=True,
+                           note=f"{len(results)} unique filings matched")
+    return results
 
 
 def _date_today() -> str:
@@ -237,3 +263,94 @@ def _date_today() -> str:
 def _date_n_days_ago(n: int) -> str:
     from datetime import date, timedelta
     return (date.today() - timedelta(days=max(1, n))).isoformat()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Scanner health persistence (Day-3 item B)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _atomic_write_json(path: Path, payload: dict) -> None:
+    """
+    Write JSON atomically on Windows + OneDrive (CLAUDE.md §20).
+    tempfile → os.replace with a 5-attempt backoff around PermissionError
+    (OneDrive sync sometimes holds the target file briefly).
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=str(path.parent),
+        prefix=".tmp_scanner_health_",
+        suffix=".json",
+        delete=False,
+    ) as tf:
+        json.dump(payload, tf, indent=2)
+        tmp_name = tf.name
+
+    last_exc: Exception | None = None
+    for attempt in range(5):
+        try:
+            os.replace(tmp_name, str(path))
+            return
+        except PermissionError as exc:
+            last_exc = exc
+            time.sleep(0.1 * (attempt + 1))
+    # Clean up tempfile if replace failed
+    try:
+        os.remove(tmp_name)
+    except OSError:
+        pass
+    if last_exc is not None:
+        raise last_exc
+
+
+def write_scanner_health(
+    n_matches: int,
+    keywords_queried: list[str],
+    forms_queried: list[str] | None = None,
+) -> None:
+    """Record a successful scanner completion to data/scanner_health.json."""
+    payload = {
+        "last_success_ts":   time.time(),
+        "last_success_iso":  datetime.now(timezone.utc).isoformat(),
+        "n_matches":         int(n_matches),
+        "keywords_queried":  list(keywords_queried),
+        "forms_queried":     list(forms_queried) if forms_queried else list(_CRYPTO_FORM_TYPES),
+    }
+    _atomic_write_json(SCANNER_HEALTH_PATH, payload)
+
+
+def get_scanner_health() -> dict:
+    """
+    Return {last_success_ts, last_success_iso, n_matches, keywords_queried,
+    forms_queried, age_hours, is_stale}. If no scan has ever run, age_hours
+    is None and is_stale is True.
+    """
+    base = {
+        "last_success_ts":   None,
+        "last_success_iso":  None,
+        "n_matches":         None,
+        "keywords_queried":  [],
+        "forms_queried":     [],
+        "age_hours":         None,
+        "is_stale":          True,
+    }
+    if not SCANNER_HEALTH_PATH.exists():
+        return base
+    try:
+        with open(SCANNER_HEALTH_PATH, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        ts = float(data.get("last_success_ts", 0))
+        age_hours = (time.time() - ts) / 3600 if ts > 0 else None
+        return {
+            "last_success_ts":   ts,
+            "last_success_iso":  data.get("last_success_iso"),
+            "n_matches":         data.get("n_matches"),
+            "keywords_queried":  data.get("keywords_queried", []),
+            "forms_queried":     data.get("forms_queried", []),
+            "age_hours":         round(age_hours, 2) if age_hours is not None else None,
+            "is_stale":          True if age_hours is None else (age_hours > SCANNER_STALE_HOURS),
+        }
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        logger.warning("scanner_health.json unreadable: %s", exc)
+        return base

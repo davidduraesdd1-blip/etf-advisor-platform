@@ -20,8 +20,12 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-# Realistic demo-mode slippage bounds in basis points (0.05% - 0.20%)
+# Realistic demo-mode slippage bounds in basis points (0.05% - 0.20%).
+# TODO: retune for real broker (Alpaca Pro: typical 8-15 bps on major
+# crypto ETFs during market hours). Day-3+ once BROKER_PROVIDER flips
+# to "alpaca_paper", rewire these bounds from live bid/ask spread data.
 _SLIPPAGE_BPS_RANGE = (5, 20)
+_ESTIMATED_SLIPPAGE_BPS = sum(_SLIPPAGE_BPS_RANGE) / 2   # midpoint = 12.5 bps
 
 
 def _mock_order_id(ticker: str, qty: float, side: str) -> str:
@@ -99,6 +103,10 @@ def submit_basket(
             "slippage_bps": 0 if dry_run else round(
                 ((fill_price / mid_price) - 1) * 10_000, 2
             ),
+            # Day-3 Q3 answer: UI reads this to display expected slippage in
+            # the mock confirmation modal BEFORE execution. For the real
+            # Alpaca integration this will come from live bid/ask spread.
+            "estimated_slippage_bps": _ESTIMATED_SLIPPAGE_BPS,
         })
 
     return {
@@ -109,12 +117,13 @@ def submit_basket(
         "client_id":     client_id,
         "fills":         fills,
         "summary": {
-            "n_orders":         len(fills),
-            "gross_usd":        round(gross_usd, 2),
-            "net_usd":          round(gross_usd, 2),   # mock: no commission
-            "avg_slippage_bps": round(
+            "n_orders":               len(fills),
+            "gross_usd":              round(gross_usd, 2),
+            "net_usd":                round(gross_usd, 2),   # mock: no commission
+            "avg_slippage_bps":       round(
                 sum(f["slippage_bps"] for f in fills) / max(len(fills), 1), 2
             ),
+            "estimated_slippage_bps": _ESTIMATED_SLIPPAGE_BPS,
         },
     }
 

@@ -80,6 +80,41 @@ RWA). Do not retune in Phase 1.
   - Random source: `np.random.default_rng(42)` explicit (was already
     the case in RWA source). Confirmed bit-stable across numpy ≥ 1.17.
 
+## Phase 2 — Day 3 morning (Wednesday 2026-04-22)
+
+**_phase1_eth_correlation_guard** — removed entirely. Phase-2 pairwise
+correlation handles ETH-based ETFs correctly without a blanket warning.
+Build_portfolio call site was also removed. Test
+`test_eth_ticker_no_longer_emits_phase1_warning` asserts absence.
+
+**_build_covariance_matrix** (new in this project) — built from scratch.
+Phase-2 uses:
+  - Category-pair correlation targets (4 categories × 4 self-pair +
+    6 cross-pair = 10 entries in _CATEGORY_PAIR_CORR)
+  - Same-issuer within-category boost (+0.02, capped at 0.99)
+  - Volatility product per pair from each holding's `volatility_pct`
+Replaces the Phase-1 2-bucket inline covariance inside
+compute_portfolio_metrics.
+
+**_pair_corr** — helper exposing category-pair lookup for tests.
+
+**_issuer_tier_nudge** — new. Tier A (BlackRock, Fidelity) = +2pp,
+Tier C (GBTC, ETHE legacy high-fee, DEFI futures) = -2pp, else neutral.
+Applied inside build_portfolio per-category weight allocation with
+post-hoc renormalization to preserve category total.
+
+**Chain-maturity discount** — evaluated and DROPPED for ETFs. Rationale:
+  ETFs are not chain-scoped. The wrapper is the security; the underlying
+  coin's chain (BTC mainnet, ETH mainnet) is implicit in the ETF category
+  (btc_spot / eth_spot) and doesn't need a separate maturity premium.
+  For thematic ETFs that hold a basket of tokens across multiple chains,
+  the thematic category's base correlation (0.85 same-category, 0.70-0.74
+  cross) already accounts for heterogeneity.
+
+**Institutional backing bonus** — renamed and reframed as "issuer tier
+nudge" per Day-3 directive. Numerical effect: +2pp / 0 / -2pp depending
+on issuer tier. Lands inside build_portfolio, not inside scoring.
+
 ## Dropped entirely (not ported)
 
 **CATEGORY_CORRELATIONS** (17×17 matrix) — RWA asset classes only.

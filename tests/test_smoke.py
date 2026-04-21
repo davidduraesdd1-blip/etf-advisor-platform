@@ -22,6 +22,18 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+# Network helpers are stubbed by tests/conftest.py. Monte Carlo is
+# stubbed only here (smoke tests) to keep Streamlit AppTest renders
+# fast — the real MC math is validated by test_portfolio_engine.py.
+
+
+@pytest.fixture(autouse=True)
+def _fast_mc(monkeypatch):
+    from tests.conftest import _fast_monte_carlo
+    import core.portfolio_engine as pe
+    monkeypatch.setattr(pe, "run_monte_carlo", _fast_monte_carlo)
+    yield
+
 
 def _parses(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
