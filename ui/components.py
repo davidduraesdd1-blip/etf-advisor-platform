@@ -25,14 +25,9 @@ def card(title: str | None = None) -> st.delta_generator.DeltaGenerator:
         with card("Client overview"):
             st.write("...")
     """
-    container = st.container()
-    with container:
-        st.markdown("<div class='eap-card'>", unsafe_allow_html=True)
-        if title:
-            st.markdown(f"#### {title}")
-    # Streamlit will close the container on `with` exit; CSS relies on the
-    # wrapper div which stays open until the next markdown block. For the
-    # demo scaffold that's acceptable; on Day 3 we revisit if visuals slip.
+    container = st.container(border=True)
+    if title:
+        container.markdown(f"#### {title}")
     return container
 
 
@@ -63,12 +58,11 @@ def disclosure(text: str) -> None:
 
 def coming_soon(page_name: str) -> None:
     """Default render for placeholder pages during Day 1 scaffold."""
-    st.markdown("<div class='eap-card'>", unsafe_allow_html=True)
-    st.markdown(f"### Coming soon — {page_name}")
-    st.caption(
-        "Scaffold in place. Wiring to data + math layers lands on Day 2 and Day 3."
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown(f"### Coming soon — {page_name}")
+        st.caption(
+            "Scaffold in place. Wiring to data + math layers lands on Day 2 and Day 3."
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════

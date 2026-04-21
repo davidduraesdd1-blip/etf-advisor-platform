@@ -19,7 +19,7 @@ from config import (
     PORTFOLIO_TIERS,
 )
 from core.demo_clients import DEMO_CLIENTS, get_client
-from core.etf_universe import load_universe
+from core.etf_universe import load_universe_with_live_returns
 from core.portfolio_engine import build_portfolio, run_monte_carlo
 from integrations.broker_mock import submit_basket
 from integrations.data_feeds import get_etf_prices, get_last_close
@@ -105,15 +105,41 @@ st.caption(level_text(
 
 
 @st.cache_data(ttl=600)
-def _build_cached(tier_name: str, portfolio_value: float) -> dict:
-    universe = load_universe()
+def _universe_with_live_returns_cached() -> list[dict]:
+    """
+    Fetch the universe with live CAGR enrichment. Cached for 10 min so we
+    don't re-hit yfinance on every tier/client toggle. The per-ticker
+    price bundles have their own cache inside data_feeds too.
+    """
+    return load_universe_with_live_returns()
+
+
+@st.cache_data(ttl=600)
+def _build_cached(tier_name: str, portfolio_value: float,
+                  universe_key: int) -> dict:
+    # universe_key is a cache discriminator: when the live-enriched
+    # universe changes (ticker returns drift), Streamlit invalidates.
+    universe = _universe_with_live_returns_cached()
     return build_portfolio(tier_name, universe, portfolio_value_usd=portfolio_value)
 
 
 crypto_sleeve_usd = client["total_portfolio_usd"] * client["crypto_allocation_pct"] / 100
-portfolio = _build_cached(tier_name, crypto_sleeve_usd)
+with st.spinner("Deriving live expected returns from price history..."):
+    universe_live = _universe_with_live_returns_cached()
+# id(universe_live) is stable per cache entry so we reuse the 10-min bucket.
+portfolio = _build_cached(tier_name, crypto_sleeve_usd, id(universe_live))
 holdings = portfolio["holdings"]
 metrics = portfolio["metrics"]
+
+# Count how many ETFs in this portfolio used live vs category-default
+# expected returns, for the transparency footnote under the KPI tile.
+_holding_tickers = {h["ticker"] for h in holdings}
+_sources = [
+    e.get("expected_return_source", "category_default")
+    for e in universe_live if e["ticker"] in _holding_tickers
+]
+_n_live = sum(1 for s in _sources if s == "live")
+_n_total = len(_sources) or 1
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -124,11 +150,66 @@ k1, k2, k3, k4 = st.columns(4)
 with k1:
     kpi_tile("Crypto sleeve", f"${crypto_sleeve_usd:,.0f}")
 with k2:
-    kpi_tile("Expected return", f"{metrics['weighted_return_pct']:.1f}%")
+    kpi_tile("Expected return (annualized)",
+             f"{metrics['weighted_return_pct']:.1f}%")
 with k3:
     kpi_tile("Portfolio vol", f"{metrics['portfolio_volatility_pct']:.1f}%")
 with k4:
     kpi_tile("Sharpe", f"{metrics['sharpe_ratio']:.2f}")
+
+# Provenance for the expected-return KPI. Scales by user level.
+if _n_live == _n_total:
+    _ret_src_msg = level_text(
+        beginner=(
+            f"Expected return is derived from each fund's actual price "
+            f"history (all {_n_total} ETFs in this basket). It tells you "
+            f"how the fund has performed on an annualized basis — not a "
+            f"prediction."
+        ),
+        intermediate=(
+            f"Expected return = annualized CAGR from each ETF's own "
+            f"price history ({_n_total}/{_n_total} live). Capped at ±300% "
+            f"to filter data-error artifacts."
+        ),
+        advanced=(
+            f"Per-ETF annualized CAGR from first-to-last available close "
+            f"({_n_total}/{_n_total} live, yfinance primary). ±300% cap. "
+            f"Weighted by basket allocation."
+        ),
+    )
+elif _n_live == 0:
+    _ret_src_msg = level_text(
+        beginner=(
+            "Live price history unavailable right now — the expected return "
+            "above uses category averages as a fallback. Refresh once live "
+            "data is back for per-fund accuracy."
+        ),
+        intermediate=(
+            f"All {_n_total} ETFs fell back to category-default expected "
+            f"returns — live price fetch unavailable."
+        ),
+        advanced=(
+            f"0/{_n_total} live — full fallback to category defaults "
+            f"(btc_spot=25%, eth_spot=35%, btc_futures=15%, thematic=50%)."
+        ),
+    )
+else:
+    _ret_src_msg = level_text(
+        beginner=(
+            f"{_n_live} of {_n_total} ETFs used live price history; the "
+            f"rest fell back to category averages (live data temporarily "
+            f"unavailable for those tickers)."
+        ),
+        intermediate=(
+            f"{_n_live}/{_n_total} ETFs: live CAGR. "
+            f"{_n_total - _n_live}/{_n_total}: category-default fallback."
+        ),
+        advanced=(
+            f"{_n_live}/{_n_total} live, {_n_total - _n_live}/{_n_total} "
+            f"category-default fallback. Mixed-source weighted return."
+        ),
+    )
+st.caption(_ret_src_msg)
 data_source_badge("risk_free_rate")   # Sharpe consumed FRED → show state
 
 

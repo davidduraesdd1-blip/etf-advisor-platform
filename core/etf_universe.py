@@ -90,10 +90,10 @@ def _assert_edgar_configured() -> None:
 # used when real price/return history hasn't been computed yet. Day 3+
 # computes these live from yfinance OHLCV.
 _CATEGORY_DEFAULTS: dict[str, dict[str, float]] = {
-    "btc_spot":    {"expected_return": 35.0, "volatility": 55.0, "correlation_with_btc": 0.98},
-    "eth_spot":    {"expected_return": 40.0, "volatility": 70.0, "correlation_with_btc": 0.78},
-    "btc_futures": {"expected_return": 28.0, "volatility": 58.0, "correlation_with_btc": 0.95},
-    "thematic":    {"expected_return": 45.0, "volatility": 75.0, "correlation_with_btc": 0.70},
+    "btc_spot":    {"expected_return": 25.0, "volatility": 55.0, "correlation_with_btc": 0.98},
+    "eth_spot":    {"expected_return": 35.0, "volatility": 70.0, "correlation_with_btc": 0.78},
+    "btc_futures": {"expected_return": 15.0, "volatility": 58.0, "correlation_with_btc": 0.95},
+    "thematic":    {"expected_return": 50.0, "volatility": 75.0, "correlation_with_btc": 0.70},
 }
 
 # Expense ratios (bps) sourced from public issuer pages at time of writing.
@@ -130,6 +130,42 @@ def load_universe(scanner_additions: list[dict] | None = None) -> list[dict]:
         for new in scanner_additions:
             if new.get("ticker") and new["ticker"] not in existing:
                 base.append(_enrich(new))
+    # Default provenance flag — load_universe_with_live_returns overrides
+    # it per-ticker when a live CAGR fetch succeeds.
+    for e in base:
+        e.setdefault("expected_return_source", "category_default")
+    return base
+
+
+def load_universe_with_live_returns(
+    scanner_additions: list[dict] | None = None,
+) -> list[dict]:
+    """
+    Like load_universe() but replaces each ETF's category-default
+    expected_return with its live annualized historical CAGR when a
+    price fetch succeeds. Falls back to the category default per-ticker.
+    Sets expected_return_source = "live" | "category_default" so the
+    UI can label the source.
+
+    N.B. this performs one price-bundle fetch per ticker. Callers should
+    cache the result (the Portfolio page wraps this in @st.cache_data).
+    """
+    from integrations.data_feeds import get_historical_cagr
+
+    base = load_universe(scanner_additions)
+    for etf in base:
+        try:
+            info = get_historical_cagr(etf["ticker"])
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning("get_historical_cagr failed for %s: %s", etf["ticker"], exc)
+            continue
+        cagr_pct = info.get("cagr_pct")
+        if cagr_pct is not None:
+            etf["expected_return"] = round(float(cagr_pct), 2)
+            etf["expected_return_source"] = "live"
+            etf["cagr_days_observed"] = info.get("days_observed")
+            etf["cagr_source"] = info.get("source")
+        # else: keep category default + source = "category_default"
     return base
 
 

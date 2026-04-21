@@ -222,6 +222,68 @@ def get_last_close(ticker: str) -> float | None:
     return _last_close.get(ticker.upper())
 
 
+# Sanity cap for CAGR derivation. Crypto can legitimately 3-6x in a year,
+# so we do NOT want a tight cap — this only filters data-error artifacts
+# like unadjusted splits or dust-start prices. ±300% = a 4x move per year
+# sustained over the full lookback window.
+_CAGR_CAP_PCT: float = 300.0
+
+
+def get_historical_cagr(ticker: str, period: str = "5y") -> dict:
+    """
+    Annualized return from the earliest to the most recent available close,
+    as a percent. Shape:
+        {"cagr_pct": float|None, "source": str, "days_observed": int}
+    Returns cagr_pct=None if fewer than ~30 valid closes are available or
+    the CAGR math can't be computed. source mirrors the price-bundle
+    source ("yfinance" / "stooq" / "alphavantage" / "unavailable") so
+    callers can register data-source-state correctly.
+    """
+    from datetime import datetime
+
+    bundle = get_etf_prices([ticker], period=period, interval="1d")
+    entry = bundle.get(ticker, {}) or {}
+    rows = entry.get("prices", []) or []
+    source = entry.get("source", "unavailable")
+
+    closes: list[tuple[str, float]] = []
+    for row in rows:
+        try:
+            c = float(row.get("close"))
+            if c > 0:
+                closes.append((str(row.get("date", "")), c))
+        except (TypeError, ValueError):
+            continue
+
+    if len(closes) < 30:
+        return {"cagr_pct": None, "source": source, "days_observed": len(closes)}
+
+    start_date_raw, start_close = closes[0]
+    end_date_raw, end_close = closes[-1]
+
+    try:
+        start_dt = datetime.fromisoformat(start_date_raw.split("T")[0])
+        end_dt = datetime.fromisoformat(end_date_raw.split("T")[0])
+        days = (end_dt - start_dt).days
+    except (ValueError, AttributeError):
+        days = int(len(closes) * 365 / 252)
+
+    if days < 30 or start_close <= 0:
+        return {"cagr_pct": None, "source": source, "days_observed": days}
+
+    years = days / 365.25
+    try:
+        ratio = end_close / start_close
+        if ratio <= 0:
+            return {"cagr_pct": None, "source": source, "days_observed": days}
+        cagr = (ratio ** (1.0 / years)) - 1.0
+    except (ValueError, ZeroDivisionError, OverflowError):
+        return {"cagr_pct": None, "source": source, "days_observed": days}
+
+    cagr_pct = max(-_CAGR_CAP_PCT, min(_CAGR_CAP_PCT, cagr * 100.0))
+    return {"cagr_pct": cagr_pct, "source": source, "days_observed": days}
+
+
 def _fetch_yfinance(ticker: str, period: str, interval: str) -> list[dict]:
     """Primary source. Returns [] on empty / failure (caller records miss)."""
     try:

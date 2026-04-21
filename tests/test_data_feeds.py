@@ -128,3 +128,108 @@ class TestGetActivePriceSourceContract:
         src = get_active_price_source()
         assert isinstance(src, str)
         assert src in {"yfinance", "stooq", "alphavantage"}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# get_historical_cagr — live CAGR derivation used by Portfolio expected return
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestHistoricalCagr:
+    """
+    get_historical_cagr is the Portfolio-page hook replacing hardcoded
+    category-default expected returns. Tests cover:
+      - plausible-shape 100-day rising series → sensible positive CAGR
+      - declining series → negative CAGR
+      - empty bundle → None with source registered
+      - single-day bundle (insufficient data) → None
+      - ±300% cap preserves legitimate 3-6x crypto moves but filters
+        pathological divisor-by-zero / data-error artifacts
+    """
+
+    def _rising_bundle(self, start: float, end: float, n_days: int = 400):
+        """Build a price bundle that grows from start → end over n_days."""
+        from datetime import date, timedelta
+        dates = [(date(2024, 1, 1) + timedelta(days=i)).isoformat()
+                 for i in range(n_days)]
+        # Geometric interpolation → CAGR math is exact
+        ratio = (end / start) ** (1 / max(1, n_days - 1))
+        closes = [start * (ratio ** i) for i in range(n_days)]
+        return {"source": "yfinance",
+                "prices": [{"date": d, "close": c}
+                           for d, c in zip(dates, closes)]}
+
+    def test_rising_series_produces_positive_cagr(self, monkeypatch):
+        from integrations import data_feeds as df
+
+        bundle = self._rising_bundle(100.0, 150.0, n_days=365)
+        monkeypatch.setattr(df, "get_etf_prices",
+                            lambda tickers, **kw: {tickers[0]: bundle})
+
+        result = df.get_historical_cagr("IBIT")
+        assert result["cagr_pct"] is not None
+        # Geometric ratio 1.5 over ~1 year → CAGR ≈ 50%
+        assert 48 < result["cagr_pct"] < 53
+        assert result["source"] == "yfinance"
+
+    def test_declining_series_produces_negative_cagr(self, monkeypatch):
+        from integrations import data_feeds as df
+
+        bundle = self._rising_bundle(100.0, 70.0, n_days=365)
+        monkeypatch.setattr(df, "get_etf_prices",
+                            lambda tickers, **kw: {tickers[0]: bundle})
+
+        result = df.get_historical_cagr("ETHA")
+        assert result["cagr_pct"] is not None
+        # 100 → 70 in ~1 year → CAGR ≈ -30%
+        assert -32 < result["cagr_pct"] < -28
+
+    def test_empty_bundle_returns_none(self, monkeypatch):
+        from integrations import data_feeds as df
+
+        monkeypatch.setattr(df, "get_etf_prices",
+                            lambda tickers, **kw: {tickers[0]: {"source": "unavailable", "prices": []}})
+
+        result = df.get_historical_cagr("NOPE")
+        assert result["cagr_pct"] is None
+        assert result["source"] == "unavailable"
+
+    def test_short_series_returns_none(self, monkeypatch):
+        from integrations import data_feeds as df
+
+        bundle = self._rising_bundle(100.0, 110.0, n_days=15)
+        monkeypatch.setattr(df, "get_etf_prices",
+                            lambda tickers, **kw: {tickers[0]: bundle})
+
+        result = df.get_historical_cagr("IBIT")
+        assert result["cagr_pct"] is None
+
+    def test_cap_preserves_legitimate_crypto_moves(self, monkeypatch):
+        """
+        A 3x move over 1 year = 200% CAGR — that's a legitimate crypto
+        year (think BTC 2020). Must NOT be capped at a too-tight value.
+        """
+        from integrations import data_feeds as df
+
+        bundle = self._rising_bundle(100.0, 300.0, n_days=365)
+        monkeypatch.setattr(df, "get_etf_prices",
+                            lambda tickers, **kw: {tickers[0]: bundle})
+
+        result = df.get_historical_cagr("IBIT")
+        # ~200% CAGR — well under the 300% cap, must pass through.
+        assert result["cagr_pct"] is not None
+        assert 195 < result["cagr_pct"] < 205
+
+    def test_cap_filters_pathological_values(self, monkeypatch):
+        """
+        A 20x move over 1 year = 1900% CAGR — implausible for any ETF,
+        must be clamped to the ±300% cap.
+        """
+        from integrations import data_feeds as df
+
+        bundle = self._rising_bundle(1.0, 20.0, n_days=365)
+        monkeypatch.setattr(df, "get_etf_prices",
+                            lambda tickers, **kw: {tickers[0]: bundle})
+
+        result = df.get_historical_cagr("WILD")
+        assert result["cagr_pct"] is not None
+        assert result["cagr_pct"] == 300.0  # exact cap
