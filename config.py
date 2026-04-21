@@ -102,6 +102,7 @@ PORTFOLIO_TIERS: dict[str, dict] = {
         "rebalance": "quarterly",
         "typical_client": "retiree or explicitly risk-averse",
         "focus": "lowest-expense BTC spot ETFs (IBIT, FBTC, BITB)",
+        "max_drawdown_pct": 15,
     },
     "Conservative": {
         "tier_number": 2,
@@ -109,6 +110,7 @@ PORTFOLIO_TIERS: dict[str, dict] = {
         "rebalance": "quarterly",
         "typical_client": "near-retirement, diversification allocation",
         "focus": "BTC-heavy mix with ETH allocation starting",
+        "max_drawdown_pct": 25,
     },
     "Moderate": {
         "tier_number": 3,
@@ -116,6 +118,7 @@ PORTFOLIO_TIERS: dict[str, dict] = {
         "rebalance": "bi-monthly",
         "typical_client": "mid-career, moderate risk tolerance",
         "focus": "balanced BTC/ETH across multiple issuers",
+        "max_drawdown_pct": 40,
     },
     "Aggressive": {
         "tier_number": 4,
@@ -123,6 +126,7 @@ PORTFOLIO_TIERS: dict[str, dict] = {
         "rebalance": "monthly",
         "typical_client": "younger, higher risk tolerance, longer horizon",
         "focus": "BTC + ETH + emerging thematic ETFs",
+        "max_drawdown_pct": 55,
     },
     "Ultra Aggressive": {
         "tier_number": 5,
@@ -130,6 +134,7 @@ PORTFOLIO_TIERS: dict[str, dict] = {
         "rebalance": "bi-weekly",
         "typical_client": "high-conviction crypto allocator",
         "focus": "max diversification across all approved crypto ETFs",
+        "max_drawdown_pct": 70,
     },
 }
 
@@ -169,3 +174,19 @@ BENCHMARK_DEFAULT: dict[str, float] = {
 # ── Rate limits ──────────────────────────────────────────────────────────────
 EDGAR_REQS_PER_SEC: int = 10              # SEC hard cap
 YFINANCE_TICKERS_PER_CALL: int = 50       # batch ceiling to be safe
+
+# ── SEC EDGAR identifier (Day-2 Mod 2) ───────────────────────────────────────
+# SEC requires an identifiable User-Agent with contact email for all programmatic
+# access. daily_scanner() raises RuntimeError if this is still the placeholder.
+EDGAR_CONTACT_EMAIL: str = "REPLACE_BEFORE_DEPLOY@example.com"
+
+# ── Monte Carlo memory ceiling (Day-2 Mod 4 / Risk 4) ────────────────────────
+# Compute with full sample count for accurate math; retain far fewer paths for
+# UI rendering so @st.cache_data doesn't blow the 1GB Streamlit Cloud ceiling.
+MONTE_CARLO_PATHS_COMPUTE: int = 10_000
+MONTE_CARLO_PATHS_RETAIN: int = 250
+MONTE_CARLO_MEMORY_CEILING_MB: int = 100
+
+# ── yfinance circuit breaker (Day-2 Mod 3) ───────────────────────────────────
+YF_CIRCUIT_BREAKER_WINDOW_SEC: int = 60
+YF_CIRCUIT_BREAKER_THRESHOLD: int = 3
