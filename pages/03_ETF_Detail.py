@@ -55,19 +55,53 @@ def _universe_with_live_analytics_cached() -> list[dict]:
 
 with st.spinner("Loading live ETF analytics..."):
     universe = _universe_with_live_analytics_cached()
-tickers = [u["ticker"] for u in universe]
 
 # Cross-page landing hook: if the FA clicked a row on the Portfolio
 # allocation table, `selected_etf_ticker` carries the target ticker.
 # Honor it once, then clear so a subsequent manual selectbox change
 # doesn't get silently overridden.
-_default_idx = 0
 _incoming = st.session_state.pop("selected_etf_ticker", None)
+
+# Category filter — typing in the selectbox already filters by ticker
+# substring, but advisors often want to see "show me only the leveraged
+# ETFs" or "show me only the income covered-call wrappers". This pill
+# selector cuts the dropdown down to exactly that subset.
+from collections import Counter
+_cat_counts = Counter(u.get("category", "") for u in universe)
+_cat_options = ["All categories"] + [
+    f"{c} ({n})" for c, n in sorted(_cat_counts.items())
+]
+_cat_choice = st.selectbox(
+    "Filter by category",
+    options=_cat_options,
+    index=0,
+    help="Narrow the ticker list below. 'All categories' shows every fund "
+         "in the universe.",
+)
+
+if _cat_choice == "All categories":
+    _filtered_universe = universe
+else:
+    _selected_cat = _cat_choice.rsplit(" (", 1)[0]
+    _filtered_universe = [u for u in universe if u.get("category") == _selected_cat]
+
+tickers = [u["ticker"] for u in _filtered_universe]
+_default_idx = 0
 if _incoming and _incoming in tickers:
     _default_idx = tickers.index(_incoming)
+elif _incoming and _incoming not in tickers:
+    # Incoming ticker was filtered out — reset filter so we don't lose it.
+    _filtered_universe = universe
+    tickers = [u["ticker"] for u in _filtered_universe]
+    _default_idx = tickers.index(_incoming)
 
-chosen = st.selectbox("Ticker", options=tickers, index=_default_idx)
-etf = next(u for u in universe if u["ticker"] == chosen)
+chosen = st.selectbox(
+    f"Ticker — {len(tickers)} of {len(universe)} available",
+    options=tickers,
+    index=_default_idx,
+    help="Type to filter (e.g., 'BIT' shows BITX, BITB, BITQ, BITW).",
+)
+etf = next(u for u in _filtered_universe if u["ticker"] == chosen)
 
 # Fetch live price history so signal_adapter can run its Day-4 upgrade
 # path (RSI + MACD + momentum). If history is unavailable the adapter
