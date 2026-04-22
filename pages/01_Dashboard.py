@@ -18,6 +18,7 @@ from integrations.data_feeds import get_etf_prices
 from ui.components import (
     card,
     data_source_badge,
+    data_sources_panel,
     disclosure,
     section_header,
 )
@@ -51,17 +52,11 @@ try:
 except Exception:
     pass   # Seed failure is not demo-blocking
 
-# Data-source transparency — consume this page's primary data. In demo
-# mode clients are local; prices come from data_feeds which registers
-# its own state. Show badges for each dependency.
-st.markdown("**Data sources**")
-badge_cols = st.columns(2)
-with badge_cols[0]:
-    st.caption("Client roster")
-    st.caption("Source: local demo fixtures (fictional — not real client data)")
-with badge_cols[1]:
-    st.caption("ETF prices")
-    data_source_badge("etf_price")
+# Top-of-page data-source audit panel (Option 3 transparency).
+# Collapsed by default — the FA expands when they want the stack
+# view. Renders an amber summary when anything is in fallback so
+# fallback state is impossible to miss even when collapsed.
+data_sources_panel(key="ds_panel_dashboard")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Live per-client metrics — Q5. Each client's numbers are derived from

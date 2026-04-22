@@ -22,6 +22,7 @@ from integrations.edgar_nport import SUPPORTED_TICKERS as NPORT_TICKERS, get_etf
 from ui.components import (
     card,
     data_source_badge,
+    data_sources_panel,
     disclosure,
     kpi_tile,
     safe_page_link,
@@ -43,6 +44,9 @@ section_header(
         advanced="Per-ETF research with Phase-1 composite signal (coin-level wiring Day 4+).",
     ),
 )
+
+# Top-of-page data-source audit panel (Option 3).
+data_sources_panel(key="ds_panel_etf_detail")
 
 @st.cache_data(ttl=600)
 def _universe_with_live_analytics_cached() -> list[dict]:
@@ -450,13 +454,25 @@ with card("Forward projection"):
         mc = None
 
     if mc:
+        import numpy as _np
         paths = mc["sample_paths"]
         fig = go.Figure()
+        # Fan of sample paths — alpha 0.15 → 0.35, width 0.6 → 1.1 per
+        # 2026-04-22 readability feedback.
         for path in paths[: min(40, len(paths))]:
             fig.add_trace(go.Scatter(
                 y=path, mode="lines",
-                line=dict(width=0.6, color="rgba(0,212,170,0.15)"),
+                line=dict(width=1.1, color="rgba(0,212,170,0.35)"),
                 showlegend=False, hoverinfo="skip",
+            ))
+        if paths:
+            paths_arr = _np.array(paths)
+            median_path = _np.median(paths_arr, axis=0).tolist()
+            fig.add_trace(go.Scatter(
+                y=median_path, mode="lines",
+                line=dict(width=2.4, color="rgba(0,212,170,1.0)"),
+                name="Median path",
+                hovertemplate="Day %{x} · Median ≈ $%{y:,.0f}<extra></extra>",
             ))
         fig.add_hline(y=mc["initial_value_usd"], line_dash="dash", line_color="#9ca3af")
         fig.update_layout(
@@ -466,6 +482,7 @@ with card("Forward projection"):
             height=280,
             yaxis_title="Value per $100k",
             xaxis_title="Trading days",
+            showlegend=False,
         )
         st.plotly_chart(fig, use_container_width=True)
         if is_advanced():

@@ -24,7 +24,7 @@ from core.data_source_state import snapshot as dss_snapshot
 from core.demo_clients import DEMO_CLIENTS
 from core.etf_universe import SCANNER_STALE_HOURS, get_scanner_health
 from integrations.data_feeds import circuit_breaker_state, reset_circuit_breaker
-from ui.components import card, section_header
+from ui.components import card, data_sources_panel, section_header
 from ui.level_helpers import level_text
 from ui.theme import apply_theme
 
@@ -40,6 +40,10 @@ section_header(
         advanced="Runtime flags + data-source state + circuit-breaker controls + per-client overrides.",
     ),
 )
+
+# Top-of-page data-source audit panel (Option 3 transparency).
+# Settings opens it expanded since this is the operator-diagnostic page.
+data_sources_panel(expanded=True, key="ds_panel_settings")
 
 
 # ═══════════════════════════════════════════════════════════════════════════

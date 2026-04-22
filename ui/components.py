@@ -81,23 +81,57 @@ _SOURCE_LABEL = {
 }
 
 
+def _affected_metrics_phrase(category: str,
+                              consumer_label: str | None) -> str:
+    """
+    Build a user-facing description of WHICH metrics this category
+    feeds. If the caller passed an explicit consumer_label (e.g.,
+    "Sharpe ratio" from the Portfolio KPI row), use it verbatim. If
+    not, look up METRIC_DEPENDENCIES from data_source_state and
+    render the first 2-3 downstream metric names as a concise list.
+    """
+    if consumer_label:
+        return consumer_label
+    from core.data_source_state import affected_metrics
+    metrics = affected_metrics(category)
+    if not metrics:
+        return "this panel"
+    if len(metrics) == 1:
+        return metrics[0]
+    if len(metrics) == 2:
+        return f"{metrics[0]} and {metrics[1]}"
+    return f"{metrics[0]}, {metrics[1]}, and {len(metrics) - 2} other metric" + (
+        "s" if len(metrics) - 2 > 1 else ""
+    )
+
+
 def data_source_badge(
     category: str,
     state: "str | None" = None,
     source: "str | None" = None,
     age_minutes: "int | None" = None,
+    consumer_label: "str | None" = None,
 ) -> None:
     """
     Render the fallback-transparency badge for a data category.
 
     STATE 1 (LIVE)          — renders nothing.
-    STATE 2 (FALLBACK_LIVE) — small amber-dot badge + source name.
-    STATE 3 (CACHED)        — amber banner with age + Retry button.
-    STATIC                  — footnote-style annotation.
+    STATE 2 (FALLBACK_LIVE) — small amber-dot badge + source name +
+                              affected-metric label.
+    STATE 3 (CACHED)        — amber banner with age + affected
+                              metric + Retry button.
+    STATIC                  — footnote-style annotation naming the
+                              specific consumer metric.
+
+    `consumer_label` (Option 3): a short string naming the UI metric
+    that consumes this category — e.g., "Sharpe ratio" or "Historical
+    chart". If omitted, the badge looks up METRIC_DEPENDENCIES and
+    names the affected metrics generically. Passing an explicit label
+    produces the clearest message ("The Sharpe ratio is using…") when
+    only one KPI nearby consumes this category.
 
     Normally called without arguments beyond `category` — the current
     state, source, and age are read live from core.data_source_state.
-    Explicit args are accepted for testing / UI previews.
     """
     import html as _html
 
@@ -113,6 +147,9 @@ def data_source_badge(
     resolved_source = source if source is not None else get_source(category)
     resolved_age = age_minutes if age_minutes is not None else get_age_minutes(category)
 
+    affected = _affected_metrics_phrase(category, consumer_label)
+    affected_html = _html.escape(affected)
+
     # STATE 1 — nothing to show.
     if resolved_state in (DataSourceState.LIVE.value, DataSourceState.UNKNOWN.value):
         return
@@ -120,28 +157,24 @@ def data_source_badge(
     # STATE 2 — secondary/tertiary live source active.
     if resolved_state == DataSourceState.FALLBACK_LIVE.value:
         pretty = _SOURCE_LABEL.get(resolved_source, resolved_source or "alternate")
-        # HTML-escape the source name before injecting into markdown with
-        # unsafe_allow_html=True. All call sites today pass hardcoded
-        # source strings, so this is hygiene rather than a live XSS
-        # vector — but future callers (e.g., scanner passing a filer
-        # display_name that originated from an EDGAR response) would
-        # be a vector without this.
         pretty_html = _html.escape(str(pretty))
         st.markdown(
             f"<span class='eap-dss-badge eap-dss-fallback' "
-            f"title='Primary source unavailable — serving from {pretty_html}.'>"
-            f"● Source: {pretty_html}</span>",
+            f"title='{affected_html} — primary source unavailable; "
+            f"serving from {pretty_html}.'>"
+            f"● {affected_html}: source → {pretty_html}</span>",
             unsafe_allow_html=True,
         )
         return
 
-    # STATIC — footnote-style annotation (e.g., risk-free-rate fallback).
+    # STATIC — footnote-style annotation naming the specific consumer.
     if resolved_state == DataSourceState.STATIC.value:
         pretty = _SOURCE_LABEL.get(resolved_source, "static estimate")
         pretty_html = _html.escape(str(pretty))
         st.markdown(
             f"<span class='eap-dss-footnote'>"
-            f"¹ Using {pretty_html} — primary live source temporarily unavailable.</span>",
+            f"¹ {affected_html} is using {pretty_html} — primary "
+            f"live source temporarily unavailable.</span>",
             unsafe_allow_html=True,
         )
         return
@@ -153,7 +186,8 @@ def data_source_badge(
     with col_msg:
         st.markdown(
             f"<div class='eap-dss-banner'>"
-            f"⚠ Last updated {age_label} — live data temporarily unavailable."
+            f"⚠ {affected_html} — last live update {age_label}. "
+            f"Primary source temporarily unavailable."
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -161,6 +195,92 @@ def data_source_badge(
         if st.button("Retry live fetch", key=banner_key, use_container_width=True):
             reset_all()
             st.toast("Live fetch retry queued — refreshing caches.")
+
+
+def data_sources_panel(
+    categories: list[str] | None = None,
+    *,
+    expanded: bool = False,
+    key: str = "data_sources_panel",
+) -> None:
+    """
+    Top-of-page live status grid for every data-source category this
+    app consumes. Lets the FA audit the whole data stack at a glance
+    without having to read tile-level footnotes scattered across the
+    page.
+
+    Each row shows:
+      - Data source (human-friendly label)
+      - Current state (LIVE / FALLBACK_LIVE / CACHED / STATIC / UNKNOWN)
+      - Active source (yfinance, stooq, fred, edgar, cache, static, …)
+      - Age of most recent successful fetch (minutes)
+      - Affected metrics (comma-separated list from METRIC_DEPENDENCIES)
+
+    Collapsed by default so it doesn't dominate above-the-fold — the
+    FA clicks to expand when they want the audit.
+
+    `categories`: if None, shows every known category from METRIC_DEPENDENCIES.
+    """
+    from core.data_source_state import (
+        DataSourceState,
+        METRIC_DEPENDENCIES,
+        get_age_minutes,
+        get_source,
+        get_state,
+        human_category_label,
+    )
+
+    shown_cats = categories if categories is not None else list(METRIC_DEPENDENCIES.keys())
+
+    # Summary dot — green if every category is LIVE, amber if any are
+    # in a fallback state, grey if nothing's been touched this session.
+    states = [get_state(c).value for c in shown_cats]
+    any_fallback = any(
+        s in (DataSourceState.FALLBACK_LIVE.value,
+              DataSourceState.CACHED.value,
+              DataSourceState.STATIC.value)
+        for s in states
+    )
+    all_live_or_unknown = all(
+        s in (DataSourceState.LIVE.value, DataSourceState.UNKNOWN.value)
+        for s in states
+    )
+    if any_fallback:
+        summary = "Data sources — some categories in fallback"
+    elif all_live_or_unknown and any(s == DataSourceState.LIVE.value for s in states):
+        summary = "Data sources — all live"
+    else:
+        summary = "Data sources — awaiting first fetch"
+
+    with st.expander(summary, expanded=expanded):
+        import pandas as _pd
+        rows = []
+        for cat in shown_cats:
+            state = get_state(cat).value
+            src = get_source(cat) or "—"
+            age = get_age_minutes(cat)
+            metrics_list = METRIC_DEPENDENCIES.get(cat, [])
+            rows.append({
+                "Data source":    human_category_label(cat),
+                "State":          state,
+                "Active source":  src,
+                "Age (min)":      age if age is not None else "—",
+                "Affected metrics": ", ".join(metrics_list) if metrics_list else "—",
+            })
+        df = _pd.DataFrame(rows)
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            key=key,
+        )
+        st.caption(
+            "LIVE = primary source succeeded most recently. "
+            "FALLBACK_LIVE = secondary live source served the request. "
+            "CACHED = all live sources failed; serving last-known data. "
+            "STATIC = no cache available; serving a hardcoded default. "
+            "UNKNOWN = category not yet queried this session."
+        )
 
 
 def tier_pill_selector(options: list[str], default_index: int = 2,

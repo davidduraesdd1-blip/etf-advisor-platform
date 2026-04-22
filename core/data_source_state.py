@@ -60,11 +60,74 @@ class DataSourceState(str, Enum):
 # the primary source resets the category to LIVE. A fetch that succeeds
 # from anything else transitions to FALLBACK_LIVE.
 _PRIMARY_SOURCE_BY_CATEGORY: dict[str, str] = {
-    "etf_price":      "yfinance",
-    "etf_reference":  "edgar",
-    "risk_free_rate": "fred",
-    "edgar_scanner":  "edgar",
+    "etf_price":       "yfinance",
+    "etf_reference":   "edgar",
+    "etf_composition": "edgar",
+    "etf_long_run":    "yfinance",
+    "risk_free_rate":  "fred",
+    "edgar_scanner":   "edgar",
 }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Metric-dependency registry — which user-facing numbers each data-source
+# category feeds. The data_source_badge component + the top-of-page
+# data_sources_panel use this to tell the FA EXACTLY which metric is
+# affected when a source enters fallback.
+# ═══════════════════════════════════════════════════════════════════════════
+
+METRIC_DEPENDENCIES: dict[str, list[str]] = {
+    "etf_price": [
+        "Historical return (annualized)",
+        "90-day realized volatility",
+        "90-day BTC correlation",
+        "30-day basket change (Dashboard)",
+        "Historical returns chart (Portfolio + ETF Detail)",
+        "Execute Basket last-close prices",
+    ],
+    "etf_long_run": [
+        "Forward estimate (model)",
+    ],
+    "risk_free_rate": [
+        "Sharpe ratio",
+        "Sortino ratio",
+        "Calmar ratio",
+        "Excess return",
+    ],
+    "etf_composition": [
+        "ETF Detail Composition table (per-ticker)",
+    ],
+    "etf_reference": [
+        "Issuer / expense-ratio metadata",
+    ],
+    "edgar_scanner": [
+        "New-listing discovery (daily cron)",
+        "Scanner health indicator (Settings)",
+    ],
+}
+
+
+def affected_metrics(category: str) -> list[str]:
+    """
+    Return the list of user-facing metric names that consume this
+    data-source category. Used by UI components to name specifically
+    which numbers go stale when a category enters fallback.
+    Unknown categories return [] rather than raising so the UI
+    degrades cleanly.
+    """
+    return list(METRIC_DEPENDENCIES.get(category, []))
+
+
+def human_category_label(category: str) -> str:
+    """Pretty label for the top-of-page data sources panel."""
+    return {
+        "etf_price":       "ETF price history (yfinance → Stooq)",
+        "etf_long_run":    "Long-run BTC/ETH CAGR (10yr underlying)",
+        "risk_free_rate":  "Risk-free rate (FRED 3M T-bill)",
+        "etf_composition": "ETF composition (SEC EDGAR N-PORT + issuer)",
+        "etf_reference":   "ETF reference data (expense, issuer)",
+        "edgar_scanner":   "EDGAR new-listing scanner",
+    }.get(category, category)
 
 
 @dataclass
