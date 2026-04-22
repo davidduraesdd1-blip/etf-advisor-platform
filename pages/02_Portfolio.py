@@ -335,7 +335,7 @@ with card("Performance"):
                         "service is temporarily unreachable. The forward-projection tab still works."
                     ),
                     intermediate="No historical data from any fallback source. Try the Retry button on the banner, or switch to forward projection.",
-                    advanced="All live price sources (yfinance / Stooq / Alpha Vantage) returned empty. Check circuit breaker state in Settings.",
+                    advanced="Live price chain (yfinance → Stooq) returned empty for every holding. Check circuit breaker state in Settings.",
                 )
             )
 

@@ -67,9 +67,16 @@ def take_token() -> None:
     """
     Block the caller until a token is available. Refill rate =
     EDGAR_REQS_PER_SEC tokens/sec up to a max of EDGAR_REQS_PER_SEC.
+
+    Implementation: take the lock briefly to read + decrement the token
+    counter. If empty, compute the wait time, release the lock, sleep
+    outside the critical section, then retry. This avoids the busy-wait
+    under lock that the earlier implementation had, which would burn
+    CPU for up to 100ms per throttled request and block all other
+    threads from checking the bucket during that window.
     """
-    with _bucket_lock:
-        while True:
+    while True:
+        with _bucket_lock:
             now = time.monotonic()
             elapsed = now - _bucket_state["last_refill"]
             _bucket_state["tokens"] = min(
@@ -80,22 +87,13 @@ def take_token() -> None:
             if _bucket_state["tokens"] >= 1.0:
                 _bucket_state["tokens"] -= 1.0
                 return
-            sleep_for = (1.0 - _bucket_state["tokens"]) / EDGAR_REQS_PER_SEC
-        # release lock while sleeping — but we want global rate limit, so
-        # we keep the lock held. sleep_for is typically < 100ms.
-        # (unreachable — loop returns)
-
-
-def _sleep_for_token() -> None:
-    """Helper: wait outside the lock when tokens are empty."""
-    now = time.monotonic()
-    elapsed = now - _bucket_state["last_refill"]
-    tokens = min(
-        float(EDGAR_REQS_PER_SEC),
-        _bucket_state["tokens"] + elapsed * EDGAR_REQS_PER_SEC,
-    )
-    if tokens < 1.0:
-        time.sleep((1.0 - tokens) / EDGAR_REQS_PER_SEC)
+            deficit = 1.0 - _bucket_state["tokens"]
+            sleep_for = deficit / EDGAR_REQS_PER_SEC
+        # Sleep OUTSIDE the lock so other threads can check the bucket
+        # meanwhile. Cap the wait at 1s to avoid unresponsive hangs if
+        # the system clock jumps backwards (monotonic() guards against
+        # that already, but defense in depth).
+        time.sleep(min(max(sleep_for, 0.001), 1.0))
 
 
 # ═══════════════════════════════════════════════════════════════════════════

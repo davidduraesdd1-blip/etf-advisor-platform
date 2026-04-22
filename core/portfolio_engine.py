@@ -258,12 +258,43 @@ _CATEGORY_PAIR_CORR: dict[tuple[str, str], float] = {
 }
 
 
+# Track cross-category pairs we've already warned about so the log doesn't
+# spam on every covariance-matrix build. Session-scoped.
+_warned_missing_pairs: set[tuple[str, str]] = set()
+
+
 def _pair_corr(cat_i: str, cat_j: str) -> float:
-    """Lookup pairwise correlation between two categories (symmetric)."""
+    """
+    Lookup pairwise correlation between two categories (symmetric).
+    Emits a one-time warning per missing pair so incomplete category
+    coverage surfaces in the logs during development, rather than
+    silently falling back to the generic 0.70 estimate.
+    """
     if cat_i == cat_j:
-        return _CATEGORY_PAIR_CORR.get((cat_i, cat_j), 0.90)
+        val = _CATEGORY_PAIR_CORR.get((cat_i, cat_j))
+        if val is None:
+            key = (cat_i, cat_i)
+            if key not in _warned_missing_pairs:
+                _warned_missing_pairs.add(key)
+                logger.warning(
+                    "Missing within-category correlation for %r — using 0.90 default.",
+                    cat_i,
+                )
+            return 0.90
+        return val
+
     key = (cat_i, cat_j) if (cat_i, cat_j) in _CATEGORY_PAIR_CORR else (cat_j, cat_i)
-    return _CATEGORY_PAIR_CORR.get(key, 0.70)
+    val = _CATEGORY_PAIR_CORR.get(key)
+    if val is None:
+        canonical = tuple(sorted((cat_i, cat_j)))
+        if canonical not in _warned_missing_pairs:
+            _warned_missing_pairs.add(canonical)
+            logger.warning(
+                "Missing cross-category correlation for %r × %r — using 0.70 default.",
+                cat_i, cat_j,
+            )
+        return 0.70
+    return val
 
 
 def _build_covariance_matrix(holdings: list[dict]) -> np.ndarray:

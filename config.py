@@ -130,7 +130,9 @@ DAILY_SCANNER_MINUTE_ET: int = 30
 USER_LEVELS: tuple[str, ...] = ("Beginner", "Intermediate", "Advanced")
 DEFAULT_USER_LEVEL: str = "Beginner"
 
-# ── Risk tiers (CLAUDE.md §13) — full allocations land on Day 2 ───────────────
+# ── Risk tiers (CLAUDE.md §13) ────────────────────────────────────────────────
+# Full allocation matrix is in core.risk_tiers.TIER_CATEGORY_ALLOCATIONS.
+# This dict is only the tier metadata shown on the Portfolio + Dashboard pages.
 PORTFOLIO_TIERS: dict[str, dict] = {
     "Ultra Conservative": {
         "tier_number": 1,
@@ -174,7 +176,16 @@ PORTFOLIO_TIERS: dict[str, dict] = {
     },
 }
 
-# ── Starter ETF universe (CLAUDE.md §13) — scanner expands this on Day 2 ──────
+# ── ETF universe (CLAUDE.md §13) ─────────────────────────────────────────────
+# POST OPTION-2: the authoritative universe lives in data/etf_universe.json
+# (73 tickers, 9 categories). This ETF_UNIVERSE_SEED is a minimal emergency
+# fallback ONLY used if that JSON file is missing or malformed at runtime.
+# DO NOT EDIT — edit data/etf_universe.json instead. A mismatch between
+# these two sources is OK at rest because the seed is never consulted
+# when the JSON is readable.
+#
+# DEFI is categorized here as btc_spot (matching the JSON) — Hashdex
+# converted it from a futures ETF to a spot ETF in March 2024.
 ETF_UNIVERSE_SEED: list[dict[str, str]] = [
     # Spot Bitcoin ETFs
     {"ticker": "IBIT", "issuer": "BlackRock",  "category": "btc_spot",   "name": "iShares Bitcoin Trust"},
@@ -187,7 +198,7 @@ ETF_UNIVERSE_SEED: list[dict[str, str]] = [
     {"ticker": "HODL", "issuer": "VanEck",     "category": "btc_spot",   "name": "VanEck Bitcoin Trust"},
     {"ticker": "BTC",  "issuer": "Grayscale",  "category": "btc_spot",   "name": "Grayscale Bitcoin Mini Trust"},
     {"ticker": "GBTC", "issuer": "Grayscale",  "category": "btc_spot",   "name": "Grayscale Bitcoin Trust"},
-    {"ticker": "DEFI", "issuer": "Hashdex",    "category": "btc_futures","name": "Hashdex Bitcoin Futures ETF"},
+    {"ticker": "DEFI", "issuer": "Hashdex",    "category": "btc_spot",   "name": "Hashdex Bitcoin ETF"},
     # Spot Ethereum ETFs
     {"ticker": "ETHA", "issuer": "BlackRock",  "category": "eth_spot",   "name": "iShares Ethereum Trust"},
     {"ticker": "FETH", "issuer": "Fidelity",   "category": "eth_spot",   "name": "Fidelity Ethereum Fund"},

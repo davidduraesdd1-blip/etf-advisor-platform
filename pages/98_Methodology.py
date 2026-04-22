@@ -82,19 +82,20 @@ with card("Backtest methodology"):
             "20% Bitcoin spot sleeve, rebalanced quarterly."
         ),
         intermediate=(
-            "Historical OHLCV from yfinance → Stooq → Alpha Vantage "
-            "fallback chain (cached 5min during market hours, 60min off-hours). "
-            "1Y / 3Y / 5Y / since-inception tabs. Benchmark = "
-            "`BENCHMARK_DEFAULT` in `config.py`. Max drawdown computed on "
-            "daily close series."
+            "Historical OHLCV from yfinance → Stooq fallback chain (cached "
+            "5min during market hours, 60min off-hours). 1Y / 3Y / 5Y / "
+            "since-inception tabs. Benchmark = `BENCHMARK_DEFAULT` in "
+            "`config.py`. Max drawdown computed on daily close series."
         ),
         advanced=(
-            "Price chain: yfinance primary → Stooq (~15-min delayed) → "
-            "Alpha Vantage (25 req/day, spot-check only). Circuit breaker "
-            "trips yfinance to Stooq on 3 failures in a 60-second rolling "
-            "window; new-ETF empty results do not count toward the breaker. "
-            "All fallback states surface via `data_source_badge` on the "
-            "affected panel."
+            "Price chain: yfinance primary → Stooq (~15-min delayed). "
+            "Circuit breaker trips yfinance to Stooq on 3 failures in a "
+            "60-second rolling window; new-ETF empty results do not count "
+            "toward the breaker. All fallback states surface via "
+            "`data_source_badge` on the affected panel. Alpha Vantage was "
+            "removed from the active chain (25 req/day free tier was a "
+            "false fallback); scaffold retained in integrations/data_feeds "
+            "for paid-tier reactivation."
         ),
     ))
 

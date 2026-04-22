@@ -99,6 +99,8 @@ def data_source_badge(
     state, source, and age are read live from core.data_source_state.
     Explicit args are accepted for testing / UI previews.
     """
+    import html as _html
+
     from core.data_source_state import (
         DataSourceState,
         get_age_minutes,
@@ -118,10 +120,17 @@ def data_source_badge(
     # STATE 2 — secondary/tertiary live source active.
     if resolved_state == DataSourceState.FALLBACK_LIVE.value:
         pretty = _SOURCE_LABEL.get(resolved_source, resolved_source or "alternate")
+        # HTML-escape the source name before injecting into markdown with
+        # unsafe_allow_html=True. All call sites today pass hardcoded
+        # source strings, so this is hygiene rather than a live XSS
+        # vector — but future callers (e.g., scanner passing a filer
+        # display_name that originated from an EDGAR response) would
+        # be a vector without this.
+        pretty_html = _html.escape(str(pretty))
         st.markdown(
             f"<span class='eap-dss-badge eap-dss-fallback' "
-            f"title='Primary source unavailable — serving from {pretty}.'>"
-            f"● Source: {pretty}</span>",
+            f"title='Primary source unavailable — serving from {pretty_html}.'>"
+            f"● Source: {pretty_html}</span>",
             unsafe_allow_html=True,
         )
         return
@@ -129,9 +138,10 @@ def data_source_badge(
     # STATIC — footnote-style annotation (e.g., risk-free-rate fallback).
     if resolved_state == DataSourceState.STATIC.value:
         pretty = _SOURCE_LABEL.get(resolved_source, "static estimate")
+        pretty_html = _html.escape(str(pretty))
         st.markdown(
             f"<span class='eap-dss-footnote'>"
-            f"¹ Using {pretty} — primary live source temporarily unavailable.</span>",
+            f"¹ Using {pretty_html} — primary live source temporarily unavailable.</span>",
             unsafe_allow_html=True,
         )
         return

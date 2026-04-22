@@ -215,7 +215,7 @@ with card("Historical returns"):
         st.info(level_text(
             beginner="Historical prices aren't available right now — the market-data service is temporarily unreachable.",
             intermediate="No price data from any live source.",
-            advanced="All live price sources (yfinance / Stooq / Alpha Vantage) returned empty for this ticker.",
+            advanced="Live price chain (yfinance → Stooq) returned empty for this ticker.",
         ))
     else:
         df = pd.DataFrame(rows)
