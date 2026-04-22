@@ -13,7 +13,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from config import BRAND_NAME
+from config import BRAND_NAME, SUPERGROK_BASE_URL, SUPERGROK_COIN_MAP
 from core.etf_universe import load_universe_with_live_analytics
 from core.portfolio_engine import build_portfolio, run_monte_carlo
 from core.signal_adapter import composite_signal
@@ -147,6 +147,21 @@ with r2:
     kpi_tile("Forward estimate (model)",
              f"{fwd:.1f}%" if fwd is not None else "—")
 
+# Count how many ETFs share this fund's category so the user knows
+# why the forward estimate clusters with its category peers.
+_cat = etf.get("category", "")
+_n_same_cat = sum(1 for u in universe if u.get("category") == _cat)
+if _n_same_cat > 1:
+    _cat_pretty = _cat.replace("_", " ")
+    st.caption(
+        f"Forward estimate uses a category-level formula (long-run "
+        f"BTC-USD / ETH-USD CAGR with category-specific drag/premium), "
+        f"so all {_n_same_cat} funds in the **{_cat_pretty}** category "
+        f"land within expense-ratio tolerance of each other. Historical "
+        f"return above is per-fund and will vary by individual price "
+        f"history."
+    )
+
 # Per-tile provenance — makes live/fallback explicit on ETF Detail.
 _vol_src = etf.get("volatility_source", "category_default")
 _corr_src = etf.get("correlation_source", "category_default")
@@ -268,8 +283,18 @@ with card("Composition"):
             import pandas as _pd
             df_rows = []
             for h in comp["holdings"]:
+                raw_name = h.get("name", "")
+                # If this holding name maps to a SuperGrok-covered coin,
+                # render as a clickable markdown link so the FA can
+                # open the crypto-screener research view.
+                sg_symbol = SUPERGROK_COIN_MAP.get(raw_name)
+                if sg_symbol:
+                    sg_url = f"{SUPERGROK_BASE_URL}?coin={sg_symbol}"
+                    display_name = f"[{raw_name} →]({sg_url})"
+                else:
+                    display_name = raw_name
                 df_rows.append({
-                    "Name":       h.get("name", ""),
+                    "Name":       display_name,
                     "Asset cat":  h.get("asset_cat", ""),
                     "Balance":    h.get("balance"),
                     "Value USD":  h.get("value_usd"),
@@ -281,11 +306,33 @@ with card("Composition"):
                 use_container_width=True,
                 hide_index=True,
                 column_config={
+                    # LinkColumn renders markdown [text](url) links as
+                    # clickable; column width follows the label length.
+                    "Name": st.column_config.LinkColumn(
+                        "Name",
+                        help="Click to open this coin in the SuperGrok screener.",
+                        display_text=r"\[(.*?) →\]",
+                    ),
                     "Value USD": st.column_config.NumberColumn(format="$%,.0f"),
                     "% of fund": st.column_config.NumberColumn(format="%.2f%%"),
                 },
             )
             st.caption(f"Total holdings: {comp['holdings_count']}")
+
+            # SuperGrok onboarding notice — only surface when there's
+            # at least one clickable coin in this basket.
+            _has_sg_link = any(
+                SUPERGROK_COIN_MAP.get(h.get("name", ""))
+                for h in comp["holdings"]
+            )
+            if _has_sg_link:
+                st.info(
+                    "**→ SuperGrok integration:** Click any coin name "
+                    "above to open full technical + on-chain research. "
+                    "**First-time tip:** once SuperGrok loads, click the "
+                    "'Analyze All Coins Now' button to seed the data "
+                    "(nothing populates until you do)."
+                )
 
             # For issuer-static trusts, surface the issuer's live
             # holdings page so the FA can audit the per-share coin

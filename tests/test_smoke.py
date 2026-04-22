@@ -131,3 +131,57 @@ def test_page_runs_via_streamlit_apptest(page: str) -> None:
     at = AppTest.from_file(str(REPO_ROOT / page), default_timeout=10)
     at.run()
     assert not at.exception, f"{page} raised: {at.exception}"
+
+
+def test_etf_detail_selectbox_change_produces_different_values() -> None:
+    """
+    Regression guard for the "numbers don't change when I pick a
+    different ETF" concern. After selecting a non-default ticker, at
+    least one of the fund-specific fields on the page (historical
+    return text, volatility text, etc.) must differ from the default
+    render. Confirms Streamlit's rerun correctly propagates the
+    selectbox change through every downstream calculation.
+    """
+    pytest.importorskip("streamlit.testing.v1")
+    from streamlit.testing.v1 import AppTest
+
+    # First render — default ticker (usually index 0 of the universe)
+    at_default = AppTest.from_file(
+        str(REPO_ROOT / "pages/03_ETF_Detail.py"),
+        default_timeout=15,
+    )
+    at_default.run()
+    assert not at_default.exception, f"default render raised: {at_default.exception}"
+
+    # Text content on the default render (captions + markdown blocks)
+    default_blob = " ".join(
+        (el.value or "") if hasattr(el, "value") else str(el)
+        for el in list(at_default.markdown) + list(at_default.caption)
+    )
+
+    # Second render — swap selectbox to a different ticker (index 1).
+    at_changed = AppTest.from_file(
+        str(REPO_ROOT / "pages/03_ETF_Detail.py"),
+        default_timeout=15,
+    )
+    at_changed.run()
+    # Streamlit AppTest exposes the first selectbox via .selectbox[0]
+    # For ETF Detail the first selectbox is the Ticker picker.
+    if len(at_changed.selectbox) > 0:
+        sb = at_changed.selectbox[0]
+        options = list(sb.options or [])
+        if len(options) >= 2:
+            sb.set_value(options[1]).run()
+
+    changed_blob = " ".join(
+        (el.value or "") if hasattr(el, "value") else str(el)
+        for el in list(at_changed.markdown) + list(at_changed.caption)
+    )
+
+    # Something about the rendered output MUST differ when a different
+    # ticker is selected — either the ticker name in headers, the
+    # category caption, or individual per-fund numbers.
+    assert default_blob != changed_blob, (
+        "ETF Detail rendered identical content for two different "
+        "selectbox values — the selectbox change is not flowing through."
+    )

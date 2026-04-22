@@ -21,6 +21,35 @@ DOCS_DIR: Path = PROJECT_ROOT / "docs"
 BRAND_NAME: str = "ETF Advisor Platform"
 BRAND_LOGO_PATH: str | None = None  # set to a local path when a real logo exists
 
+# ── Cross-app integration: SuperGrok crypto screener ──────────────────────────
+# The SuperGrok Mathematically Model is a separate Streamlit app that
+# scores and ranks crypto coins. When the ETF Advisor shows a fund's
+# underlying coin in the Composition card, we deep-link the coin name
+# to SuperGrok so the FA can jump into a full research view.
+#
+# IMPORTANT FA onboarding note: SuperGrok requires the FA to click the
+# "Analyze All Coins Now" button on first visit before any data
+# populates. This instruction is surfaced in the UI wherever a
+# SuperGrok link is presented.
+SUPERGROK_BASE_URL: str = "https://cryptosignal-ddb1.streamlit.app/"
+
+# Coin-symbol mapping: underlying asset name → SuperGrok query param.
+# SuperGrok's query-param spec is `?coin=BTC` / `?coin=ETH` etc.
+# Kept here so we stay in sync if SuperGrok adds more coins later.
+SUPERGROK_COIN_MAP: dict[str, str] = {
+    "Bitcoin":    "BTC",
+    "Ethereum":   "ETH",
+    "Solana":     "SOL",
+    "XRP":        "XRP",
+    "Litecoin":   "LTC",
+    "Dogecoin":   "DOGE",
+    "HBAR":       "HBAR",
+    "Avalanche":  "AVAX",
+    "Cardano":    "ADA",
+    "Polkadot":   "DOT",
+    "Chainlink":  "LINK",
+}
+
 # ── Feature flags (CLAUDE.md §22, §2) ─────────────────────────────────────────
 # EXTENDED_MODULES_ENABLED toggles Framing A (ETF-only) vs Framing B
 # (ETF + RWA + DeFi). Default False = conservative framing.
