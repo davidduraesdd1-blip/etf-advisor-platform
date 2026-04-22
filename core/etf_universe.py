@@ -317,8 +317,26 @@ def load_universe_with_live_analytics(
             etf.setdefault("forward_return_source", "unavailable")
         return base
 
-    # Slow path — no fresh precompute. Run the live enrichment loop
-    # (~3-5 minutes on a cold throttled Streamlit Cloud IP).
+    # Slow path — no fresh precompute. Run the live enrichment loop.
+    # Pre-warm with batched fetches so the per-ticker calls below all
+    # hit the in-memory _yf_memo cache. Without batching, this loop
+    # takes 5+ minutes; with it, ~10-30 seconds even when yfinance is
+    # throttled.
+    try:
+        from integrations.data_feeds import get_etf_prices_batch
+        all_tickers = [e["ticker"] for e in base]
+        # 5y for CAGR + 144d for vol / correlation
+        get_etf_prices_batch(all_tickers, period="5y", interval="1d")
+        get_etf_prices_batch(all_tickers, period="144d", interval="1d")
+        # IBIT (BTC proxy) is already in the universe so it's pre-warmed.
+        # BTC-USD / ETH-USD long-run for forward returns:
+        get_etf_prices_batch(["BTC-USD", "ETH-USD"], period="10y", interval="1d")
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.warning(
+            "Batch pre-warm failed (%s) — per-ticker enrichment "
+            "will fall through to individual yfinance calls.", exc,
+        )
+
     for etf in base:
         tkr = etf["ticker"]
 

@@ -37,7 +37,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from config import DATA_DIR
 from core.etf_universe import (
     ANALYTICS_SNAPSHOT_PATH,
-    _CATEGORY_DEFAULTS,
     load_universe,
 )
 from integrations.data_feeds import (
@@ -152,15 +151,34 @@ def precompute() -> dict:
         if snap:
             per_ticker[tkr] = snap
 
+    # Distinguish "fully covered" tickers (live ret + vol + corr from
+    # this fund's own price history) from "forward-only" ones (yfinance
+    # didn't index the ticker, so we have only the model-derived forward
+    # estimate from BTC/ETH long-run). Previously the metadata reported
+    # a single tickers_with_data count that conflated both — misleading.
+    n_fully_live = sum(
+        1 for snap in per_ticker.values()
+        if snap.get("expected_return_source") == "live"
+        and "volatility" in snap
+        and "correlation_with_btc" in snap
+    )
+    n_forward_only = sum(
+        1 for snap in per_ticker.values()
+        if "forward_return" in snap
+        and snap.get("expected_return_source") != "live"
+    )
+
     snapshot = {
         "_metadata": {
-            "computed_at_ts":     time.time(),
-            "computed_at_iso":    datetime.now(timezone.utc).isoformat(),
-            "universe_size":      n_total,
-            "tickers_with_data":  len(per_ticker),
-            "btc_long_run_cagr_pct": btc_long.get("cagr_pct"),
-            "eth_long_run_cagr_pct": eth_long.get("cagr_pct"),
-            "schema_version":     1,
+            "computed_at_ts":          time.time(),
+            "computed_at_iso":         datetime.now(timezone.utc).isoformat(),
+            "universe_size":           n_total,
+            "tickers_with_data":       len(per_ticker),
+            "tickers_fully_live":      n_fully_live,
+            "tickers_forward_only":    n_forward_only,
+            "btc_long_run_cagr_pct":   btc_long.get("cagr_pct"),
+            "eth_long_run_cagr_pct":   eth_long.get("cagr_pct"),
+            "schema_version":          1,
         },
         "etfs": per_ticker,
     }
