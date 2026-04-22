@@ -278,14 +278,30 @@ with card("Composition"):
             st.caption(f"Total holdings: {comp['holdings_count']}")
     else:
         category = etf.get("category", "")
-        if category == "btc_spot":
-            st.write("Summary view: Bitcoin spot exposure, custodied by the issuer.")
-        elif category == "eth_spot":
-            st.write("Summary view: Ethereum spot exposure, custodied by the issuer.")
-        elif category == "btc_futures":
-            st.write("Summary view: Bitcoin futures (CME). No spot BTC holdings.")
-        else:
-            st.write("Summary view: thematic / multi-asset exposure.")
+        underlying = etf.get("underlying", "")
+        _category_summaries = {
+            "btc_spot":            "Bitcoin spot exposure, custodied by the issuer.",
+            "eth_spot":            "Ethereum spot exposure, custodied by the issuer. "
+                                   "Staking yield may be distributed (ETHA / FETH / ETH as of Feb 2026).",
+            "btc_futures":         "Bitcoin futures (CME). No spot BTC holdings. "
+                                   "Tracking error + contango drag vs. spot.",
+            "eth_futures":         "Ethereum futures (CME). Tracking error + contango drag vs. spot.",
+            "altcoin_spot":        f"Spot {underlying or 'altcoin'} exposure. Approved via SEC's "
+                                   f"Sep-2025 generic listing standard for commodity trusts.",
+            "leveraged":           f"2× daily leveraged exposure to "
+                                   f"{underlying or 'crypto'} via swaps / futures. "
+                                   f"Volatility decay erodes long-run multi-day returns "
+                                   f"below the headline leverage factor.",
+            "income_covered_call": f"Covered-call strategy on {underlying or 'underlying crypto asset'}. "
+                                   f"Caps upside participation in exchange for option "
+                                   f"premium distributions (typically paid weekly or monthly).",
+            "thematic_equity":     "Basket of crypto-industry equities (miners, exchanges, "
+                                   "blockchain infrastructure). Equity-market beta on top of "
+                                   "crypto-asset exposure.",
+            "multi_asset":         "Multi-asset basket of large-cap cryptocurrencies "
+                                   "(typically BTC/ETH-dominant with long-tail altcoin exposure).",
+        }
+        st.write(f"Summary view: {_category_summaries.get(category, 'thematic / multi-asset exposure.')}")
         st.caption(
             "Live EDGAR N-PORT holdings are wired for IBIT / ETHA / FBTC / FETH "
             "in the demo scope. Full issuer coverage lands post-demo."

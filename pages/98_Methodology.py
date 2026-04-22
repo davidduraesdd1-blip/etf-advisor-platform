@@ -47,7 +47,10 @@ with card("How portfolios are constructed"):
             "category ceilings on the crypto sleeve: **5% / 10% / 20% / "
             "35% / 50%+** of total portfolio. Inside each tier, the allocation "
             "matrix (`core/risk_tiers.py`) distributes the sleeve across "
-            "btc_spot / eth_spot / btc_futures / thematic buckets."
+            "9 category buckets: btc_spot / eth_spot / altcoin_spot / "
+            "income_covered_call / thematic_equity / leveraged / multi_asset. "
+            "btc_futures and eth_futures are excluded by design (spot strictly "
+            "dominates post-approval)."
         ),
         advanced=(
             "`core/portfolio_engine.py::build_portfolio` implements: \n\n"
@@ -56,7 +59,7 @@ with card("How portfolios are constructed"):
             "`MAX_ETFS_PER_CATEGORY=3` ETFs sorted by expense ratio (ties "
             "broken on issuer diversity).\n"
             "3. Apply issuer-tier nudge: Tier A (BlackRock, Fidelity) +2pp, "
-            "Tier C (GBTC / ETHE / DEFI) −2pp, neutral otherwise. "
+            "Tier C (GBTC / ETHE / DEFI / XRPR / BITW) −2pp, neutral otherwise. "
             "Post-nudge renormalize so each category still sums to its target.\n"
             "4. Enforce `MAX_SINGLE_POSITION_PCT=30%` diversification cap.\n"
             "5. Normalize final weights to 100%; last holding absorbs "

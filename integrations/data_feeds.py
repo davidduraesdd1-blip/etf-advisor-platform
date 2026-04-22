@@ -45,10 +45,23 @@ from core.data_source_state import (
 logger = logging.getLogger(__name__)
 
 # Known-history set — only failures on these tickers count against the
-# circuit breaker per planning-side Risk 5 direction.
-_KNOWN_HISTORY_TICKERS: frozenset[str] = frozenset(
-    e["ticker"] for e in ETF_UNIVERSE_SEED
-)
+# circuit breaker. Post Option-2 we source from the full JSON-backed
+# registry (36 tickers including new altcoin spot, leveraged, and
+# income-covered-call products) so the breaker reflects the true
+# universe. Falls back to the legacy 19-ticker seed if the JSON
+# registry is missing.
+def _known_history_set() -> frozenset[str]:
+    try:
+        from core.etf_universe import _load_registry_from_disk
+        reg = _load_registry_from_disk()
+        if reg:
+            return frozenset(e["ticker"] for e in reg if e.get("ticker"))
+    except Exception:  # pragma: no cover — defensive
+        pass
+    return frozenset(e["ticker"] for e in ETF_UNIVERSE_SEED)
+
+
+_KNOWN_HISTORY_TICKERS: frozenset[str] = _known_history_set()
 
 # Day-4 Risk 2 mitigation: module-level memo of last-good fetch per ticker.
 # Keyed on (ticker, period, interval). Reduces yfinance hits during rapid

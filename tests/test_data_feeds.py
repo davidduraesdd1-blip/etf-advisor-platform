@@ -520,6 +520,84 @@ class TestForwardReturnEstimate:
         assert result["forward_return_pct"] is None
         assert result["source"] == "unavailable"
 
+    def test_altcoin_spot_applies_drawdown_haircut(self, monkeypatch):
+        """Altcoins modeled at BTC × 0.70 to reflect structural drawdown drag."""
+        from integrations import data_feeds as df
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=60.0, eth_cagr=45.0))
+
+        btc = df.get_forward_return_estimate("btc_spot", expense_ratio_bps=25)
+        alt = df.get_forward_return_estimate("altcoin_spot", expense_ratio_bps=50)
+        # altcoin_spot should be meaningfully below btc_spot
+        assert alt["forward_return_pct"] < btc["forward_return_pct"]
+        # Expected ≈ 60 × 0.70 - 0.50 = 41.50%
+        assert 40.5 < alt["forward_return_pct"] < 42.5
+
+    def test_leveraged_applies_vol_decay_factor(self, monkeypatch):
+        """2x products modeled at BTC × 1.40 (not 2.0) for vol decay."""
+        from integrations import data_feeds as df
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=60.0, eth_cagr=45.0))
+
+        lev = df.get_forward_return_estimate("leveraged", expense_ratio_bps=185)
+        btc = df.get_forward_return_estimate("btc_spot", expense_ratio_bps=25)
+        # 2x should exceed 1x but not by 2x (vol decay)
+        assert lev["forward_return_pct"] > btc["forward_return_pct"]
+        # Expected ≈ 60 × 1.40 - 1.85 = 82.15% — well below naive 2×60=120%
+        assert 80 < lev["forward_return_pct"] < 85
+
+    def test_income_covered_call_caps_upside(self, monkeypatch):
+        """Covered-call wrappers at BTC × 0.55 for option cap."""
+        from integrations import data_feeds as df
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=60.0, eth_cagr=45.0))
+
+        cc = df.get_forward_return_estimate("income_covered_call", expense_ratio_bps=99)
+        btc = df.get_forward_return_estimate("btc_spot", expense_ratio_bps=25)
+        # Covered-call total return roughly half of naked long
+        assert cc["forward_return_pct"] < btc["forward_return_pct"] * 0.7
+        # Expected ≈ 60 × 0.55 - 0.99 = 32.01%
+        assert 30 < cc["forward_return_pct"] < 34
+
+    def test_multi_asset_blends_three_components(self, monkeypatch):
+        """Multi-asset = 75% BTC + 15% ETH + 10% altcoin-proxy."""
+        from integrations import data_feeds as df
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=60.0, eth_cagr=45.0))
+
+        multi = df.get_forward_return_estimate("multi_asset", expense_ratio_bps=250)
+        # 0.75×60 + 0.15×45 + 0.10×(60×0.70) - 2.50
+        # = 45 + 6.75 + 4.20 - 2.50 = 53.45%
+        assert 52.5 < multi["forward_return_pct"] < 54.5
+
+    def test_eth_futures_applies_contango_drag(self, monkeypatch):
+        """ETH futures at ETH × 0.90."""
+        from integrations import data_feeds as df
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=60.0, eth_cagr=45.0))
+
+        efut = df.get_forward_return_estimate("eth_futures", expense_ratio_bps=95)
+        espot = df.get_forward_return_estimate("eth_spot", expense_ratio_bps=25)
+        assert efut["forward_return_pct"] < espot["forward_return_pct"]
+        # Expected ≈ 45 × 0.90 - 0.95 = 39.55%
+        assert 38.5 < efut["forward_return_pct"] < 40.5
+
+    def test_thematic_equity_alias_works(self, monkeypatch):
+        """`thematic_equity` (new name) should behave same as legacy `thematic`."""
+        from integrations import data_feeds as df
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=60.0, eth_cagr=45.0))
+
+        old = df.get_forward_return_estimate("thematic", expense_ratio_bps=71)
+        new = df.get_forward_return_estimate("thematic_equity", expense_ratio_bps=71)
+        assert old["forward_return_pct"] == new["forward_return_pct"]
+
     def test_long_run_cagr_caches_result(self, monkeypatch):
         """
         Once resolved, the 24-hour cache should prevent re-fetch on the
