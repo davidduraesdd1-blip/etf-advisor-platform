@@ -211,12 +211,22 @@ def get_cik_for_ticker(ticker: str) -> str | None:
 # Recent filings list for a CIK
 # ═══════════════════════════════════════════════════════════════════════════
 
-def get_recent_filings(cik: str, form_types: tuple[str, ...] = ("N-PORT",),
-                       max_rows: int = 20) -> list[dict]:
+def get_recent_filings(
+    cik: str,
+    form_types: tuple[str, ...] = ("NPORT-P", "NPORT-EX"),
+    max_rows: int = 20,
+) -> list[dict]:
     """
     Return a list of recent filings for the given CIK, filtered to the
     requested form_types. Each entry: {accession, form, filing_date,
     primary_document, primary_doc_url}.
+
+    IMPORTANT: SEC EDGAR's submissions.json uses specific form-name
+    strings; the generic label "N-PORT" is NOT one of them. Use:
+      - NPORT-P  (monthly portfolio holdings, public — what we want)
+      - NPORT-EX (exempt variant)
+      - NPORT-NP (non-public)
+      - 10-K, 10-Q, 8-K, S-1, N-1A, 19b-4, 497 — all exact
     """
     cik_padded = cik.lstrip("0").zfill(10)
     url = f"https://data.sec.gov/submissions/CIK{cik_padded}.json"

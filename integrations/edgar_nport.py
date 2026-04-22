@@ -230,9 +230,18 @@ def get_etf_composition(ticker: str) -> dict:
         if not cik:
             raise RuntimeError(f"No CIK found for ticker {tkr}")
 
-        filings = get_recent_filings(cik, form_types=("N-PORT",), max_rows=1)
+        # SEC EDGAR uses NPORT-P (monthly public portfolio report) and
+        # NPORT-EX (exempt variant) as the actual filed form names — NOT
+        # "N-PORT" which never appears in submissions.json. Asking for
+        # "N-PORT" silently returned zero matches and the app fell
+        # through to the "live unavailable" caption on every lookup.
+        filings = get_recent_filings(
+            cik, form_types=("NPORT-P", "NPORT-EX"), max_rows=1,
+        )
         if not filings:
-            raise RuntimeError(f"No recent N-PORT filing for CIK {cik}")
+            raise RuntimeError(
+                f"No recent NPORT-P / NPORT-EX filing for CIK {cik}"
+            )
 
         latest = filings[0]
         resp = edgar_get(latest["primary_doc_url"], accept="application/xml")
