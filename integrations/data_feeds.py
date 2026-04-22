@@ -493,17 +493,47 @@ def get_long_run_cagr(symbol: str, period: str = "10y") -> dict:
 def get_forward_return_estimate(
     category: str,
     expense_ratio_bps: int | None = None,
+    underlying: str | None = None,
 ) -> dict:
     """
     Model forward-return estimate per ETF category. Returns:
         {"forward_return_pct": float|None,
          "source": "live_long_run" | "unavailable",
          "basis": str — human-readable derivation}
+
+    `underlying` (from the universe registry) picks the correct
+    reference asset for categories where it matters:
+        leveraged:            ETHU → ETH long-run, BITX → BTC, etc.
+        altcoin_spot:         each altcoin proxies through BTC × 0.70
+                              (alts historically underperform BTC long-run;
+                              using BTC as anchor is honest here)
+        income_covered_call:  ETHI → ETH × 0.55, BTCI → BTC × 0.55, etc.
+    If `underlying` is unset / not mappable, falls back to BTC.
     """
     btc_info = get_long_run_cagr("BTC-USD", period="10y")
     eth_info = get_long_run_cagr("ETH-USD", period="10y")
     btc_cagr = btc_info.get("cagr_pct")
     eth_cagr = eth_info.get("cagr_pct")
+
+    def _underlying_cagr() -> tuple[float | None, str]:
+        """
+        Pick the correct long-run CAGR for the fund's actual underlying.
+        Returns (cagr_pct, reference_label). Handles None gracefully.
+        """
+        u = (underlying or "").upper()
+        # ETH-based wrappers (ETHU / ETHT / ETHI / YETH / ETHY)
+        if u in ("ETH", "ETHA", "FETH"):
+            return (eth_cagr, "ETH-USD 10yr")
+        # BTC-based wrappers (BITX / BITU / BTCL / BTCI / YBIT / IBIY)
+        if u in ("BTC", "IBIT", "FBTC"):
+            return (btc_cagr, "BTC-USD 10yr")
+        # Equity-underlying wrappers (MSTR / COIN / MARA / RIOT) —
+        # high-beta BTC proxies, modeled at BTC × 1.0 baseline. The
+        # category-level multiplier (e.g., leveraged 1.40) still applies.
+        if u in ("MSTR", "COIN", "MARA", "RIOT"):
+            return (btc_cagr, f"BTC-USD 10yr (as {u} proxy)")
+        # Default to BTC as the crypto-asset anchor.
+        return (btc_cagr, "BTC-USD 10yr")
 
     # Expense-ratio drag converted to decimal (25bps → 0.0025).
     er_drag = (expense_ratio_bps or 0) / 10000.0
@@ -579,30 +609,31 @@ def get_forward_return_estimate(
         # of volatility decay (path dependency reduces long-run CAGR
         # below 2x when the underlying is volatile). Empirically ~1.4x
         # the underlying over multi-year periods for 2x crypto products,
-        # minus the ~1.85% expense drag.
-        if btc_cagr is None:
+        # minus the ~1.85% expense drag. Uses the fund's ACTUAL
+        # underlying coin (ETHU → ETH, BITX → BTC, MSTU → BTC proxy)
+        # rather than a one-size BTC assumption.
+        u_cagr, u_label = _underlying_cagr()
+        if u_cagr is None:
             return {"forward_return_pct": None, "source": "unavailable",
-                    "basis": "BTC-USD long-run history unavailable"}
-        # Use BTC as default underlying proxy; finer-grained would look
-        # at etf.underlying but we haven't plumbed that through here.
-        fwd = btc_cagr * 1.40 - er_drag * 100.0
+                    "basis": f"{u_label} long-run history unavailable"}
+        fwd = u_cagr * 1.40 - er_drag * 100.0
         return {"forward_return_pct": fwd, "source": "live_long_run",
-                "basis": f"BTC-USD 10yr CAGR ({btc_cagr:.1f}%) × 1.40 "
+                "basis": f"{u_label} CAGR ({u_cagr:.1f}%) × 1.40 "
                          f"(vol-decay-adjusted 2x), minus expenses"}
 
     if category == "income_covered_call":
         # Covered-call wrappers cap upside (typically giving up 40-60%
         # of underlying price appreciation in exchange for option
         # premium distributions). Long-run total return is roughly
-        # 0.55 × underlying + modest yield pickup. Simple model:
-        # 55% of underlying CAGR, net of the ~1% expense drag. The
-        # "yield" the investor sees is distributions, not excess return.
-        if btc_cagr is None:
+        # 0.55 × underlying + modest yield pickup. Uses the fund's
+        # actual underlying (ETHI → ETH, BTCI → BTC, MSTY → MSTR/BTC).
+        u_cagr, u_label = _underlying_cagr()
+        if u_cagr is None:
             return {"forward_return_pct": None, "source": "unavailable",
-                    "basis": "Reference asset unavailable"}
-        fwd = btc_cagr * 0.55 - er_drag * 100.0
+                    "basis": f"{u_label} long-run history unavailable"}
+        fwd = u_cagr * 0.55 - er_drag * 100.0
         return {"forward_return_pct": fwd, "source": "live_long_run",
-                "basis": f"BTC-USD 10yr CAGR ({btc_cagr:.1f}%) × 0.55 "
+                "basis": f"{u_label} CAGR ({u_cagr:.1f}%) × 0.55 "
                          f"(covered-call upside cap), minus expenses. "
                          f"Distribution yield is included in total return."}
 

@@ -257,12 +257,15 @@ def load_universe_with_live_analytics(
             logger.warning("CAGR failed for %s: %s", tkr, exc)
 
         # Forward-return MODEL estimate — long-run BTC / ETH CAGR with
-        # category-specific drag / premium. This is what we display as
-        # the "Forward estimate (model)" tile alongside historical.
+        # category-specific drag / premium. Pass the fund's `underlying`
+        # (from the JSON registry) so leveraged / income / altcoin funds
+        # route to the correct reference asset — ETHU → ETH CAGR rather
+        # than one-size-fits-all BTC CAGR.
         try:
             fwd_info = get_forward_return_estimate(
                 etf.get("category", ""),
                 expense_ratio_bps=etf.get("expense_ratio_bps"),
+                underlying=etf.get("underlying"),
             )
             fwd = fwd_info.get("forward_return_pct")
             if fwd is not None:
@@ -336,8 +339,11 @@ def daily_scanner(days_back: int = 7) -> list[dict]:
     }
 
     matches: list[dict] = []
+    n_queries = 0
+    n_successful_queries = 0
     for keyword in _CRYPTO_KEYWORDS:
         for form in _CRYPTO_FORM_TYPES:
+            n_queries += 1
             _edgar_take_token()
             params = {
                 "q":     f'"{keyword}"',
@@ -364,6 +370,7 @@ def daily_scanner(days_back: int = 7) -> list[dict]:
                 logger.warning("EDGAR query failed (%s / %s): %s", keyword, form, exc)
                 continue
 
+            n_successful_queries += 1
             hits = data.get("hits", {}).get("hits", [])
             for hit in hits:
                 source = hit.get("_source", {})
@@ -390,7 +397,12 @@ def daily_scanner(days_back: int = 7) -> list[dict]:
 
     results = list(dedup.values())
 
-    # Scanner health + data-source-state book-keeping
+    # Scanner health + data-source-state book-keeping. Success depends
+    # on at least one inner query actually completing — if all
+    # len(_CRYPTO_KEYWORDS) × len(_CRYPTO_FORM_TYPES) requests 429'd
+    # or errored, we should mark the scanner as failed instead of
+    # claiming a successful scan of zero filings.
+    any_query_succeeded = n_successful_queries > 0
     try:
         write_scanner_health(
             n_matches=len(results),
@@ -399,8 +411,16 @@ def daily_scanner(days_back: int = 7) -> list[dict]:
         )
     except Exception as exc:
         logger.warning("write_scanner_health failed: %s", exc)
-    register_fetch_attempt("edgar_scanner", "edgar", success=True,
-                           note=f"{len(results)} unique filings matched")
+    register_fetch_attempt(
+        "edgar_scanner", "edgar",
+        success=any_query_succeeded,
+        note=(
+            f"{len(results)} unique filings matched "
+            f"across {n_successful_queries}/{n_queries} queries"
+            if any_query_succeeded
+            else f"All {n_queries} EDGAR queries failed (429 or network)"
+        ),
+    )
     return results
 
 
