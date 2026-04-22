@@ -53,7 +53,13 @@ Full secrets block (enable every live data path):
 
 ```toml
 EDGAR_CONTACT_EMAIL = "ops@your-domain.example"
-ALPHA_VANTAGE_API_KEY = "your_alpha_vantage_key"
+# Alpha Vantage is NOT wired into the active price chain. Its free tier
+# is 25 req/day — insufficient even for one user across the 19-ETF
+# universe, so it was removed as a false fallback. Scaffold retained:
+# set ALPHA_VANTAGE_API_KEY here AND re-enable the _fetch_alphavantage
+# call in integrations/data_feeds.py::_fetch_single_ticker (currently
+# documented-out with a comment) to reactivate on a paid tier.
+# ALPHA_VANTAGE_API_KEY = "paid_tier_key_required"
 POLYGON_API_KEY = "your_polygon_key"
 FINNHUB_API_KEY = "your_finnhub_key"
 SENTRY_DSN = "https://...@sentry.io/..."

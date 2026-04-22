@@ -53,12 +53,16 @@ class TestFallbackLiveState:
         assert get_state("etf_price") == DataSourceState.FALLBACK_LIVE
         assert get_source("etf_price") == "stooq"
 
-    def test_tertiary_source_also_fallback_live(self):
+    def test_state_machine_accepts_arbitrary_source_names(self):
+        # The DSS state machine is source-agnostic — it accepts any
+        # string as a source label. Runtime only currently calls it
+        # with {yfinance, stooq, edgar, fred, cache, static}, but this
+        # keeps the door open for paid-tier sources (Alpha Vantage,
+        # Polygon, Kaiko) reactivating without DSS changes.
         register_fetch_attempt("etf_price", "yfinance", success=False)
-        register_fetch_attempt("etf_price", "stooq", success=False)
-        register_fetch_attempt("etf_price", "alphavantage", success=True)
+        register_fetch_attempt("etf_price", "polygon", success=True)
         assert get_state("etf_price") == DataSourceState.FALLBACK_LIVE
-        assert get_source("etf_price") == "alphavantage"
+        assert get_source("etf_price") == "polygon"
 
 
 class TestCachedState:
@@ -93,7 +97,6 @@ class TestFullCascade:
         # Step 3: all live fail, serve cache → CACHED
         register_fetch_attempt("etf_price", "yfinance", success=False)
         register_fetch_attempt("etf_price", "stooq", success=False)
-        register_fetch_attempt("etf_price", "alphavantage", success=False)
         mark_cache_hit("etf_price", age_seconds=180)
         assert get_state("etf_price") == DataSourceState.CACHED
 

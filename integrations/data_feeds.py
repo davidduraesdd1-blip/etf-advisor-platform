@@ -191,14 +191,13 @@ def _fetch_single_ticker(ticker: str, period: str, interval: str) -> dict:
         register_fetch_attempt("etf_price", "stooq", success=False,
                                note=f"{ticker}: stooq returned empty")
 
-    data = _fetch_alphavantage(ticker)
-    if data:
-        register_fetch_attempt("etf_price", "alphavantage", success=True,
-                               note="fallback chain: yfinance + stooq unavailable")
-        _update_last_close(ticker, data)
-        result = {"source": "alphavantage", "prices": data}
-        _yf_memo[memo_key] = {**result, "_mono": time.monotonic()}
-        return result
+    # Alpha Vantage intentionally NOT in the active chain. Free tier is
+    # 25 req/day — insufficient for even one user across the 19-ETF
+    # universe, so it is a false fallback that fails silently under
+    # real load. _fetch_alphavantage() + ALPHA_VANTAGE_API_KEY config
+    # are retained as pre-architected scaffolding per CLAUDE.md §12 so
+    # a paid-tier upgrade (75 req/min, 10k/day) can re-enable in four
+    # lines. See docs/streamlit_cloud_deploy.md.
 
     register_fetch_attempt("etf_price", "none", success=False,
                            note=f"{ticker}: all live sources exhausted")
@@ -236,8 +235,8 @@ def get_historical_cagr(ticker: str, period: str = "5y") -> dict:
         {"cagr_pct": float|None, "source": str, "days_observed": int}
     Returns cagr_pct=None if fewer than ~30 valid closes are available or
     the CAGR math can't be computed. source mirrors the price-bundle
-    source ("yfinance" / "stooq" / "alphavantage" / "unavailable") so
-    callers can register data-source-state correctly.
+    source ("yfinance" / "stooq" / "unavailable") so callers can register
+    data-source-state correctly.
     """
     from datetime import datetime
 

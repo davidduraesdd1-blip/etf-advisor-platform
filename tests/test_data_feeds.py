@@ -127,7 +127,11 @@ class TestGetActivePriceSourceContract:
     def test_returns_string_with_valid_source_value(self):
         src = get_active_price_source()
         assert isinstance(src, str)
-        assert src in {"yfinance", "stooq", "alphavantage"}
+        # Alpha Vantage was dropped from the active chain because the
+        # free tier's 25 req/day is insufficient even for one user.
+        # Scaffold retained for paid-tier reactivation; not reachable
+        # at runtime, so not a valid active-source value.
+        assert src in {"yfinance", "stooq"}
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -26,7 +26,6 @@ The state transitions driven by register_fetch_attempt():
     register_fetch_attempt("etf_price", "stooq",          success=True)   → FALLBACK_LIVE
     register_fetch_attempt("etf_price", "yfinance",       success=False)
     register_fetch_attempt("etf_price", "stooq",          success=False)
-    register_fetch_attempt("etf_price", "alphavantage",   success=False)
     # at this point the caller falls back to cache or static
     mark_cache_hit("etf_price",  age_minutes=7)                           → CACHED
     mark_static_fallback("risk_free_rate", note="FRED unavailable")       → STATIC
@@ -79,7 +78,9 @@ class _CategoryInfo:
 
 
 _state: dict[str, _CategoryInfo] = {}
-_lock = threading.Lock()
+# RLock (not Lock): snapshot() holds _lock and its dict-comp calls
+# get_age_minutes() which also needs _lock. A plain Lock deadlocks.
+_lock = threading.RLock()
 
 
 # ═══════════════════════════════════════════════════════════════════════════

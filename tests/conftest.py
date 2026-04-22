@@ -69,16 +69,22 @@ _pe.get_live_risk_free_rate = _fake_rfr
 
 
 def _empty_composition(ticker: str) -> dict:
+    from integrations.edgar_nport import SUPPORTED_TICKERS
+    tkr = ticker.upper()
     return {
-        "ticker":          ticker.upper(),
-        "supported":       True,
+        "ticker":          tkr,
+        "supported":       tkr in SUPPORTED_TICKERS,
         "source":          "unavailable",
         "filing_date":     None,
         "accession":       None,
         "holdings":        [],
         "holdings_count":  0,
         "total_value_usd": 0.0,
-        "note":            "smoke-test stub",
+        "note":            "smoke-test stub"
+                           if tkr in SUPPORTED_TICKERS
+                           else "Live holdings via SEC EDGAR not wired for this "
+                                "ticker yet. Supported in demo scope: IBIT, ETHA, "
+                                "FBTC, FETH.",
     }
 
 
