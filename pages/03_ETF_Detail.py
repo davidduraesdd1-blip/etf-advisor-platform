@@ -280,51 +280,69 @@ with card("Composition"):
             st.info(comp["note"])
 
         if comp["holdings"]:
-            import pandas as _pd
-            df_rows = []
-            for h in comp["holdings"]:
-                raw_name = h.get("name", "")
-                # If this holding name maps to a SuperGrok-covered coin,
-                # render as a clickable markdown link so the FA can
-                # open the crypto-screener research view.
-                sg_symbol = SUPERGROK_COIN_MAP.get(raw_name)
-                if sg_symbol:
-                    sg_url = f"{SUPERGROK_BASE_URL}?coin={sg_symbol}"
-                    display_name = f"[{raw_name} →]({sg_url})"
-                else:
-                    display_name = raw_name
-                df_rows.append({
-                    "Name":       display_name,
-                    "Asset cat":  h.get("asset_cat", ""),
-                    "Balance":    h.get("balance"),
-                    "Value USD":  h.get("value_usd"),
-                    "% of fund":  h.get("pct_value"),
-                })
-            df = _pd.DataFrame(df_rows)
-            st.dataframe(
-                df,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    # LinkColumn renders markdown [text](url) links as
-                    # clickable; column width follows the label length.
-                    "Name": st.column_config.LinkColumn(
-                        "Name",
-                        help="Click to open this coin in the SuperGrok screener.",
-                        display_text=r"\[(.*?) →\]",
-                    ),
-                    "Value USD": st.column_config.NumberColumn(format="$%,.0f"),
-                    "% of fund": st.column_config.NumberColumn(format="%.2f%%"),
-                },
-            )
-            st.caption(f"Total holdings: {comp['holdings_count']}")
+            # ── Trust composition path (2 rows, coin + cash) ─────────
+            # Render manually so markdown hyperlinks work. st.dataframe
+            # cells don't render markdown; st.column_config.LinkColumn
+            # expects cell values to be plain URLs, not [text](url)
+            # syntax, which led to the previous "wrapped markdown as
+            # path" routing bug.
+            _has_sg_link = False
+            if src == "issuer_static":
+                # Column headers
+                hcol1, hcol2, hcol3 = st.columns([3, 2, 2])
+                hcol1.markdown("**Name**")
+                hcol2.markdown("**Asset category**")
+                hcol3.markdown("**% of fund**")
+                st.divider()
+
+                for h in comp["holdings"]:
+                    raw_name = h.get("name", "")
+                    pct = h.get("pct_value") or 0.0
+                    asset_cat = h.get("asset_cat", "")
+                    sg_symbol = SUPERGROK_COIN_MAP.get(raw_name)
+
+                    c1, c2, c3 = st.columns([3, 2, 2])
+                    with c1:
+                        if sg_symbol:
+                            _has_sg_link = True
+                            sg_url = f"{SUPERGROK_BASE_URL}?coin={sg_symbol}"
+                            st.markdown(f"**[{raw_name} →]({sg_url})**")
+                        else:
+                            st.markdown(f"**{raw_name}**")
+                    with c2:
+                        st.markdown(asset_cat or "—")
+                    with c3:
+                        st.markdown(f"{pct:.2f}%")
+                st.caption(f"Total holdings: {comp['holdings_count']}")
+            else:
+                # ── N-PORT path (longer holdings list) — dataframe ──
+                # These are futures / securities holdings, not spot
+                # coins, so we don't SuperGrok-link them.
+                import pandas as _pd
+                df_rows = [
+                    {
+                        "Name":      h.get("name", ""),
+                        "Asset cat": h.get("asset_cat", ""),
+                        "Balance":   h.get("balance"),
+                        "Value USD": h.get("value_usd"),
+                        "% of fund": h.get("pct_value"),
+                    }
+                    for h in comp["holdings"]
+                ]
+                df = _pd.DataFrame(df_rows)
+                st.dataframe(
+                    df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Value USD": st.column_config.NumberColumn(format="$%,.0f"),
+                        "% of fund": st.column_config.NumberColumn(format="%.2f%%"),
+                    },
+                )
+                st.caption(f"Total holdings: {comp['holdings_count']}")
 
             # SuperGrok onboarding notice — only surface when there's
             # at least one clickable coin in this basket.
-            _has_sg_link = any(
-                SUPERGROK_COIN_MAP.get(h.get("name", ""))
-                for h in comp["holdings"]
-            )
             if _has_sg_link:
                 st.info(
                     "**→ SuperGrok integration:** Click any coin name "
