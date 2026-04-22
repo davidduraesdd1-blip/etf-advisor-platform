@@ -102,21 +102,27 @@ class TestDailyScannerGuard:
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestScannerHealth:
-    def _cleanup_health(self):
-        try:
-            SCANNER_HEALTH_PATH.unlink()
-        except FileNotFoundError:
-            pass
+    """
+    All scanner-health tests run against a per-test temp path so they
+    NEVER touch the production data/scanner_health.json that the
+    GitHub Actions cron maintains on main. Previously the tests used
+    SCANNER_HEALTH_PATH.unlink() directly, which deleted the real file
+    locally and caused `git add -A` to ship the deletion.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _redirect_health_path(self, tmp_path, monkeypatch):
+        fake = tmp_path / "scanner_health.json"
+        monkeypatch.setattr("core.etf_universe.SCANNER_HEALTH_PATH", fake)
+        yield fake
 
     def test_health_reader_returns_is_stale_when_missing(self):
-        self._cleanup_health()
         health = get_scanner_health()
         assert health["is_stale"] is True
         assert health["last_success_ts"] is None
         assert health["age_hours"] is None
 
     def test_write_then_read_round_trip(self):
-        self._cleanup_health()
         write_scanner_health(
             n_matches=7,
             keywords_queried=["bitcoin", "ethereum"],
@@ -127,29 +133,23 @@ class TestScannerHealth:
         assert "bitcoin" in health["keywords_queried"]
         assert health["age_hours"] is not None and health["age_hours"] < 0.5
         assert health["is_stale"] is False
-        self._cleanup_health()
 
-    def test_stale_threshold_flips_is_stale(self):
+    def test_stale_threshold_flips_is_stale(self, _redirect_health_path):
         """Write a health record with a timestamp older than SCANNER_STALE_HOURS."""
-        self._cleanup_health()
-        # Write then mutate the timestamp directly
         write_scanner_health(n_matches=0, keywords_queried=[])
         stale_ts = time.time() - (SCANNER_STALE_HOURS + 1) * 3600
-        with open(SCANNER_HEALTH_PATH, "r", encoding="utf-8") as fh:
+        with open(_redirect_health_path, "r", encoding="utf-8") as fh:
             data = json.load(fh)
         data["last_success_ts"] = stale_ts
-        with open(SCANNER_HEALTH_PATH, "w", encoding="utf-8") as fh:
+        with open(_redirect_health_path, "w", encoding="utf-8") as fh:
             json.dump(data, fh)
 
         health = get_scanner_health()
         assert health["is_stale"] is True
         assert health["age_hours"] > SCANNER_STALE_HOURS
-        self._cleanup_health()
 
-    def test_atomic_write_does_not_leave_tempfile(self):
-        self._cleanup_health()
+    def test_atomic_write_does_not_leave_tempfile(self, _redirect_health_path):
         write_scanner_health(n_matches=1, keywords_queried=["x"])
-        parent = SCANNER_HEALTH_PATH.parent
+        parent = _redirect_health_path.parent
         leftover = list(parent.glob(".tmp_scanner_health_*.json"))
         assert not leftover, f"Tempfile leaked: {leftover}"
-        self._cleanup_health()
