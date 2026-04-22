@@ -218,7 +218,22 @@ _provenance = level_text(
     ),
 )
 st.caption(_provenance)
-data_source_badge("risk_free_rate")   # Sharpe consumed FRED → show state
+
+# Risk-free-rate source transparency — ONLY affects the Sharpe tile
+# (Sharpe = (portfolio_return − rfr) / portfolio_vol). When FRED is
+# reachable, primary is "fred" and DSS state is LIVE → nothing renders.
+# When FRED fails and we fall back to the static 4.25% default, this
+# makes clear which metric the fallback touched so the FA doesn't
+# read "static fallback" as applying to every number above.
+from core.data_source_state import DataSourceState, get_state as _get_state
+_rfr_state = _get_state("risk_free_rate").value
+if _rfr_state in (DataSourceState.STATIC.value, DataSourceState.CACHED.value):
+    _verb = "static 4.25% default" if _rfr_state == DataSourceState.STATIC.value else "cached FRED reading"
+    st.caption(
+        f"⓵ Sharpe ratio uses the {_verb} for the risk-free rate — "
+        f"FRED 3-month T-bill is temporarily unreachable. Every other "
+        f"number above is live."
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
