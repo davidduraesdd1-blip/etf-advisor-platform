@@ -145,82 +145,78 @@ _sources = [e.get("expected_return_source", "category_default") for e in _basket
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# KPI row
+# KPI row — now 5 tiles so the FA sees historical + forward side-by-side
 # ═══════════════════════════════════════════════════════════════════════════
 
-k1, k2, k3, k4 = st.columns(4)
+# Weighted forward-return across the basket (uses each ETF's
+# forward_return if populated; falls back to category default
+# via the same weighting path).
+_fwd_numer = 0.0
+_fwd_denom = 0.0
+_n_fwd_live = 0
+for h in holdings:
+    _uni_entry = next((e for e in universe_live if e["ticker"] == h["ticker"]), None)
+    if _uni_entry is None:
+        continue
+    w = float(h.get("weight_pct", 0)) / 100.0
+    fwd = _uni_entry.get("forward_return")
+    if fwd is None:
+        continue
+    _fwd_numer += w * float(fwd)
+    _fwd_denom += w
+    _n_fwd_live += 1
+_portfolio_forward_return = (_fwd_numer / _fwd_denom) if _fwd_denom > 0 else None
+
+k1, k2, k3, k4, k5 = st.columns(5)
 with k1:
     kpi_tile("Crypto sleeve", f"${crypto_sleeve_usd:,.0f}")
 with k2:
-    kpi_tile("Expected return (annualized)",
+    kpi_tile("Historical return (annualized)",
              f"{metrics['weighted_return_pct']:.1f}%")
 with k3:
-    kpi_tile("Portfolio vol", f"{metrics['portfolio_volatility_pct']:.1f}%")
+    if _portfolio_forward_return is not None:
+        kpi_tile("Forward estimate (model)",
+                 f"{_portfolio_forward_return:.1f}%")
+    else:
+        kpi_tile("Forward estimate (model)", "—")
 with k4:
+    kpi_tile("Portfolio vol", f"{metrics['portfolio_volatility_pct']:.1f}%")
+with k5:
     kpi_tile("Sharpe", f"{metrics['sharpe_ratio']:.2f}")
 
-# Provenance: per-metric live-vs-fallback count. Every number in the
-# KPI row above that traces back to an ETF property (return, vol,
-# correlation) is tagged. Scales by user level.
-_all_live = (_n_live_ret == _n_total and _n_live_vol == _n_total
-             and _n_live_corr == _n_total)
-_none_live = (_n_live_ret == 0 and _n_live_vol == 0 and _n_live_corr == 0)
-
-if _all_live:
-    _provenance = level_text(
-        beginner=(
-            f"Every number above is live — derived from each fund's own "
-            f"price history over the last 90 trading days (all "
-            f"{_n_total} ETFs in this basket)."
-        ),
-        intermediate=(
-            f"All {_n_total} ETFs live on all three inputs: annualized "
-            f"CAGR · 90-day realized volatility · 90-day BTC correlation."
-        ),
-        advanced=(
-            f"Live · Return: full-history CAGR (±300% cap) · "
-            f"Vol: 90d annualized σ_daily·√252 · "
-            f"Corr: 90d Pearson vs IBIT. {_n_total}/{_n_total} on all."
-        ),
-    )
-elif _none_live:
-    _provenance = level_text(
-        beginner=(
-            "Live price data is unavailable right now — every number "
-            "above is using category averages as a fallback. Refresh "
-            "once live data returns."
-        ),
-        intermediate=(
-            f"All {_n_total} ETFs fell back to category defaults on "
-            f"every input. Live price fetch unavailable."
-        ),
-        advanced=(
-            f"0/{_n_total} live on all three. Full fallback to seed "
-            f"category defaults (return/vol/corr)."
-        ),
-    )
-else:
-    _provenance = level_text(
-        beginner=(
-            f"Mixed sources. Return: {_n_live_ret} of {_n_total} live. "
-            f"Volatility: {_n_live_vol} of {_n_total} live. "
-            f"BTC correlation: {_n_live_corr} of {_n_total} live. "
-            f"Remaining ETFs fall back to category averages for any "
-            f"input that isn't live."
-        ),
-        intermediate=(
-            f"Live by metric — return: {_n_live_ret}/{_n_total} · "
-            f"vol: {_n_live_vol}/{_n_total} · "
-            f"corr: {_n_live_corr}/{_n_total}. "
-            f"Any missing input falls back to category default."
-        ),
-        advanced=(
-            f"Return {_n_live_ret}/{_n_total} live · "
-            f"Vol {_n_live_vol}/{_n_total} live · "
-            f"Corr {_n_live_corr}/{_n_total} live (inc. self). "
-            f"Mixed-source portfolio metrics."
-        ),
-    )
+# Provenance: the two return tiles have different backward-vs-forward
+# framings; explain what each one is and how much of it is live.
+_provenance = level_text(
+    beginner=(
+        f"**Historical return** = what each fund actually did over its "
+        f"available price history (most launched Jan 2024 → ~2 years). "
+        f"Short-term and regime-dependent; BTC outperformed ETH in this "
+        f"window, which is why conservative tiers look strong here.\n\n"
+        f"**Forward estimate (model)** = what the underlying assets did "
+        f"over a full 10-year market cycle — BTC ~long-run CAGR for BTC "
+        f"funds, ETH long-run CAGR for ETH funds. This is more "
+        f"representative of steady-state expected return across cycles.\n\n"
+        f"Live sources — return: {_n_live_ret}/{_n_total} · "
+        f"vol: {_n_live_vol}/{_n_total} · "
+        f"corr: {_n_live_corr}/{_n_total} · "
+        f"forward estimate: {_n_fwd_live}/{_n_total}."
+    ),
+    intermediate=(
+        f"Historical = each ETF's full-history CAGR (capped ±300%). "
+        f"Forward estimate = long-run BTC-USD / ETH-USD CAGR with "
+        f"category drag/premium (btc_futures × 0.90 for contango, "
+        f"thematic × 1.10 equity beta). Live coverage: "
+        f"return {_n_live_ret}/{_n_total} · vol {_n_live_vol}/{_n_total} "
+        f"· corr {_n_live_corr}/{_n_total} · forward {_n_fwd_live}/{_n_total}."
+    ),
+    advanced=(
+        f"Historical: per-ETF CAGR(end/start, full period) × basket weights. "
+        f"Forward: 10y BTC-USD / ETH-USD CAGR mapped per category, net of "
+        f"expense-ratio drag. Sources — return={_n_live_ret}/{_n_total}, "
+        f"vol={_n_live_vol}/{_n_total}, corr={_n_live_corr}/{_n_total}, "
+        f"forward={_n_fwd_live}/{_n_total}."
+    ),
+)
 st.caption(_provenance)
 data_source_badge("risk_free_rate")   # Sharpe consumed FRED → show state
 

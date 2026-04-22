@@ -120,7 +120,7 @@ if sig.get("source") == "technical_composite" and sig.get("components"):
         ))
 
 
-# KPI tiles
+# KPI tiles — row 1: fund characteristics
 k1, k2, k3, k4 = st.columns(4)
 with k1:
     er_bps = etf.get("expense_ratio_bps")
@@ -135,34 +135,55 @@ with k4:
     tier_label = "A (preferred)" if nudge > 0 else ("C (discouraged)" if nudge < 0 else "B (neutral)")
     kpi_tile("Issuer tier", tier_label)
 
+# KPI row 2: returns — historical (from this fund's own price history)
+# + forward estimate (from long-run underlying CAGR)
+r1, r2 = st.columns(2)
+with r1:
+    hist = etf.get("expected_return")
+    kpi_tile("Historical return (annualized)",
+             f"{hist:.1f}%" if hist is not None else "—")
+with r2:
+    fwd = etf.get("forward_return")
+    kpi_tile("Forward estimate (model)",
+             f"{fwd:.1f}%" if fwd is not None else "—")
+
 # Per-tile provenance — makes live/fallback explicit on ETF Detail.
 _vol_src = etf.get("volatility_source", "category_default")
 _corr_src = etf.get("correlation_source", "category_default")
 _ret_src = etf.get("expected_return_source", "category_default")
+_fwd_src = etf.get("forward_return_source", "unavailable")
+_fwd_basis = etf.get("forward_return_basis", "")
 
 
 def _src_label(src: str) -> str:
     return {
         "live":             "live",
         "self":             "self (BTC proxy)",
+        "live_long_run":    "live 10yr underlying",
+        "unavailable":      "unavailable",
         "category_default": "category default (live unavailable)",
     }.get(src, src)
 
 
 st.caption(level_text(
     beginner=(
-        f"Source — expected return: {_src_label(_ret_src)} · "
+        f"Source — historical return: {_src_label(_ret_src)} · "
+        f"forward estimate: {_src_label(_fwd_src)} · "
         f"volatility: {_src_label(_vol_src)} · "
-        f"correlation with BTC: {_src_label(_corr_src)}. "
-        f"\"Live\" means derived from this fund's actual price history."
+        f"BTC correlation: {_src_label(_corr_src)}. "
+        f"Historical = what this fund did. Forward = what BTC / ETH did "
+        f"over 10 years, adjusted for this fund's category. "
+        f"Forward basis: {_fwd_basis}"
     ),
     intermediate=(
-        f"Return src: {_ret_src} · "
+        f"Historical src: {_ret_src} · Forward src: {_fwd_src} · "
         f"Vol src (90d σ·√252): {_vol_src} · "
-        f"BTC-corr src (90d Pearson vs IBIT): {_corr_src}."
+        f"BTC-corr src (90d Pearson vs IBIT): {_corr_src}. "
+        f"Forward basis: {_fwd_basis}"
     ),
     advanced=(
-        f"return={_ret_src} vol={_vol_src} corr={_corr_src} · "
+        f"hist={_ret_src} fwd={_fwd_src} vol={_vol_src} corr={_corr_src} · "
+        f"Forward: {_fwd_basis} · "
         f"BTC proxy: {etf.get('btc_proxy_used', 'IBIT')} · "
         f"n_returns vol={etf.get('vol_n_returns', '—')} "
         f"corr={etf.get('corr_n_returns', '—')}."

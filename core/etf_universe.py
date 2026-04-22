@@ -195,6 +195,7 @@ def load_universe_with_live_analytics(
     """
     from integrations.data_feeds import (
         get_btc_correlation,
+        get_forward_return_estimate,
         get_historical_cagr,
         get_realized_volatility,
     )
@@ -203,7 +204,7 @@ def load_universe_with_live_analytics(
     for etf in base:
         tkr = etf["ticker"]
 
-        # Expected return
+        # Historical return (1-2yr CAGR from this fund's own price history)
         try:
             cagr_info = get_historical_cagr(tkr)
             if cagr_info.get("cagr_pct") is not None:
@@ -212,6 +213,25 @@ def load_universe_with_live_analytics(
                 etf["cagr_days_observed"] = cagr_info.get("days_observed")
         except Exception as exc:  # pragma: no cover — defensive
             logger.warning("CAGR failed for %s: %s", tkr, exc)
+
+        # Forward-return MODEL estimate — long-run BTC / ETH CAGR with
+        # category-specific drag / premium. This is what we display as
+        # the "Forward estimate (model)" tile alongside historical.
+        try:
+            fwd_info = get_forward_return_estimate(
+                etf.get("category", ""),
+                expense_ratio_bps=etf.get("expense_ratio_bps"),
+            )
+            fwd = fwd_info.get("forward_return_pct")
+            if fwd is not None:
+                etf["forward_return"] = round(float(fwd), 2)
+                etf["forward_return_source"] = "live_long_run"
+                etf["forward_return_basis"] = fwd_info.get("basis", "")
+            else:
+                etf.setdefault("forward_return_source", "unavailable")
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning("forward_return failed for %s: %s", tkr, exc)
+            etf.setdefault("forward_return_source", "unavailable")
 
         # Volatility
         try:

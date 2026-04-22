@@ -389,6 +389,159 @@ def get_realized_volatility(ticker: str, lookback_days: int = 90) -> dict:
             "n_returns": len(returns)}
 
 
+_LONG_RUN_CAGR_MEMO: dict[str, tuple[float | None, float]] = {}
+_LONG_RUN_CAGR_TTL_SEC: int = 24 * 3600   # daily refresh is plenty
+
+
+def get_long_run_cagr(symbol: str, period: str = "10y") -> dict:
+    """
+    Long-run annualized CAGR for a reference symbol (e.g., "BTC-USD",
+    "ETH-USD") over 10 years (or as much history as yfinance provides).
+
+    Used by the Portfolio forward-return estimate — short-term CAGR
+    from 2-year-old ETF launches (IBIT, ETHA) is too regime-dependent
+    to be a meaningful forward estimate. 10-year BTC-USD / ETH-USD
+    smooths across full market cycles and gives a calibrated long-run
+    baseline.
+
+    Shape: {"cagr_pct": float|None, "source": str, "days_observed": int}
+    Cache: module-level dict with 24-hour TTL — these numbers barely
+    move day-to-day, no reason to re-fetch every page load.
+    """
+    import time as _time
+    import datetime as _dt
+
+    cached = _LONG_RUN_CAGR_MEMO.get(symbol)
+    if cached is not None:
+        cagr_pct, cached_ts = cached
+        if _time.monotonic() - cached_ts < _LONG_RUN_CAGR_TTL_SEC:
+            return {"cagr_pct": cagr_pct, "source": "cached_long_run",
+                    "days_observed": 0}
+
+    bundle = get_etf_prices([symbol], period=period, interval="1d")
+    entry = bundle.get(symbol, {}) or {}
+    rows = entry.get("prices", []) or []
+    source = entry.get("source", "unavailable")
+
+    closes: list[tuple[str, float]] = []
+    for row in rows:
+        try:
+            c = float(row.get("close"))
+            if c > 0:
+                closes.append((str(row.get("date", "")), c))
+        except (TypeError, ValueError):
+            continue
+
+    if len(closes) < 365:  # need at least ~1 year for a long-run reading
+        return {"cagr_pct": None, "source": source,
+                "days_observed": len(closes)}
+
+    start_date_raw, start_close = closes[0]
+    end_date_raw, end_close = closes[-1]
+    try:
+        start_dt = _dt.datetime.fromisoformat(start_date_raw.split("T")[0])
+        end_dt = _dt.datetime.fromisoformat(end_date_raw.split("T")[0])
+        days = (end_dt - start_dt).days
+    except (ValueError, AttributeError):
+        days = int(len(closes) * 365 / 252)
+
+    if days < 365 or start_close <= 0:
+        return {"cagr_pct": None, "source": source, "days_observed": days}
+
+    years = days / 365.25
+    try:
+        ratio = end_close / start_close
+        if ratio <= 0:
+            return {"cagr_pct": None, "source": source,
+                    "days_observed": days}
+        cagr = (ratio ** (1.0 / years)) - 1.0
+    except (ValueError, ZeroDivisionError, OverflowError):
+        return {"cagr_pct": None, "source": source, "days_observed": days}
+
+    cagr_pct = max(-_CAGR_CAP_PCT, min(_CAGR_CAP_PCT, cagr * 100.0))
+    _LONG_RUN_CAGR_MEMO[symbol] = (cagr_pct, _time.monotonic())
+    return {"cagr_pct": cagr_pct, "source": source, "days_observed": days}
+
+
+# Forward-return estimate per ETF category. Uses long-run BTC-USD and
+# ETH-USD CAGR as the underlying-asset expected return (smooths across
+# 2021 ATH, 2022 drawdown, 2023 recovery, 2024 halving rally), then
+# applies category-specific adjustments. This is the MODEL forward
+# estimate displayed alongside the 1-2yr historical CAGR so the FA
+# sees both "what it did" and "what the long-run underlying suggests."
+#
+# Adjustments (rough, calibrated to observable drag/premium):
+#   btc_spot     → BTC long-run CAGR × 0.99  (tiny expense-ratio drag)
+#   eth_spot     → ETH long-run CAGR × 0.99
+#   btc_futures  → BTC long-run CAGR × 0.90  (contango / roll drag ~10%)
+#   thematic     → weighted avg (60% BTC, 40% ETH) × 1.10 (equity beta
+#                  premium for miner/infra exposure)
+
+def get_forward_return_estimate(
+    category: str,
+    expense_ratio_bps: int | None = None,
+) -> dict:
+    """
+    Model forward-return estimate per ETF category. Returns:
+        {"forward_return_pct": float|None,
+         "source": "live_long_run" | "unavailable",
+         "basis": str — human-readable derivation}
+    """
+    btc_info = get_long_run_cagr("BTC-USD", period="10y")
+    eth_info = get_long_run_cagr("ETH-USD", period="10y")
+    btc_cagr = btc_info.get("cagr_pct")
+    eth_cagr = eth_info.get("cagr_pct")
+
+    # Expense-ratio drag converted to decimal (25bps → 0.0025).
+    er_drag = (expense_ratio_bps or 0) / 10000.0
+
+    if category == "btc_spot":
+        if btc_cagr is None:
+            return {"forward_return_pct": None, "source": "unavailable",
+                    "basis": "BTC-USD long-run history unavailable"}
+        fwd = btc_cagr * 0.99 - er_drag * 100.0
+        return {"forward_return_pct": fwd, "source": "live_long_run",
+                "basis": f"BTC-USD 10yr CAGR ({btc_cagr:.1f}%) "
+                         f"minus expense drag ({er_drag*100:.2f}%)"}
+
+    if category == "eth_spot":
+        if eth_cagr is None:
+            return {"forward_return_pct": None, "source": "unavailable",
+                    "basis": "ETH-USD long-run history unavailable"}
+        fwd = eth_cagr * 0.99 - er_drag * 100.0
+        return {"forward_return_pct": fwd, "source": "live_long_run",
+                "basis": f"ETH-USD long-run CAGR ({eth_cagr:.1f}%) "
+                         f"minus expense drag ({er_drag*100:.2f}%)"}
+
+    if category == "btc_futures":
+        if btc_cagr is None:
+            return {"forward_return_pct": None, "source": "unavailable",
+                    "basis": "BTC-USD long-run history unavailable"}
+        # 10% futures drag (contango/roll) + expense drag
+        fwd = btc_cagr * 0.90 - er_drag * 100.0
+        return {"forward_return_pct": fwd, "source": "live_long_run",
+                "basis": f"BTC-USD 10yr CAGR ({btc_cagr:.1f}%) × 0.90 "
+                         f"for contango/roll drag, minus expenses"}
+
+    if category == "thematic":
+        if btc_cagr is None and eth_cagr is None:
+            return {"forward_return_pct": None, "source": "unavailable",
+                    "basis": "Reference assets unavailable"}
+        btc_part = (btc_cagr or 0) * 0.60
+        eth_part = (eth_cagr or 0) * 0.40
+        base = btc_part + eth_part
+        # Equity-beta premium: thematic crypto equities historically
+        # beta ~1.3-1.6 vs underlying; use 1.10 conservative multiplier.
+        fwd = base * 1.10 - er_drag * 100.0
+        return {"forward_return_pct": fwd, "source": "live_long_run",
+                "basis": f"60% BTC + 40% ETH long-run CAGR × 1.10 "
+                         f"(equity-beta premium), minus expenses"}
+
+    # Unknown category → no estimate
+    return {"forward_return_pct": None, "source": "unavailable",
+            "basis": f"Unknown category: {category}"}
+
+
 def get_btc_correlation(
     ticker: str,
     lookback_days: int = 90,

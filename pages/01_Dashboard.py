@@ -121,6 +121,22 @@ def _basket_30d_return_pct(holdings: list[dict]) -> tuple[float | None, int]:
 with st.spinner("Computing live per-client metrics..."):
     universe_live = _live_universe()
     _uni_key = id(universe_live)
+    _uni_by_tkr = {e["ticker"]: e for e in universe_live}
+
+    def _basket_forward_return(holdings: list[dict]) -> float | None:
+        """Weighted forward-return estimate using per-ETF forward_return."""
+        num, denom = 0.0, 0.0
+        for h in holdings:
+            ue = _uni_by_tkr.get(h["ticker"])
+            if ue is None:
+                continue
+            fwd = ue.get("forward_return")
+            if fwd is None:
+                continue
+            w = float(h.get("weight_pct", 0)) / 100.0
+            num += w * float(fwd)
+            denom += w
+        return (num / denom) if denom > 0 else None
 
     # De-dup portfolio builds by (tier, sleeve_usd) — 3 demo clients so
     # at most 3 distinct portfolios.
@@ -130,12 +146,13 @@ with st.spinner("Computing live per-client metrics..."):
         p = _build_for_tier(c["assigned_tier"], sleeve, _uni_key)
         delta_pct, n_priced = _basket_30d_return_pct(p["holdings"])
         per_client_metrics[c["id"]] = {
-            "exp_return":  p["metrics"]["weighted_return_pct"],
-            "port_vol":    p["metrics"]["portfolio_volatility_pct"],
-            "sleeve_usd":  sleeve,
-            "delta_30d":   delta_pct,
-            "n_priced":    n_priced,
-            "n_holdings":  len(p["holdings"]),
+            "hist_return":  p["metrics"]["weighted_return_pct"],
+            "fwd_return":   _basket_forward_return(p["holdings"]),
+            "port_vol":     p["metrics"]["portfolio_volatility_pct"],
+            "sleeve_usd":   sleeve,
+            "delta_30d":    delta_pct,
+            "n_priced":     n_priced,
+            "n_holdings":   len(p["holdings"]),
         }
 
 # Aggregate live/fallback counts across the universe for the caption.
@@ -156,7 +173,8 @@ df = pd.DataFrame([
         "Tier":         c["assigned_tier"],
         "Portfolio $":  c["total_portfolio_usd"],
         "Crypto %":     c["crypto_allocation_pct"],
-        "Exp return":   per_client_metrics[c["id"]]["exp_return"],
+        "Hist return":  per_client_metrics[c["id"]]["hist_return"],
+        "Fwd estimate": per_client_metrics[c["id"]]["fwd_return"],
         "Port vol":     per_client_metrics[c["id"]]["port_vol"],
         "30d change":   per_client_metrics[c["id"]]["delta_30d"],
         "Drift %":      c["drift_pct"],
@@ -174,10 +192,17 @@ with card("Clients"):
         column_config={
             "Portfolio $":  st.column_config.NumberColumn(format="$%,.0f"),
             "Crypto %":     st.column_config.NumberColumn(format="%.1f%%"),
-            "Exp return":   st.column_config.NumberColumn(
+            "Hist return":  st.column_config.NumberColumn(
                 format="%.1f%%",
-                help="Annualized expected return of each client's crypto "
-                     "sleeve — derived live from the basket's ETF CAGRs.",
+                help="Annualized CAGR of each client's crypto sleeve "
+                     "over the ETFs' available price history "
+                     "(~2 years since Jan 2024 launches). Backward-looking.",
+            ),
+            "Fwd estimate": st.column_config.NumberColumn(
+                format="%.1f%%",
+                help="Model forward-return estimate using 10-year BTC-USD "
+                     "and ETH-USD CAGR with category-specific drag/premium. "
+                     "Represents cross-cycle steady-state expected return.",
             ),
             "Port vol":     st.column_config.NumberColumn(
                 format="%.1f%%",

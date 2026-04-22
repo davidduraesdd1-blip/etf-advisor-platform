@@ -400,3 +400,144 @@ class TestBtcCorrelation:
                                                                  "prices": []}})
         result = df.get_btc_correlation("NOPE")
         assert result["correlation"] is None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Forward-return estimate — Option B model layer
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestForwardReturnEstimate:
+    """
+    Per-ETF forward-return estimate drives the "Forward estimate (model)"
+    KPI tile alongside the historical CAGR. Uses long-run BTC-USD /
+    ETH-USD CAGR (10-year lookback) with category-specific drag/premium.
+    """
+
+    def _long_run_bundle(self, cagr_pct: float, n_days: int = 4000):
+        """
+        Build a price bundle that realizes exactly `cagr_pct` annualized
+        over ~11 years. Exact geometric interpolation, no noise.
+        """
+        from datetime import date, timedelta
+        years = n_days / 365.25
+        ratio = (1.0 + cagr_pct / 100.0) ** years
+        start = 100.0
+        end = start * ratio
+        per_step = (end / start) ** (1 / max(1, n_days - 1))
+        closes = [start * (per_step ** i) for i in range(n_days)]
+        dates = [(date(2014, 1, 1) + timedelta(days=i)).isoformat()
+                 for i in range(n_days)]
+        return {"source": "yfinance",
+                "prices": [{"date": d, "close": c}
+                           for d, c in zip(dates, closes)]}
+
+    def _fake_prices(self, btc_cagr: float, eth_cagr: float):
+        """Return a fake get_etf_prices that feeds exact long-run CAGRs."""
+        btc_bundle = self._long_run_bundle(btc_cagr)
+        eth_bundle = self._long_run_bundle(eth_cagr)
+
+        def fake(tickers, **kw):
+            t = tickers[0]
+            if t == "BTC-USD":
+                return {t: btc_bundle}
+            if t == "ETH-USD":
+                return {t: eth_bundle}
+            return {t: {"source": "unavailable", "prices": []}}
+
+        return fake
+
+    def test_btc_spot_uses_btc_long_run(self, monkeypatch):
+        from integrations import data_feeds as df
+        # Clear the module-level long-run cache so our stub is observed.
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=60.0, eth_cagr=45.0))
+
+        result = df.get_forward_return_estimate("btc_spot", expense_ratio_bps=25)
+        assert result["forward_return_pct"] is not None
+        # 60% × 0.99 - 0.25% ≈ 59.15%
+        assert 58.5 < result["forward_return_pct"] < 59.8
+        assert result["source"] == "live_long_run"
+
+    def test_eth_spot_uses_eth_long_run(self, monkeypatch):
+        from integrations import data_feeds as df
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=60.0, eth_cagr=45.0))
+
+        result = df.get_forward_return_estimate("eth_spot", expense_ratio_bps=25)
+        # 45% × 0.99 - 0.25% ≈ 44.30%
+        assert 43.5 < result["forward_return_pct"] < 44.8
+
+    def test_btc_futures_applies_roll_drag(self, monkeypatch):
+        from integrations import data_feeds as df
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=60.0, eth_cagr=45.0))
+
+        spot = df.get_forward_return_estimate("btc_spot", expense_ratio_bps=25)
+        futures = df.get_forward_return_estimate("btc_futures", expense_ratio_bps=95)
+        # Futures should be meaningfully lower than spot due to 10% drag
+        # factor plus higher expense ratio.
+        assert futures["forward_return_pct"] < spot["forward_return_pct"]
+        assert spot["forward_return_pct"] - futures["forward_return_pct"] > 5
+
+    def test_thematic_applies_equity_beta_premium(self, monkeypatch):
+        from integrations import data_feeds as df
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=60.0, eth_cagr=45.0))
+
+        result = df.get_forward_return_estimate("thematic", expense_ratio_bps=50)
+        # 60% × 0.6 + 45% × 0.4 = 54% base × 1.10 = 59.4% - 0.5% = 58.9%
+        assert 58.0 < result["forward_return_pct"] < 59.8
+
+    def test_tier_monotonicity_on_underlying_cagr_spread(self, monkeypatch):
+        """
+        With BTC > ETH, btc_spot should exceed eth_spot. With ETH > BTC,
+        the opposite. Confirms forward-estimate direction tracks underlying.
+        """
+        from integrations import data_feeds as df
+
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=70.0, eth_cagr=40.0))
+        assert (df.get_forward_return_estimate("btc_spot", 25)["forward_return_pct"]
+                > df.get_forward_return_estimate("eth_spot", 25)["forward_return_pct"])
+
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=30.0, eth_cagr=60.0))
+        assert (df.get_forward_return_estimate("eth_spot", 25)["forward_return_pct"]
+                > df.get_forward_return_estimate("btc_spot", 25)["forward_return_pct"])
+
+    def test_unknown_category_returns_none(self, monkeypatch):
+        from integrations import data_feeds as df
+        df._LONG_RUN_CAGR_MEMO.clear()
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=60.0, eth_cagr=45.0))
+        result = df.get_forward_return_estimate("made_up_cat")
+        assert result["forward_return_pct"] is None
+        assert result["source"] == "unavailable"
+
+    def test_long_run_cagr_caches_result(self, monkeypatch):
+        """
+        Once resolved, the 24-hour cache should prevent re-fetch on the
+        next call. We assert by swapping the backing fetcher between
+        calls — the second call should use the cached value.
+        """
+        from integrations import data_feeds as df
+        df._LONG_RUN_CAGR_MEMO.clear()
+
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=50.0, eth_cagr=30.0))
+        first = df.get_long_run_cagr("BTC-USD")
+        assert first["cagr_pct"] is not None
+
+        # Swap to a totally different backing — if cache works, we still
+        # get the original 50%, not the new 5%.
+        monkeypatch.setattr(df, "get_etf_prices",
+                            self._fake_prices(btc_cagr=5.0, eth_cagr=3.0))
+        second = df.get_long_run_cagr("BTC-USD")
+        assert second["source"] == "cached_long_run"
+        assert abs(second["cagr_pct"] - first["cagr_pct"]) < 0.01
