@@ -90,41 +90,83 @@ def _assert_edgar_configured() -> None:
 # used when real price/return history hasn't been computed yet. Day 3+
 # computes these live from yfinance OHLCV.
 _CATEGORY_DEFAULTS: dict[str, dict[str, float]] = {
-    "btc_spot":    {"expected_return": 25.0, "volatility": 55.0, "correlation_with_btc": 0.98},
-    "eth_spot":    {"expected_return": 35.0, "volatility": 70.0, "correlation_with_btc": 0.78},
-    "btc_futures": {"expected_return": 15.0, "volatility": 58.0, "correlation_with_btc": 0.95},
-    "thematic":    {"expected_return": 50.0, "volatility": 75.0, "correlation_with_btc": 0.70},
+    # Original 4 — same calibration as before Option B widening.
+    "btc_spot":            {"expected_return": 25.0, "volatility": 55.0, "correlation_with_btc": 0.98},
+    "eth_spot":            {"expected_return": 35.0, "volatility": 70.0, "correlation_with_btc": 0.78},
+    "btc_futures":         {"expected_return": 15.0, "volatility": 58.0, "correlation_with_btc": 0.95},
+    "eth_futures":         {"expected_return": 25.0, "volatility": 72.0, "correlation_with_btc": 0.75},
+    "thematic":            {"expected_return": 50.0, "volatility": 75.0, "correlation_with_btc": 0.70},
+    # Expanded categories from the Q1 2026 universe research:
+    "altcoin_spot":        {"expected_return": 40.0, "volatility": 95.0, "correlation_with_btc": 0.72},
+    "leveraged":           {"expected_return": 30.0, "volatility":110.0, "correlation_with_btc": 0.85},
+    "income_covered_call": {"expected_return": 25.0, "volatility": 45.0, "correlation_with_btc": 0.55},
+    "thematic_equity":     {"expected_return": 35.0, "volatility": 55.0, "correlation_with_btc": 0.50},
+    "multi_asset":         {"expected_return": 30.0, "volatility": 60.0, "correlation_with_btc": 0.85},
 }
-
-# Expense ratios (bps) sourced from public issuer pages at time of writing.
-# Exact values will be refreshed on Day 2+ once data_feeds.get_etf_reference
-# is live. Used here only to break ties in issuer-diversity selection.
-_EXPENSE_RATIO_BPS: dict[str, float] = {
-    "IBIT": 25,  "FBTC": 25,  "BITB": 20,  "ARKB": 21,  "BTCO": 25,
-    "EZBC": 19,  "BRRR": 25,  "HODL": 20,  "BTC":  15,  "GBTC": 150, "DEFI": 95,
-    "ETHA": 25,  "FETH": 25,  "ETHE": 250, "ETHW": 20,  "CETH": 21,
-    "QETH": 25,  "EZET": 19,  "ETH":  15,
-}
-
 
 def _enrich(etf: dict[str, Any]) -> dict[str, Any]:
-    """Attach Phase-1 analytic defaults + expense ratio if present."""
-    defaults = _CATEGORY_DEFAULTS.get(etf.get("category", ""), _CATEGORY_DEFAULTS["btc_spot"])
+    """Attach analytic defaults + preserve issuer metadata from JSON."""
+    defaults = _CATEGORY_DEFAULTS.get(
+        etf.get("category", ""),
+        _CATEGORY_DEFAULTS["btc_spot"],
+    )
     return {
         **etf,
         "expected_return":       defaults["expected_return"],
         "volatility":            defaults["volatility"],
         "correlation_with_btc":  defaults["correlation_with_btc"],
-        "expense_ratio_bps":     _EXPENSE_RATIO_BPS.get(etf["ticker"]),
+        # Prefer expense_ratio_bps from the JSON; fall back to None so
+        # caller can treat it as unknown rather than falsely zero.
+        "expense_ratio_bps":     etf.get("expense_ratio_bps"),
     }
+
+
+# Path to the JSON-backed universe registry. This is the authoritative
+# source post Option-2; config.ETF_UNIVERSE_SEED is kept as a minimal
+# emergency fallback only.
+UNIVERSE_REGISTRY_PATH: Path = DATA_DIR / "etf_universe.json"
+
+
+def _load_registry_from_disk() -> list[dict] | None:
+    """Read data/etf_universe.json. Return None if missing or malformed."""
+    if not UNIVERSE_REGISTRY_PATH.exists():
+        return None
+    try:
+        with open(UNIVERSE_REGISTRY_PATH, "r", encoding="utf-8") as fh:
+            payload = json.load(fh)
+        etfs = payload.get("etfs")
+        if not isinstance(etfs, list) or not etfs:
+            return None
+        return etfs
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        logger.warning("Universe registry unreadable (%s) — falling back to seed.", exc)
+        return None
 
 
 def load_universe(scanner_additions: list[dict] | None = None) -> list[dict]:
     """
-    Return the active ETF universe = seed + scanner-added, each entry
-    enriched with Phase-1 analytic defaults. Day-3 live fetches overwrite.
+    Return the active ETF universe.
+
+    Source order:
+      1. data/etf_universe.json — 35+ curated US-listed crypto ETFs
+         spanning spot (BTC/ETH/altcoin), futures, leveraged, income
+         covered-call wrappers, thematic equity baskets, multi-asset.
+         This is the authoritative production source.
+      2. config.ETF_UNIVERSE_SEED — minimal (~19 ticker) legacy fallback
+         only used if the JSON is missing or malformed.
+
+    Each entry is enriched with category-default volatility + correlation
+    + expense_ratio_bps. Scanner additions are merged by ticker.
+
+    Day-3+ callers should prefer load_universe_with_live_analytics()
+    which overwrites the defaults with live-derived values per ETF.
     """
-    base = [_enrich(e) for e in ETF_UNIVERSE_SEED]
+    base_list = _load_registry_from_disk()
+    if base_list is None:
+        logger.info("Universe registry not on disk — using config.ETF_UNIVERSE_SEED.")
+        base_list = list(ETF_UNIVERSE_SEED)
+
+    base = [_enrich(e) for e in base_list]
     if scanner_additions:
         existing = {e["ticker"] for e in base}
         for new in scanner_additions:

@@ -523,19 +523,88 @@ def get_forward_return_estimate(
                 "basis": f"BTC-USD 10yr CAGR ({btc_cagr:.1f}%) × 0.90 "
                          f"for contango/roll drag, minus expenses"}
 
-    if category == "thematic":
+    if category in ("thematic", "thematic_equity"):
         if btc_cagr is None and eth_cagr is None:
             return {"forward_return_pct": None, "source": "unavailable",
                     "basis": "Reference assets unavailable"}
         btc_part = (btc_cagr or 0) * 0.60
         eth_part = (eth_cagr or 0) * 0.40
         base = btc_part + eth_part
-        # Equity-beta premium: thematic crypto equities historically
-        # beta ~1.3-1.6 vs underlying; use 1.10 conservative multiplier.
+        # Equity-beta premium: thematic crypto equities (miners, brokers,
+        # Coinbase, etc.) historically carry beta ~1.3-1.6 vs underlying
+        # crypto but with equity-market drag. Use 1.10 conservative.
         fwd = base * 1.10 - er_drag * 100.0
         return {"forward_return_pct": fwd, "source": "live_long_run",
                 "basis": f"60% BTC + 40% ETH long-run CAGR × 1.10 "
                          f"(equity-beta premium), minus expenses"}
+
+    if category == "eth_futures":
+        if eth_cagr is None:
+            return {"forward_return_pct": None, "source": "unavailable",
+                    "basis": "ETH-USD long-run history unavailable"}
+        fwd = eth_cagr * 0.90 - er_drag * 100.0
+        return {"forward_return_pct": fwd, "source": "live_long_run",
+                "basis": f"ETH-USD long-run CAGR ({eth_cagr:.1f}%) × 0.90 "
+                         f"for contango/roll drag, minus expenses"}
+
+    if category == "altcoin_spot":
+        # Altcoins (SOL / XRP / LTC / DOGE / HBAR / ADA / AVAX) have
+        # historically underperformed BTC on long-run CAGR due to
+        # steeper drawdowns + higher issuance dilution. Model at BTC
+        # long-run × 0.70 to reflect that structural underperformance
+        # while still carrying meaningful upside vs. cash.
+        if btc_cagr is None:
+            return {"forward_return_pct": None, "source": "unavailable",
+                    "basis": "BTC-USD long-run history unavailable"}
+        fwd = btc_cagr * 0.70 - er_drag * 100.0
+        return {"forward_return_pct": fwd, "source": "live_long_run",
+                "basis": f"BTC-USD 10yr CAGR ({btc_cagr:.1f}%) × 0.70 "
+                         f"(altcoin drawdown/dilution haircut), minus expenses"}
+
+    if category == "leveraged":
+        # 2x leveraged products: naive 2x of underlying is wrong because
+        # of volatility decay (path dependency reduces long-run CAGR
+        # below 2x when the underlying is volatile). Empirically ~1.4x
+        # the underlying over multi-year periods for 2x crypto products,
+        # minus the ~1.85% expense drag.
+        if btc_cagr is None:
+            return {"forward_return_pct": None, "source": "unavailable",
+                    "basis": "BTC-USD long-run history unavailable"}
+        # Use BTC as default underlying proxy; finer-grained would look
+        # at etf.underlying but we haven't plumbed that through here.
+        fwd = btc_cagr * 1.40 - er_drag * 100.0
+        return {"forward_return_pct": fwd, "source": "live_long_run",
+                "basis": f"BTC-USD 10yr CAGR ({btc_cagr:.1f}%) × 1.40 "
+                         f"(vol-decay-adjusted 2x), minus expenses"}
+
+    if category == "income_covered_call":
+        # Covered-call wrappers cap upside (typically giving up 40-60%
+        # of underlying price appreciation in exchange for option
+        # premium distributions). Long-run total return is roughly
+        # 0.55 × underlying + modest yield pickup. Simple model:
+        # 55% of underlying CAGR, net of the ~1% expense drag. The
+        # "yield" the investor sees is distributions, not excess return.
+        if btc_cagr is None:
+            return {"forward_return_pct": None, "source": "unavailable",
+                    "basis": "Reference asset unavailable"}
+        fwd = btc_cagr * 0.55 - er_drag * 100.0
+        return {"forward_return_pct": fwd, "source": "live_long_run",
+                "basis": f"BTC-USD 10yr CAGR ({btc_cagr:.1f}%) × 0.55 "
+                         f"(covered-call upside cap), minus expenses. "
+                         f"Distribution yield is included in total return."}
+
+    if category == "multi_asset":
+        if btc_cagr is None or eth_cagr is None:
+            return {"forward_return_pct": None, "source": "unavailable",
+                    "basis": "Reference asset unavailable"}
+        # Bitwise 10 / generic multi-asset: ~75% BTC, 15% ETH, 10% alts.
+        # Alts modeled at BTC × 0.70 (see altcoin_spot above).
+        alt_component = btc_cagr * 0.70
+        blended = 0.75 * btc_cagr + 0.15 * eth_cagr + 0.10 * alt_component
+        fwd = blended - er_drag * 100.0
+        return {"forward_return_pct": fwd, "source": "live_long_run",
+                "basis": f"75% BTC + 15% ETH + 10% altcoin-proxy long-run "
+                         f"CAGR, minus expenses"}
 
     # Unknown category → no estimate
     return {"forward_return_pct": None, "source": "unavailable",

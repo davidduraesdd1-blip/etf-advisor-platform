@@ -178,11 +178,15 @@ def cornish_fisher_var(
 
 # Issuer tiers (Day-3 Phase-2 directive).
 # Tier A +2% allocation nudge, Tier C -2% nudge, Tier B neutral.
-_ISSUER_TIER_A: frozenset[str] = frozenset({"BlackRock", "Fidelity"})
+_ISSUER_TIER_A: frozenset[str] = frozenset({
+    "BlackRock iShares", "BlackRock", "Fidelity",
+})
 _ISSUER_TIER_C_TICKERS: frozenset[str] = frozenset({
     "GBTC",   # Grayscale legacy high-fee BTC (150 bps)
     "ETHE",   # Grayscale legacy high-fee ETH (250 bps)
     "DEFI",   # Hashdex futures-based, not spot — structural Tier C
+    "XRPR",   # REX-Osprey swaps-wrapped XRP (94 bps) — higher-fee 40-Act
+    "BITW",   # Bitwise 10 closed-end during conversion — 250 bps legacy
 })
 # Everything else → Tier B (neutral).
 
@@ -203,17 +207,54 @@ def _issuer_tier_nudge(etf: dict) -> float:
 # Category-pair correlation targets (Phase-2 pairwise model).
 # Applied on top of each ETF's individual volatility to build the full NxN cov matrix.
 _CATEGORY_PAIR_CORR: dict[tuple[str, str], float] = {
-    ("btc_spot",    "btc_spot"):    0.97,    # same-underlying spot, different issuers
-    ("eth_spot",    "eth_spot"):    0.95,
-    ("btc_futures", "btc_futures"): 0.95,
-    ("thematic",    "thematic"):    0.85,
+    # Within-category (different issuers, same underlying exposure)
+    ("btc_spot",            "btc_spot"):            0.97,
+    ("eth_spot",            "eth_spot"):            0.95,
+    ("btc_futures",         "btc_futures"):         0.95,
+    ("eth_futures",         "eth_futures"):         0.93,
+    ("altcoin_spot",        "altcoin_spot"):        0.65,  # different alts ≠ same risk
+    ("thematic",            "thematic"):            0.85,
+    ("thematic_equity",     "thematic_equity"):     0.80,
+    ("leveraged",           "leveraged"):           0.80,
+    ("income_covered_call", "income_covered_call"): 0.75,
+    ("multi_asset",         "multi_asset"):         0.95,
 
-    ("btc_spot",    "eth_spot"):    0.75,    # BTC↔ETH cluster crossover
-    ("btc_spot",    "btc_futures"): 0.92,    # same-underlying different structure
-    ("btc_spot",    "thematic"):    0.72,
-    ("eth_spot",    "btc_futures"): 0.72,
-    ("eth_spot",    "thematic"):    0.74,
-    ("btc_futures", "thematic"):    0.70,
+    # Cross-category (symmetric — lookup handles order)
+    ("btc_spot",  "eth_spot"):        0.75,
+    ("btc_spot",  "btc_futures"):     0.92,
+    ("btc_spot",  "eth_futures"):     0.70,
+    ("btc_spot",  "altcoin_spot"):    0.72,
+    ("btc_spot",  "thematic"):        0.72,
+    ("btc_spot",  "thematic_equity"): 0.60,
+    ("btc_spot",  "leveraged"):       0.88,  # most leveraged is BTC-linked
+    ("btc_spot",  "income_covered_call"): 0.70,
+    ("btc_spot",  "multi_asset"):     0.85,
+
+    ("eth_spot",  "btc_futures"):     0.72,
+    ("eth_spot",  "eth_futures"):     0.92,
+    ("eth_spot",  "altcoin_spot"):    0.72,
+    ("eth_spot",  "thematic"):        0.74,
+    ("eth_spot",  "thematic_equity"): 0.55,
+    ("eth_spot",  "leveraged"):       0.70,
+    ("eth_spot",  "income_covered_call"): 0.62,
+    ("eth_spot",  "multi_asset"):     0.82,
+
+    ("altcoin_spot", "thematic"):        0.68,
+    ("altcoin_spot", "thematic_equity"): 0.55,
+    ("altcoin_spot", "leveraged"):       0.65,
+    ("altcoin_spot", "income_covered_call"): 0.55,
+    ("altcoin_spot", "multi_asset"):     0.75,
+
+    ("thematic_equity", "leveraged"):       0.60,
+    ("thematic_equity", "income_covered_call"): 0.70,  # many covered-call ETFs are on COIN/MSTR equity
+    ("thematic_equity", "multi_asset"):     0.58,
+
+    ("leveraged",       "income_covered_call"): 0.68,
+    ("leveraged",       "multi_asset"):     0.75,
+
+    ("income_covered_call", "multi_asset"): 0.58,
+
+    ("btc_futures", "thematic"):     0.70,
 }
 
 
