@@ -126,6 +126,45 @@ def _enrich(etf: dict[str, Any]) -> dict[str, Any]:
 # emergency fallback only.
 UNIVERSE_REGISTRY_PATH: Path = DATA_DIR / "etf_universe.json"
 
+# Precomputed analytics snapshot — written by scripts/precompute_analytics.py
+# via GH Actions nightly cron (.github/workflows/nightly_analytics.yml). The
+# app loads this instead of doing 146+ yfinance calls on cold boot.
+ANALYTICS_SNAPSHOT_PATH: Path = DATA_DIR / "etf_analytics.json"
+ANALYTICS_FRESH_HOURS: float = 25.0   # daily cron + 1hr grace
+
+
+def _load_precomputed_analytics() -> dict | None:
+    """
+    Load data/etf_analytics.json if it exists and is fresh enough
+    (≤ ANALYTICS_FRESH_HOURS old). Returns the parsed dict augmented
+    with `_age_hours` so the UI can show data freshness. Returns
+    None if missing, malformed, or stale — caller falls through to
+    the live-enrichment path.
+    """
+    import time as _time
+    if not ANALYTICS_SNAPSHOT_PATH.exists():
+        return None
+    try:
+        with open(ANALYTICS_SNAPSHOT_PATH, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("Precomputed analytics unreadable (%s) — using live path.", exc)
+        return None
+
+    meta = data.get("_metadata", {})
+    computed_ts = meta.get("computed_at_ts")
+    if not isinstance(computed_ts, (int, float)):
+        return None
+    age_hours = (_time.time() - float(computed_ts)) / 3600.0
+    if age_hours > ANALYTICS_FRESH_HOURS:
+        logger.info(
+            "Precomputed analytics stale (%.1fh > %.1fh) — using live path.",
+            age_hours, ANALYTICS_FRESH_HOURS,
+        )
+        return None
+    data["_age_hours"] = round(age_hours, 2)
+    return data
+
 
 def _load_registry_from_disk() -> list[dict] | None:
     """Read data/etf_universe.json. Return None if missing or malformed."""
@@ -243,6 +282,43 @@ def load_universe_with_live_analytics(
     )
 
     base = load_universe(scanner_additions)
+
+    # Option-2 cold-boot fast path: if a fresh precomputed analytics
+    # snapshot exists, merge it in and skip the live yfinance loop
+    # entirely. The precompute job (GH Actions nightly_analytics) runs
+    # once a day and writes data/etf_analytics.json. Loading the JSON
+    # is microseconds vs. ~5 minutes of live network calls.
+    precomputed = _load_precomputed_analytics()
+    if precomputed is not None:
+        per_ticker = precomputed.get("etfs", {})
+        for etf in base:
+            tkr = etf["ticker"]
+            snap = per_ticker.get(tkr)
+            if not snap:
+                continue
+            for field in (
+                "expected_return", "volatility", "correlation_with_btc",
+                "forward_return", "expected_return_source",
+                "volatility_source", "correlation_source",
+                "forward_return_source", "forward_return_basis",
+                "btc_proxy_used", "cagr_days_observed",
+                "vol_n_returns", "corr_n_returns",
+            ):
+                if field in snap and snap[field] is not None:
+                    etf[field] = snap[field]
+            etf["analytics_source"] = "precomputed"
+            etf["analytics_age_hours"] = precomputed.get("_age_hours")
+        # Mark default-source flags for any field the snapshot didn't fill,
+        # so per-tile transparency remains honest.
+        for etf in base:
+            etf.setdefault("expected_return_source", "category_default")
+            etf.setdefault("volatility_source", "category_default")
+            etf.setdefault("correlation_source", "category_default")
+            etf.setdefault("forward_return_source", "unavailable")
+        return base
+
+    # Slow path — no fresh precompute. Run the live enrichment loop
+    # (~3-5 minutes on a cold throttled Streamlit Cloud IP).
     for etf in base:
         tkr = etf["ticker"]
 

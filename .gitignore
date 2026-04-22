@@ -28,6 +28,10 @@ data/cache/
 # render the actual universe instead of the 19-ticker legacy fallback
 # in config.ETF_UNIVERSE_SEED.
 !data/etf_universe.json
+# Precomputed analytics snapshot — written by the nightly_analytics
+# GH Actions cron. The Streamlit app loads this on cold boot to skip
+# the 5-minute live yfinance enrichment loop.
+!data/etf_analytics.json
 
 # ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/

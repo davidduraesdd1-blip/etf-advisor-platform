@@ -59,12 +59,14 @@ _HISTORY_AGE_THRESHOLD_DAYS: int = 365
 
 
 def _known_history_set() -> frozenset[str]:
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     try:
         from core.etf_universe import _load_registry_from_disk
         reg = _load_registry_from_disk()
         if reg:
-            cutoff = datetime.utcnow() - timedelta(days=_HISTORY_AGE_THRESHOLD_DAYS)
+            cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+                days=_HISTORY_AGE_THRESHOLD_DAYS
+            )
             keep: set[str] = set()
             for e in reg:
                 tkr = e.get("ticker")
@@ -760,6 +762,112 @@ def _fetch_yfinance(ticker: str, period: str, interval: str) -> list[dict]:
     except Exception as exc:
         logger.info("yfinance failed for %s: %s", ticker, exc)
         return []
+
+
+def get_etf_prices_batch(
+    tickers: list[str],
+    period: str = "1y",
+    interval: str = "1d",
+) -> dict[str, dict]:
+    """
+    Batched price fetch — Option 1 cold-boot performance fix.
+
+    yfinance's `Ticker(t).history()` is one HTTP request per ticker.
+    Loading 73 tickers × 2 fetches (CAGR period + vol period) = 146
+    sequential requests, which Streamlit Cloud's heavily-throttled IP
+    can take 5+ minutes to complete on cold boot.
+
+    `yf.download([...], group_by='ticker')` issues a single HTTP
+    request that returns OHLCV for all tickers. ~146 requests collapse
+    to ~3 (one per distinct period).
+
+    Falls back to per-ticker `_fetch_yfinance` for any ticker that
+    came back empty/NaN in the batch (handles yfinance's silent
+    "possibly delisted" returns for not-yet-indexed altcoin spot ETFs).
+
+    Returns the same shape as `get_etf_prices`:
+        { ticker: {"source": "yfinance"|"unavailable",
+                   "prices": [{date, open, high, low, close, volume}, ...]} }
+
+    Honors _yf_memo cache + _last_close updates per ticker exactly
+    like the per-ticker path so callers can mix the two freely.
+    """
+    out: dict[str, dict] = {}
+
+    # First pass: serve anything that's already in the per-ticker memo
+    # so we don't re-fetch what's already cached.
+    to_fetch: list[str] = []
+    for tkr in tickers:
+        memo_key = (tkr.upper(), period, interval)
+        memo_hit = _yf_memo.get(memo_key)
+        if memo_hit is not None:
+            age_sec = int(time.monotonic() - memo_hit["_mono"])
+            ttl = CACHE_TTL.get("etf_price_market", 300)
+            if age_sec < ttl:
+                out[tkr] = {k: v for k, v in memo_hit.items() if not k.startswith("_")}
+                continue
+        to_fetch.append(tkr)
+
+    if not to_fetch:
+        return out
+
+    # Single batched yfinance call.
+    batch_succeeded = False
+    try:
+        import yfinance as yf
+        df_all = yf.download(
+            tickers=to_fetch,
+            period=period,
+            interval=interval,
+            group_by="ticker",
+            threads=True,
+            progress=False,
+            auto_adjust=False,
+        )
+        batch_succeeded = df_all is not None and not df_all.empty
+    except Exception as exc:
+        logger.info("yfinance batch failed for %d tickers: %s", len(to_fetch), exc)
+        df_all = None
+
+    if batch_succeeded:
+        # yf.download returns multi-level columns when multiple tickers
+        # are passed; single-ticker returns a flat DataFrame. Handle both.
+        for tkr in to_fetch:
+            try:
+                if len(to_fetch) == 1:
+                    df_t = df_all
+                else:
+                    if tkr in df_all.columns.get_level_values(0):
+                        df_t = df_all[tkr]
+                    else:
+                        df_t = None
+                if df_t is None or df_t.empty:
+                    raise ValueError("empty slice")
+                # Drop fully-NaN rows (delisted / missing-data tickers
+                # come back as all-NaN columns in the batch).
+                df_t = df_t.dropna(how="all")
+                if df_t.empty:
+                    raise ValueError("all-NaN after drop")
+                rows = _df_to_rows(df_t)
+                if not rows:
+                    raise ValueError("rows empty")
+                register_fetch_attempt("etf_price", "yfinance", success=True)
+                _update_last_close(tkr, rows)
+                result = {"source": "yfinance", "prices": rows}
+                _yf_memo[(tkr.upper(), period, interval)] = {
+                    **result, "_mono": time.monotonic(),
+                }
+                out[tkr] = result
+            except Exception:
+                # Individual ticker failed inside the batch — try the
+                # full per-ticker fallback chain (yfinance retry → Stooq).
+                out[tkr] = _fetch_single_ticker(tkr, period, interval)
+    else:
+        # Whole batch failed — fall through to per-ticker for everything.
+        for tkr in to_fetch:
+            out[tkr] = _fetch_single_ticker(tkr, period, interval)
+
+    return out
 
 
 def _fetch_stooq(ticker: str, period: str) -> list[dict]:
