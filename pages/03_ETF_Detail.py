@@ -244,28 +244,38 @@ with card("Composition"):
 
     if chosen in NPORT_TICKERS:
         comp = get_etf_composition(chosen)
-        if comp["source"] == "edgar_live":
+        src = comp["source"]
+        if src == "edgar_live":
             st.caption(
                 f"Live from SEC EDGAR N-PORT filing · "
                 f"dated {comp['filing_date']} · accession {comp['accession']}"
             )
-        elif comp["source"] == "cached":
+        elif src == "issuer_static":
+            # '33-Act spot commodity trust — no N-PORT filing exists;
+            # composition derived from issuer's prospectus + daily
+            # holdings disclosure. Intentionally honest about the
+            # non-live source while providing a link out to verify.
+            st.caption(
+                f"Spot commodity trust · issuer-curated composition "
+                f"(trusts don't file N-PORT). Custodian: {comp.get('custodian', 'N/A')}."
+            )
+        elif src == "cached":
             st.info(comp["note"])
         else:
             st.info(comp["note"])
 
         if comp["holdings"]:
             import pandas as _pd
-            df = _pd.DataFrame([
-                {
+            df_rows = []
+            for h in comp["holdings"]:
+                df_rows.append({
                     "Name":       h.get("name", ""),
                     "Asset cat":  h.get("asset_cat", ""),
                     "Balance":    h.get("balance"),
-                    "Value USD":  h.get("value_usd", 0),
+                    "Value USD":  h.get("value_usd"),
                     "% of fund":  h.get("pct_value"),
-                }
-                for h in comp["holdings"]
-            ])
+                })
+            df = _pd.DataFrame(df_rows)
             st.dataframe(
                 df,
                 use_container_width=True,
@@ -276,6 +286,17 @@ with card("Composition"):
                 },
             )
             st.caption(f"Total holdings: {comp['holdings_count']}")
+
+            # For issuer-static trusts, surface the issuer's live
+            # holdings page so the FA can audit the per-share coin
+            # count published daily.
+            if src == "issuer_static" and comp.get("issuer_holdings_url"):
+                st.markdown(
+                    f"📊 [Live daily holdings on issuer site]"
+                    f"({comp['issuer_holdings_url']})"
+                )
+            if comp.get("note"):
+                st.caption(comp["note"])
     else:
         category = etf.get("category", "")
         underlying = etf.get("underlying", "")

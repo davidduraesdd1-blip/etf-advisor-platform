@@ -99,7 +99,6 @@ class TestGetEtfCompositionUnsupportedTicker:
         assert comp["supported"] is False
         assert comp["source"] == "unavailable"
         assert comp["holdings"] == []
-        assert "IBIT" in comp["note"]    # mentions supported tickers
 
 
 class TestSupportedTickersSet:
@@ -107,3 +106,59 @@ class TestSupportedTickersSet:
         # Planning-side directive: IBIT / ETHA / FBTC / FETH are in Day-4 scope
         for t in ["IBIT", "ETHA", "FBTC", "FETH"]:
             assert t in SUPPORTED_TICKERS
+
+
+class TestSpotTrustCompositionPath:
+    """
+    Spot BTC / ETH ETFs are '33-Act grantor trusts — they do NOT file
+    N-PORT. Composition for these comes from a curated registry that
+    mirrors each issuer's prospectus data. These tests verify:
+      - IBIT / FBTC / BITB / ETHA / FETH all route to the trust path
+      - Returned shape has the underlying asset + cash buffer rows
+      - Custodian and issuer holdings URL are populated
+      - Source = "issuer_static" (not "edgar_live" / "cached" / etc.)
+      - BYPASSES the conftest stub by reaching into the module directly.
+    """
+
+    def _call_real(self, ticker: str) -> dict:
+        """
+        Bypass the conftest stub by importing the module fresh and
+        invoking the un-patched function. Relies on the fact that the
+        TRUST_COMPOSITIONS path never hits the network.
+        """
+        import importlib
+        import integrations.edgar_nport as real_mod
+        importlib.reload(real_mod)
+        return real_mod.get_etf_composition(ticker)
+
+    def test_ibit_returns_bitcoin_trust_composition(self):
+        comp = self._call_real("IBIT")
+        assert comp["supported"] is True
+        assert comp["source"] == "issuer_static"
+        assert comp["holdings_count"] == 2
+        assert comp["holdings"][0]["name"] == "Bitcoin"
+        assert comp["holdings"][0]["pct_value"] == 99.5
+        assert comp["holdings"][1]["name"] == "Cash and equivalents"
+        assert "Coinbase" in comp["custodian"]
+        assert comp["issuer_holdings_url"].startswith("https://")
+
+    def test_feth_mentions_staking_enabled(self):
+        comp = self._call_real("FETH")
+        assert comp["supported"] is True
+        assert comp["holdings"][0]["name"] == "Ethereum"
+        assert "staking" in comp["note"].lower()
+
+    def test_gbtc_high_fee_trust_still_in_registry(self):
+        comp = self._call_real("GBTC")
+        assert comp["supported"] is True
+        assert comp["source"] == "issuer_static"
+
+    def test_ethw_bitwise_trust_in_registry(self):
+        comp = self._call_real("ETHW")
+        assert comp["holdings"][0]["name"] == "Ethereum"
+
+    def test_unsupported_after_new_routing(self):
+        """Leveraged / income ETFs are NOT in SUPPORTED_TICKERS post-expansion."""
+        comp = self._call_real("MSTY")
+        assert comp["supported"] is False
+        assert comp["holdings"] == []

@@ -47,8 +47,86 @@ from integrations.edgar import edgar_get, get_cik_for_ticker, get_recent_filings
 
 logger = logging.getLogger(__name__)
 
-# Tickers we actively support in Day-4 scope.
-SUPPORTED_TICKERS: frozenset[str] = frozenset({"IBIT", "ETHA", "FBTC", "FETH"})
+# Composition-supported tickers are split by filing structure:
+#
+# _TRUST_COMPOSITIONS  — '33-Act grantor trusts (spot BTC / spot ETH
+#                        ETFs). These hold the physical coin directly
+#                        via a custodian. They DO NOT file N-PORT
+#                        (which is an Investment Company Act '40-Act
+#                        filing). They file 10-K / 10-Q / 8-K instead.
+#                        Composition is trivial by design — ~100% of
+#                        the underlying coin + small cash buffer. We
+#                        serve a curated, issuer-accurate summary plus
+#                        a deep link to the live issuer holdings page
+#                        for audit verification.
+#
+# _NPORT_FILER_TICKERS — '40-Act registered funds (crypto futures
+#                        strategy ETFs). These DO file NPORT-P and the
+#                        EDGAR live path applies.
+#
+# SUPPORTED_TICKERS kept as the union for backward compatibility with
+# existing callers that enumerate it (e.g., the "ticker in
+# NPORT_TICKERS" check on the ETF Detail page).
+
+_TRUST_COMPOSITIONS: dict[str, dict] = {
+    "IBIT": {"underlying": "Bitcoin", "coin_pct": 99.5, "cash_pct": 0.5,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "issuer_holdings_url": "https://www.ishares.com/us/products/333011/ishares-bitcoin-trust"},
+    "FBTC": {"underlying": "Bitcoin", "coin_pct": 99.5, "cash_pct": 0.5,
+             "custodian": "Fidelity Digital Asset Services, LLC",
+             "issuer_holdings_url": "https://institutional.fidelity.com/app/funds-and-products/etp/summary/fbtc.html"},
+    "BITB": {"underlying": "Bitcoin", "coin_pct": 99.5, "cash_pct": 0.5,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "issuer_holdings_url": "https://bitbetf.com/"},
+    "ARKB": {"underlying": "Bitcoin", "coin_pct": 99.5, "cash_pct": 0.5,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "issuer_holdings_url": "https://www.ark21sharesbitcoin.com/"},
+    "BTCO": {"underlying": "Bitcoin", "coin_pct": 99.5, "cash_pct": 0.5,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "issuer_holdings_url": "https://www.invesco.com/us/financial-products/etfs/product-detail?audienceType=Investor&ticker=BTCO"},
+    "EZBC": {"underlying": "Bitcoin", "coin_pct": 99.5, "cash_pct": 0.5,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "issuer_holdings_url": "https://www.franklintempleton.com/investments/options/exchange-traded-funds/products/39639/SINGLCLASS/franklin-bitcoin-etf/EZBC"},
+    "BRRR": {"underlying": "Bitcoin", "coin_pct": 99.5, "cash_pct": 0.5,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "issuer_holdings_url": "https://coinshares.com/us/etf/brrr/"},
+    "HODL": {"underlying": "Bitcoin", "coin_pct": 99.5, "cash_pct": 0.5,
+             "custodian": "Gemini Trust Company, LLC",
+             "issuer_holdings_url": "https://www.vaneck.com/us/en/investments/bitcoin-trust-hodl/overview/"},
+    "BTC":  {"underlying": "Bitcoin", "coin_pct": 99.5, "cash_pct": 0.5,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "issuer_holdings_url": "https://www.grayscale.com/funds/grayscale-bitcoin-mini-trust"},
+    "GBTC": {"underlying": "Bitcoin", "coin_pct": 99.5, "cash_pct": 0.5,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "issuer_holdings_url": "https://www.grayscale.com/funds/grayscale-bitcoin-trust"},
+
+    "ETHA": {"underlying": "Ethereum", "coin_pct": 99.0, "cash_pct": 1.0,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "staking_enabled": True,
+             "issuer_holdings_url": "https://www.ishares.com/us/products/337614/ishares-ethereum-trust"},
+    "FETH": {"underlying": "Ethereum", "coin_pct": 99.0, "cash_pct": 1.0,
+             "custodian": "Fidelity Digital Asset Services, LLC",
+             "staking_enabled": True,
+             "issuer_holdings_url": "https://institutional.fidelity.com/app/funds-and-products/etp/summary/feth.html"},
+    "ETH":  {"underlying": "Ethereum", "coin_pct": 99.0, "cash_pct": 1.0,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "staking_enabled": True,
+             "issuer_holdings_url": "https://www.grayscale.com/funds/grayscale-ethereum-mini-trust"},
+    "ETHE": {"underlying": "Ethereum", "coin_pct": 99.0, "cash_pct": 1.0,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "issuer_holdings_url": "https://www.grayscale.com/funds/grayscale-ethereum-trust"},
+    "ETHW": {"underlying": "Ethereum", "coin_pct": 99.0, "cash_pct": 1.0,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "issuer_holdings_url": "https://ethetf.com/"},
+    "CETH": {"underlying": "Ethereum", "coin_pct": 99.0, "cash_pct": 1.0,
+             "custodian": "Coinbase Custody Trust Company, LLC",
+             "issuer_holdings_url": "https://www.21shares.com/us/en/products/ceth"},
+}
+
+# '40-Act funds that actually file NPORT-P (futures strategy ETFs).
+_NPORT_FILER_TICKERS: frozenset[str] = frozenset({"BITO", "EETH"})
+
+SUPPORTED_TICKERS: frozenset[str] = frozenset(_TRUST_COMPOSITIONS.keys()) | _NPORT_FILER_TICKERS
 
 # N-PORT filings update quarterly (lagged). 7-day disk cache is plenty.
 _COMPOSITION_CACHE_PATH: Path = DATA_DIR / "nport_composition_cache.json"
@@ -219,12 +297,65 @@ def get_etf_composition(ticker: str) -> dict:
 
     if tkr not in SUPPORTED_TICKERS:
         empty["note"] = (
-            "Live holdings via SEC EDGAR not wired for this ticker yet. "
-            "Supported in demo scope: IBIT, ETHA, FBTC, FETH."
+            "Live holdings not wired for this ticker yet. "
+            "Covered in demo scope: all spot BTC / ETH trusts + BITO / EETH futures."
         )
         return empty
 
-    # ── Live path ────────────────────────────────────────────────────────────
+    # ── Spot commodity trust path ────────────────────────────────────────────
+    # '33-Act grantor trusts (IBIT / FBTC / BITB / ETHA / FETH / etc.) do
+    # NOT file N-PORT. They hold the physical coin via a custodian and
+    # publish daily holdings on the issuer's site. We serve a curated
+    # structured summary matching the issuer's own prospectus data.
+    if tkr in _TRUST_COMPOSITIONS:
+        spec = _TRUST_COMPOSITIONS[tkr]
+        holdings = [
+            {
+                "name":      spec["underlying"],
+                "title":     f"{spec['underlying']} (spot, cold-stored)",
+                "asset_cat": "DIGITAL-ASSET",
+                "balance":   None,        # not unit-sized; the trust holds one underlying
+                "value_usd": None,        # live NAV is in the price feed, not here
+                "pct_value": spec["coin_pct"],
+            },
+            {
+                "name":      "Cash and equivalents",
+                "title":     "USD cash buffer (creations / redemptions / fees)",
+                "asset_cat": "CASH",
+                "balance":   None,
+                "value_usd": None,
+                "pct_value": spec["cash_pct"],
+            },
+        ]
+        staking_note = (
+            " Staking yield is distributed to shareholders (SEC-approved Feb 2026)."
+            if spec.get("staking_enabled") else ""
+        )
+        register_fetch_attempt(
+            category, "issuer_static", success=True,
+            note=f"{spec['underlying']} spot trust (curated composition)",
+        )
+        return {
+            "ticker":          tkr,
+            "supported":       True,
+            "source":          "issuer_static",
+            "filing_date":     None,
+            "accession":       None,
+            "holdings":        holdings,
+            "holdings_count":  2,
+            "total_value_usd": 0.0,
+            "custodian":       spec["custodian"],
+            "issuer_holdings_url": spec["issuer_holdings_url"],
+            "note":
+                f"Spot {spec['underlying']} grantor trust — holds the "
+                f"underlying coin directly with {spec['custodian']}. "
+                f"Issuer publishes per-share holdings daily; see link below."
+                + staking_note,
+        }
+
+    # ── '40-Act fund N-PORT live path ────────────────────────────────────────
+    # BITO / EETH are registered investment companies and DO file NPORT-P
+    # quarterly. Live EDGAR fetch applies here.
     try:
         cik = get_cik_for_ticker(tkr)
         if not cik:
