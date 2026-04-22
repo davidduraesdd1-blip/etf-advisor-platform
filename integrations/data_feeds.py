@@ -45,17 +45,44 @@ from core.data_source_state import (
 logger = logging.getLogger(__name__)
 
 # Known-history set — only failures on these tickers count against the
-# circuit breaker. Post Option-2 we source from the full JSON-backed
-# registry (36 tickers including new altcoin spot, leveraged, and
-# income-covered-call products) so the breaker reflects the true
-# universe. Falls back to the legacy 19-ticker seed if the JSON
-# registry is missing.
+# circuit breaker. The breaker design (planning-side Mod 3 / Risk 5)
+# treats failures on "new listings" as legitimate misses (no history
+# yet) so they don't trip the breaker. We need to honor that for the
+# 2025-2026 altcoin spot ETFs (BSOL, FSOL, SSOL, XRPC, LTCO, HBR,
+# AVAX, ADAX, etc.) — yfinance often hasn't picked them up yet, so
+# every cold boot was tripping the breaker on the first 3 fetches
+# of these tickers and putting the whole session into Stooq fallback.
+#
+# Heuristic: a ticker counts as "known history" only if its inception
+# date is ≥ 12 months in the past. Anything newer is exempt.
+_HISTORY_AGE_THRESHOLD_DAYS: int = 365
+
+
 def _known_history_set() -> frozenset[str]:
+    from datetime import datetime, timedelta
     try:
         from core.etf_universe import _load_registry_from_disk
         reg = _load_registry_from_disk()
         if reg:
-            return frozenset(e["ticker"] for e in reg if e.get("ticker"))
+            cutoff = datetime.utcnow() - timedelta(days=_HISTORY_AGE_THRESHOLD_DAYS)
+            keep: set[str] = set()
+            for e in reg:
+                tkr = e.get("ticker")
+                if not tkr:
+                    continue
+                inception_str = e.get("inception", "")
+                try:
+                    inception = datetime.fromisoformat(inception_str.split("T")[0])
+                except (ValueError, AttributeError):
+                    # No / malformed inception — be conservative and
+                    # include in known set so failures still register.
+                    keep.add(tkr)
+                    continue
+                if inception <= cutoff:
+                    keep.add(tkr)
+                # else: launched within the last 12 months — exempt
+                # from breaker accounting (legitimately new listing).
+            return frozenset(keep)
     except Exception:  # pragma: no cover — defensive
         pass
     return frozenset(e["ticker"] for e in ETF_UNIVERSE_SEED)
