@@ -37,7 +37,7 @@ def _render_sidebar() -> None:
     with st.sidebar:
         # Brand header
         if BRAND_LOGO_PATH:
-            st.image(BRAND_LOGO_PATH, use_container_width=True)
+            st.image(BRAND_LOGO_PATH, width="stretch")
         st.markdown(f"## {BRAND_NAME}")
         st.caption("Crypto ETF portfolio platform for advisors")
 
@@ -55,10 +55,10 @@ def _render_sidebar() -> None:
 
         # Theme toggle (CLAUDE.md §8)
         theme_label = "☼ Light mode" if current_theme() == "dark" else "☾ Dark mode"
-        st.button(theme_label, on_click=toggle_theme, use_container_width=True)
+        st.button(theme_label, on_click=toggle_theme, width="stretch")
 
         # Refresh all data (CLAUDE.md §12)
-        if st.button("⟳ Refresh all data", use_container_width=True):
+        if st.button("⟳ Refresh all data", width="stretch"):
             st.cache_data.clear()
             st.toast("Caches cleared — data will refresh on next read.")
 

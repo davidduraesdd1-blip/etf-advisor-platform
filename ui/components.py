@@ -192,7 +192,7 @@ def data_source_badge(
             unsafe_allow_html=True,
         )
     with col_btn:
-        if st.button("Retry live fetch", key=banner_key, use_container_width=True):
+        if st.button("Retry live fetch", key=banner_key, width="stretch"):
             reset_all()
             st.toast("Live fetch retry queued — refreshing caches.")
 
@@ -279,7 +279,7 @@ def data_sources_panel(
             df["Age (min)"] = df["Age (min)"].astype("Int64")
         st.dataframe(
             df,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             key=key,
         )

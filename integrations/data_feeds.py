@@ -59,7 +59,41 @@ _HISTORY_AGE_THRESHOLD_DAYS: int = 365
 
 
 def _known_history_set() -> frozenset[str]:
+    """
+    Returns the set of tickers that ARE expected to have yfinance
+    history. Failures on these count toward the circuit breaker.
+    Failures on tickers OUTSIDE this set are treated as legitimate
+    new-listing misses (don't trip the breaker).
+
+    Best source: the precomputed analytics snapshot. If a ticker has
+    a successful CAGR entry there, yfinance has confirmed it knows
+    the ticker. Anything missing from the snapshot is yfinance-
+    unindexed (the 12 newly-launched altcoin spots + a few older
+    niche funds like EFBC / MARL that yfinance just doesn't have).
+
+    Fallback hierarchy:
+      1. Precomputed snapshot's tickers-with-data (best — confirmed)
+      2. JSON registry filtered by inception ≤ 12 months (heuristic)
+      3. Legacy ETF_UNIVERSE_SEED (emergency)
+    """
     from datetime import datetime, timedelta, timezone
+
+    # Tier 1 — snapshot is authoritative if it exists and is fresh.
+    try:
+        from core.etf_universe import _load_precomputed_analytics
+        snap = _load_precomputed_analytics()
+        if snap:
+            etfs = snap.get("etfs", {})
+            confirmed = {
+                t for t, info in etfs.items()
+                if info.get("expected_return_source") == "live"
+            }
+            if confirmed:
+                return frozenset(confirmed)
+    except Exception:  # pragma: no cover — defensive
+        pass
+
+    # Tier 2 — JSON registry filtered by inception age.
     try:
         from core.etf_universe import _load_registry_from_disk
         reg = _load_registry_from_disk()
@@ -76,17 +110,15 @@ def _known_history_set() -> frozenset[str]:
                 try:
                     inception = datetime.fromisoformat(inception_str.split("T")[0])
                 except (ValueError, AttributeError):
-                    # No / malformed inception — be conservative and
-                    # include in known set so failures still register.
                     keep.add(tkr)
                     continue
                 if inception <= cutoff:
                     keep.add(tkr)
-                # else: launched within the last 12 months — exempt
-                # from breaker accounting (legitimately new listing).
             return frozenset(keep)
     except Exception:  # pragma: no cover — defensive
         pass
+
+    # Tier 3 — emergency seed.
     return frozenset(e["ticker"] for e in ETF_UNIVERSE_SEED)
 
 

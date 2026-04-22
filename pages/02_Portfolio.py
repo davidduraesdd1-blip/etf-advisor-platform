@@ -276,13 +276,13 @@ with card("Allocation"):
             yaxis_title="Weight %",
             height=360,
         )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     display_cols = ["ticker", "name", "issuer", "category", "weight_pct", "usd_value"]
     _alloc_view = alloc_df[display_cols].reset_index(drop=True)
     _alloc_event = st.dataframe(
         _alloc_view,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         column_config={
             "weight_pct": st.column_config.NumberColumn("Weight %", format="%.2f"),
@@ -377,7 +377,7 @@ with card("Performance"):
         hist_df = pd.DataFrame(rows)
         any_data = hist_df[["1Y return %", "3Y return %", "5Y return %"]].notna().any().any()
         if any_data:
-            st.dataframe(hist_df, use_container_width=True, hide_index=True)
+            st.dataframe(hist_df, width="stretch", hide_index=True)
         else:
             st.info(
                 level_text(
@@ -435,7 +435,7 @@ with card("Performance"):
                 xaxis_title="Trading days",
                 showlegend=False,
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
             kk1, kk2, kk3, kk4 = st.columns(4)
             with kk1: kpi_tile("Median 1Y",   f"${mc['percentile_50']:,.0f}")
@@ -550,7 +550,7 @@ def _confirm_body() -> None:
         })
 
     preview = pd.DataFrame(preview_rows)
-    st.dataframe(preview, use_container_width=True, hide_index=True)
+    st.dataframe(preview, width="stretch", hide_index=True)
     st.caption("Estimated slippage: ~12.5 bps (mid of 5-20 bps mock range).")
 
     col_exec, col_cancel = st.columns(2)
@@ -558,31 +558,62 @@ def _confirm_body() -> None:
         exec_disabled = bool(missing_live) and len(missing_live) == len(holdings)
         if st.button(
             "Confirm and execute",
-            use_container_width=True,
+            width="stretch",
             type="primary",
             disabled=exec_disabled,
             help="Disabled until at least one live price is available."
                  if exec_disabled else None,
         ):
-            result = submit_basket(orders_draft, client_id=client["id"], dry_run=False)
+            # Filter out orders with no live price BEFORE sending to the
+            # broker — broker_mock would silently skip them; better UX
+            # to drop them with a visible audit trail.
+            executable = [o for o in orders_draft if o["mid_price"] > 0]
+            skipped = [o for o in orders_draft if o["mid_price"] <= 0]
+
+            result = submit_basket(executable, client_id=client["id"], dry_run=False)
+            # Surface skipped orders in the result so the post-modal toast +
+            # audit log can mention them.
+            result["summary"]["n_skipped_no_price"] = len(skipped)
+            result["summary"]["skipped_tickers"] = [o["ticker"] for o in skipped]
+
             st.session_state["last_execution"] = result
             st.session_state["confirm_execute"] = False
             # Audit-log write (Day-4 item I)
             try:
                 from core.audit_log import append_entry
+                detail = (
+                    f"tier={tier_name}, n_orders={result['summary']['n_orders']}, "
+                    f"gross=${result['summary']['gross_usd']:,.2f}"
+                )
+                if skipped:
+                    detail += (
+                        f", n_skipped={len(skipped)} (no live price: "
+                        f"{', '.join(o['ticker'] for o in skipped)})"
+                    )
                 append_entry(
                     client_id=client["id"],
                     action="execute_basket",
-                    detail=(
-                        f"tier={tier_name}, n_orders={result['summary']['n_orders']}, "
-                        f"gross=${result['summary']['gross_usd']:,.2f}"
-                    ),
+                    detail=detail,
                 )
             except Exception:
                 pass   # audit-log failure must never block execution
-            st.toast(f"Basket submitted — {result['summary']['n_orders']} orders filled (mock).")
+
+            if skipped:
+                st.warning(
+                    f"Basket submitted — {result['summary']['n_orders']} orders "
+                    f"filled (mock). **{len(skipped)} orders skipped because no "
+                    f"live price was available**: "
+                    f"{', '.join(o['ticker'] for o in skipped)}. These tickers "
+                    f"are likely not yet indexed on yfinance (newly-launched "
+                    f"altcoin spot ETFs). Re-execute later or use a different basket."
+                )
+            else:
+                st.toast(
+                    f"Basket submitted — {result['summary']['n_orders']} "
+                    f"orders filled (mock)."
+                )
     with col_cancel:
-        if st.button("Cancel", use_container_width=True):
+        if st.button("Cancel", width="stretch"):
             st.session_state["confirm_execute"] = False
 
 
@@ -592,7 +623,7 @@ with col_cta:
         "Execute basket →",
         on_click=_open_confirm,
         type="primary",
-        use_container_width=True,
+        width="stretch",
     )
 with col_info:
     st.caption(level_text(

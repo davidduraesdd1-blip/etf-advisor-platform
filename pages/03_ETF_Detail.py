@@ -284,7 +284,7 @@ with card("Historical returns"):
             height=320,
             yaxis_title="Close (USD)",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         def _ret(n_days: int) -> str:
             if len(df) <= n_days:
@@ -386,7 +386,7 @@ with card("Composition"):
                 df = _pd.DataFrame(df_rows)
                 st.dataframe(
                     df,
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                     column_config={
                         "Value USD": st.column_config.NumberColumn(format="$%,.0f"),
@@ -524,7 +524,7 @@ with card("Forward projection"):
             xaxis_title="Trading days",
             showlegend=False,
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         if is_advanced():
             st.caption(
                 f"Paths: {mc['n_simulations']:,} · retained: {mc['paths_retained']} · seed: {mc['seed']}"

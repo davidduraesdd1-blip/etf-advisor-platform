@@ -145,7 +145,7 @@ with card("EDGAR scanner health"):
             "refuse to run. Set EDGAR_CONTACT_EMAIL in .env locally or "
             "in Streamlit Cloud Secrets + GitHub Actions Secrets for prod."
         )
-    elif st.button("Run scanner now", use_container_width=False):
+    elif st.button("Run scanner now", width="content"):
         with st.spinner("Querying EDGAR full-text index…"):
             try:
                 from core.etf_universe import daily_scanner
@@ -170,7 +170,7 @@ with card("Data-source state"):
         st.metric("Failures in window", cb["failure_count"])
     with s3:
         st.metric("New-ETF misses", cb["new_etf_misses"])
-    if st.button("Reset circuit breaker", use_container_width=False):
+    if st.button("Reset circuit breaker", width="content"):
         reset_circuit_breaker()
         st.toast("Circuit breaker reset to primary source.")
 
@@ -179,7 +179,7 @@ with card("Data-source state"):
     if snap:
         st.dataframe([
             {"Category": cat, **info} for cat, info in snap.items()
-        ], use_container_width=True, hide_index=True)
+        ], width="stretch", hide_index=True)
     else:
         st.caption("No categories touched yet this session.")
 
@@ -207,7 +207,7 @@ with card("Recent actions"):
             }
             for e in entries
         ])
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
     else:
         st.caption("No actions recorded yet this session.")
 

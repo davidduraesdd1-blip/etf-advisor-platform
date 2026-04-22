@@ -182,7 +182,7 @@ df = pd.DataFrame([
 with card("Clients"):
     st.dataframe(
         df,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         column_config={
             "Portfolio $":  st.column_config.NumberColumn(format="$%,.0f"),
@@ -268,7 +268,7 @@ with card("Open client portfolio"):
             st.write(c.get("notes", ""))
             st.info(f"**Today:** {situation}")
     # Stash the client selection in session_state so the Portfolio page can read it
-    if st.button(f"Open {c['name']}'s portfolio →", use_container_width=True):
+    if st.button(f"Open {c['name']}'s portfolio →", width="stretch"):
         st.session_state["active_client_id"] = chosen_id
         st.switch_page("pages/02_Portfolio.py")
 
