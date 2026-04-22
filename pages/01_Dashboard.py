@@ -12,6 +12,9 @@ import streamlit as st
 from config import BRAND_NAME, DEMO_MODE
 from core.audit_log import seed_demo_entries
 from core.demo_clients import DEMO_CLIENTS
+from core.etf_universe import load_universe_with_live_analytics
+from core.portfolio_engine import build_portfolio
+from integrations.data_feeds import get_etf_prices
 from ui.components import (
     card,
     data_source_badge,
@@ -60,6 +63,90 @@ with badge_cols[1]:
     st.caption("ETF prices")
     data_source_badge("etf_price")
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Live per-client metrics — Q5. Each client's numbers are derived from
+# their assigned tier's basket built against the live-analytics universe
+# (return / vol / correlation already live per Q2). The 30-day delta is
+# computed on the spot from each holding's last 30 trading-day closes.
+# ═══════════════════════════════════════════════════════════════════════════
+
+@st.cache_data(ttl=600)
+def _live_universe() -> list[dict]:
+    return load_universe_with_live_analytics()
+
+
+@st.cache_data(ttl=600)
+def _build_for_tier(tier_name: str, sleeve_usd: float,
+                    universe_key: int) -> dict:
+    """Build a live-analytics-backed portfolio for a tier + sleeve size."""
+    return build_portfolio(tier_name, _live_universe(),
+                           portfolio_value_usd=sleeve_usd)
+
+
+def _basket_30d_return_pct(holdings: list[dict]) -> tuple[float | None, int]:
+    """
+    Weighted 30-trading-day return of a basket. Reuses cached price
+    bundles inside data_feeds so this is nearly free after the universe
+    cache is warm. Returns (pct_or_None, n_holdings_with_live_prices).
+    """
+    total_weight_with_live = 0.0
+    weighted_return = 0.0
+    n_live = 0
+    for h in holdings:
+        tkr = h["ticker"]
+        bundle = get_etf_prices([tkr], period="90d", interval="1d")
+        rows = bundle.get(tkr, {}).get("prices", []) or []
+        closes: list[float] = []
+        for row in rows:
+            try:
+                c = float(row.get("close"))
+                if c > 0:
+                    closes.append(c)
+            except (TypeError, ValueError):
+                continue
+        if len(closes) < 31:
+            continue  # insufficient recent history
+        ret_30d = (closes[-1] / closes[-31]) - 1.0
+        weight = float(h.get("weight_pct", 0)) / 100.0
+        weighted_return += weight * ret_30d
+        total_weight_with_live += weight
+        n_live += 1
+    if total_weight_with_live <= 0:
+        return (None, 0)
+    # Rescale if some holdings lacked data so partial coverage reports
+    # "weighted return of the ETFs we could price" honestly.
+    return (weighted_return / total_weight_with_live * 100.0, n_live)
+
+
+with st.spinner("Computing live per-client metrics..."):
+    universe_live = _live_universe()
+    _uni_key = id(universe_live)
+
+    # De-dup portfolio builds by (tier, sleeve_usd) — 3 demo clients so
+    # at most 3 distinct portfolios.
+    per_client_metrics: dict[str, dict] = {}
+    for c in DEMO_CLIENTS:
+        sleeve = c["total_portfolio_usd"] * c["crypto_allocation_pct"] / 100.0
+        p = _build_for_tier(c["assigned_tier"], sleeve, _uni_key)
+        delta_pct, n_priced = _basket_30d_return_pct(p["holdings"])
+        per_client_metrics[c["id"]] = {
+            "exp_return":  p["metrics"]["weighted_return_pct"],
+            "port_vol":    p["metrics"]["portfolio_volatility_pct"],
+            "sleeve_usd":  sleeve,
+            "delta_30d":   delta_pct,
+            "n_priced":    n_priced,
+            "n_holdings":  len(p["holdings"]),
+        }
+
+# Aggregate live/fallback counts across the universe for the caption.
+_n_total = len(universe_live) or 1
+_n_live_ret = sum(1 for e in universe_live
+                  if e.get("expected_return_source") == "live")
+_n_live_vol = sum(1 for e in universe_live
+                  if e.get("volatility_source") == "live")
+_n_live_corr = sum(1 for e in universe_live
+                   if e.get("correlation_source") in ("live", "self"))
+
 # Build the roster table
 df = pd.DataFrame([
     {
@@ -69,6 +156,9 @@ df = pd.DataFrame([
         "Tier":         c["assigned_tier"],
         "Portfolio $":  c["total_portfolio_usd"],
         "Crypto %":     c["crypto_allocation_pct"],
+        "Exp return":   per_client_metrics[c["id"]]["exp_return"],
+        "Port vol":     per_client_metrics[c["id"]]["port_vol"],
+        "30d change":   per_client_metrics[c["id"]]["delta_30d"],
         "Drift %":      c["drift_pct"],
         "Rebalance":    "⚠ Needed" if c["rebalance_needed"] else "Aligned",
         "Last rebalance": pd.to_datetime(c["last_rebalance_iso"]).strftime("%Y-%m-%d"),
@@ -84,9 +174,45 @@ with card("Clients"):
         column_config={
             "Portfolio $":  st.column_config.NumberColumn(format="$%,.0f"),
             "Crypto %":     st.column_config.NumberColumn(format="%.1f%%"),
+            "Exp return":   st.column_config.NumberColumn(
+                format="%.1f%%",
+                help="Annualized expected return of each client's crypto "
+                     "sleeve — derived live from the basket's ETF CAGRs.",
+            ),
+            "Port vol":     st.column_config.NumberColumn(
+                format="%.1f%%",
+                help="Portfolio volatility — 90-day annualized σ, "
+                     "derived live per ETF and aggregated by basket weight.",
+            ),
+            "30d change":   st.column_config.NumberColumn(
+                format="%.2f%%",
+                help="Weighted basket return over the last 30 trading days.",
+            ),
             "Drift %":      st.column_config.NumberColumn(format="%.1f%%"),
         },
     )
+    st.caption(level_text(
+        beginner=(
+            f"Live metrics — {_n_live_ret} of {_n_total} ETFs report live "
+            f"expected returns, {_n_live_vol} of {_n_total} report live "
+            f"volatility, {_n_live_corr} of {_n_total} report live BTC "
+            f"correlation. Anything that isn't live uses category averages "
+            f"as a fallback and is flagged on the ETF detail page."
+        ),
+        intermediate=(
+            f"Live coverage — return: {_n_live_ret}/{_n_total} · "
+            f"vol: {_n_live_vol}/{_n_total} · "
+            f"corr: {_n_live_corr}/{_n_total}. "
+            f"30d change weighted by basket allocation."
+        ),
+        advanced=(
+            f"Live: return={_n_live_ret}/{_n_total}, "
+            f"vol={_n_live_vol}/{_n_total}, "
+            f"corr={_n_live_corr}/{_n_total}. "
+            f"30d delta = Σ(weight × 30trading-day return), rescaled by "
+            f"covered weight."
+        ),
+    ))
 
 # Per-client detail + navigation
 with card("Open client portfolio"):
