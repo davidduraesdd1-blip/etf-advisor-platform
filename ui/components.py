@@ -264,10 +264,19 @@ def data_sources_panel(
                 "Data source":    human_category_label(cat),
                 "State":          state,
                 "Active source":  src,
-                "Age (min)":      age if age is not None else "—",
+                # Keep this column as a uniform numeric type so pyarrow
+                # can serialize. Mixing int + "—" string previously
+                # raised pyarrow.lib.ArrowInvalid on Streamlit Cloud.
+                # Using pandas nullable Int64 (capital I) so missing
+                # values render as <NA> rather than poisoning the dtype.
+                "Age (min)":      age,
                 "Affected metrics": ", ".join(metrics_list) if metrics_list else "—",
             })
         df = _pd.DataFrame(rows)
+        # Cast Age column to nullable Int64 so missing values become
+        # <NA> (rendered as blank by Streamlit) instead of NaN floats.
+        if "Age (min)" in df.columns:
+            df["Age (min)"] = df["Age (min)"].astype("Int64")
         st.dataframe(
             df,
             use_container_width=True,
