@@ -335,7 +335,10 @@ with card("Performance"):
     with tabs[0]:
         tickers = [h["ticker"] for h in holdings]
         price_data = get_etf_prices(tickers, period="5y", interval="1d")
-        data_source_badge("etf_price")
+        data_source_badge(
+            "etf_price",
+            consumer_label="1Y / 3Y / 5Y historical returns table",
+        )
 
         rows = []
         for h in holdings:
@@ -510,7 +513,10 @@ def _confirm_body() -> None:
             "Estimated notional uses the portfolio construction baseline. "
             "Close the modal and click Refresh if you want a live retry."
         )
-        data_source_badge("etf_price")
+        data_source_badge(
+            "etf_price",
+            consumer_label="Execute Basket fill-price estimates",
+        )
 
     preview_rows = []
     orders_draft: list[dict] = []

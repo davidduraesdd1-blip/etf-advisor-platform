@@ -223,7 +223,10 @@ st.caption(level_text(
 # Historical returns
 with card("Historical returns"):
     prices = get_etf_prices([etf["ticker"]], period="5y", interval="1d")
-    data_source_badge("etf_price")
+    data_source_badge(
+        "etf_price",
+        consumer_label=f"Historical price chart for {etf['ticker']}",
+    )
     rows = prices.get(etf["ticker"], {}).get("prices", [])
     if not rows:
         st.info(level_text(
@@ -269,7 +272,10 @@ with card("Historical returns"):
 # Non-supported tickers fall back to a category-level summary. Transparency
 # badge shows LIVE / FALLBACK_LIVE / CACHED state per Day-4 design directive.
 with card("Composition"):
-    data_source_badge("etf_composition")
+    data_source_badge(
+        "etf_composition",
+        consumer_label=f"Composition table for {etf['ticker']}",
+    )
 
     if chosen in NPORT_TICKERS:
         comp = get_etf_composition(chosen)

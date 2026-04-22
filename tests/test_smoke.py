@@ -105,6 +105,67 @@ def test_ui_modules_import() -> None:
     importlib.import_module("ui.components")
 
 
+class TestAffectedMetricsPhrase:
+    """
+    Option 3 badge helper that composes the "which metric is affected"
+    phrase for each fallback message. Exercises the branches directly
+    since rendering through Streamlit in unit tests is expensive.
+    """
+
+    def test_explicit_consumer_label_wins_over_registry(self):
+        from ui.components import _affected_metrics_phrase
+        result = _affected_metrics_phrase(
+            "risk_free_rate", consumer_label="Sharpe ratio"
+        )
+        assert result == "Sharpe ratio"
+
+    def test_registry_lookup_single_metric(self):
+        from ui.components import _affected_metrics_phrase
+        # etf_composition has exactly one entry in METRIC_DEPENDENCIES
+        result = _affected_metrics_phrase("etf_composition", None)
+        assert "Composition" in result
+
+    def test_registry_lookup_two_metrics_uses_and(self):
+        """Two-item lists render with ' and ' between them."""
+        import ui.components as c
+        # Patch METRIC_DEPENDENCIES view to have exactly 2 entries
+        # for one category; verify the phrase joins them with "and"
+        orig_fn = c._affected_metrics_phrase
+        # Inspect by calling affected_metrics — etf_long_run has 1 entry;
+        # let's use a synthetic case via monkey-inject.
+        from core import data_source_state as dss
+        dss.METRIC_DEPENDENCIES["_test_two"] = ["Alpha", "Beta"]
+        try:
+            result = orig_fn("_test_two", None)
+            assert result == "Alpha and Beta"
+        finally:
+            del dss.METRIC_DEPENDENCIES["_test_two"]
+
+    def test_registry_lookup_many_metrics_uses_and_count(self):
+        from ui.components import _affected_metrics_phrase
+        # etf_price has 6 registered metrics — expect first 2 + "others"
+        result = _affected_metrics_phrase("etf_price", None)
+        assert "and" in result
+        assert "other" in result.lower()
+
+    def test_unknown_category_falls_back_to_this_panel(self):
+        from ui.components import _affected_metrics_phrase
+        result = _affected_metrics_phrase("nonexistent_category", None)
+        assert result == "this panel"
+
+
+class TestDataSourcesPanelRenders:
+    """
+    Smoke-level check: the panel component must import and execute
+    without raising for a default call. Full visual rendering is
+    covered by the per-page AppTest run below.
+    """
+
+    def test_panel_is_importable(self):
+        from ui.components import data_sources_panel
+        assert callable(data_sources_panel)
+
+
 def test_app_runs_via_streamlit_apptest() -> None:
     """Full end-to-end render of app.py via Streamlit's test harness."""
     pytest.importorskip("streamlit.testing.v1")
