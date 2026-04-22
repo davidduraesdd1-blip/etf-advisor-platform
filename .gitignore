@@ -23,6 +23,11 @@ data/cache/
 # Cloud picks up fresh state on next auto-redeploy. Everything else
 # under data/ is runtime / per-session state and stays gitignored.
 !data/scanner_health.json
+# Curated universe registry — authoritative source for the 73-ticker
+# ETF list. MUST be committed; Streamlit Cloud needs this file to
+# render the actual universe instead of the 19-ticker legacy fallback
+# in config.ETF_UNIVERSE_SEED.
+!data/etf_universe.json
 
 # ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
