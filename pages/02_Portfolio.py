@@ -19,7 +19,7 @@ from config import (
     PORTFOLIO_TIERS,
 )
 from core.demo_clients import DEMO_CLIENTS, get_client
-from core.etf_universe import load_universe_with_live_returns
+from core.etf_universe import load_universe_with_live_analytics
 from core.portfolio_engine import build_portfolio, run_monte_carlo
 from integrations.broker_mock import submit_basket
 from integrations.data_feeds import get_etf_prices, get_last_close
@@ -105,41 +105,43 @@ st.caption(level_text(
 
 
 @st.cache_data(ttl=600)
-def _universe_with_live_returns_cached() -> list[dict]:
+def _universe_with_live_analytics_cached() -> list[dict]:
     """
-    Fetch the universe with live CAGR enrichment. Cached for 10 min so we
-    don't re-hit yfinance on every tier/client toggle. The per-ticker
-    price bundles have their own cache inside data_feeds too.
+    Fetch the universe with FULL live analytics: expected return (CAGR),
+    90-day realized volatility, 90-day BTC correlation. Cached for
+    10 min so tier/client toggles don't re-hit yfinance. The underlying
+    price bundles are also memoized inside data_feeds.
     """
-    return load_universe_with_live_returns()
+    return load_universe_with_live_analytics()
 
 
 @st.cache_data(ttl=600)
 def _build_cached(tier_name: str, portfolio_value: float,
                   universe_key: int) -> dict:
     # universe_key is a cache discriminator: when the live-enriched
-    # universe changes (ticker returns drift), Streamlit invalidates.
-    universe = _universe_with_live_returns_cached()
+    # universe changes (ticker analytics drift), Streamlit invalidates.
+    universe = _universe_with_live_analytics_cached()
     return build_portfolio(tier_name, universe, portfolio_value_usd=portfolio_value)
 
 
 crypto_sleeve_usd = client["total_portfolio_usd"] * client["crypto_allocation_pct"] / 100
-with st.spinner("Deriving live expected returns from price history..."):
-    universe_live = _universe_with_live_returns_cached()
+with st.spinner("Deriving live analytics (returns, vol, correlation) from price history..."):
+    universe_live = _universe_with_live_analytics_cached()
 # id(universe_live) is stable per cache entry so we reuse the 10-min bucket.
 portfolio = _build_cached(tier_name, crypto_sleeve_usd, id(universe_live))
 holdings = portfolio["holdings"]
 metrics = portfolio["metrics"]
 
-# Count how many ETFs in this portfolio used live vs category-default
-# expected returns, for the transparency footnote under the KPI tile.
+# Count per-metric live vs category-default for the transparency caption.
 _holding_tickers = {h["ticker"] for h in holdings}
-_sources = [
-    e.get("expected_return_source", "category_default")
-    for e in universe_live if e["ticker"] in _holding_tickers
-]
-_n_live = sum(1 for s in _sources if s == "live")
-_n_total = len(_sources) or 1
+_basket = [e for e in universe_live if e["ticker"] in _holding_tickers]
+_n_total = len(_basket) or 1
+_n_live_ret  = sum(1 for e in _basket if e.get("expected_return_source") == "live")
+_n_live_vol  = sum(1 for e in _basket if e.get("volatility_source") == "live")
+_n_live_corr = sum(1 for e in _basket if e.get("correlation_source") in ("live", "self"))
+# Legacy aliases retained for the older return-only caption code below.
+_n_live = _n_live_ret
+_sources = [e.get("expected_return_source", "category_default") for e in _basket]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -157,59 +159,69 @@ with k3:
 with k4:
     kpi_tile("Sharpe", f"{metrics['sharpe_ratio']:.2f}")
 
-# Provenance for the expected-return KPI. Scales by user level.
-if _n_live == _n_total:
-    _ret_src_msg = level_text(
+# Provenance: per-metric live-vs-fallback count. Every number in the
+# KPI row above that traces back to an ETF property (return, vol,
+# correlation) is tagged. Scales by user level.
+_all_live = (_n_live_ret == _n_total and _n_live_vol == _n_total
+             and _n_live_corr == _n_total)
+_none_live = (_n_live_ret == 0 and _n_live_vol == 0 and _n_live_corr == 0)
+
+if _all_live:
+    _provenance = level_text(
         beginner=(
-            f"Expected return is derived from each fund's actual price "
-            f"history (all {_n_total} ETFs in this basket). It tells you "
-            f"how the fund has performed on an annualized basis — not a "
-            f"prediction."
+            f"Every number above is live — derived from each fund's own "
+            f"price history over the last 90 trading days (all "
+            f"{_n_total} ETFs in this basket)."
         ),
         intermediate=(
-            f"Expected return = annualized CAGR from each ETF's own "
-            f"price history ({_n_total}/{_n_total} live). Capped at ±300% "
-            f"to filter data-error artifacts."
+            f"All {_n_total} ETFs live on all three inputs: annualized "
+            f"CAGR · 90-day realized volatility · 90-day BTC correlation."
         ),
         advanced=(
-            f"Per-ETF annualized CAGR from first-to-last available close "
-            f"({_n_total}/{_n_total} live, yfinance primary). ±300% cap. "
-            f"Weighted by basket allocation."
+            f"Live · Return: full-history CAGR (±300% cap) · "
+            f"Vol: 90d annualized σ_daily·√252 · "
+            f"Corr: 90d Pearson vs IBIT. {_n_total}/{_n_total} on all."
         ),
     )
-elif _n_live == 0:
-    _ret_src_msg = level_text(
+elif _none_live:
+    _provenance = level_text(
         beginner=(
-            "Live price history unavailable right now — the expected return "
-            "above uses category averages as a fallback. Refresh once live "
-            "data is back for per-fund accuracy."
+            "Live price data is unavailable right now — every number "
+            "above is using category averages as a fallback. Refresh "
+            "once live data returns."
         ),
         intermediate=(
-            f"All {_n_total} ETFs fell back to category-default expected "
-            f"returns — live price fetch unavailable."
+            f"All {_n_total} ETFs fell back to category defaults on "
+            f"every input. Live price fetch unavailable."
         ),
         advanced=(
-            f"0/{_n_total} live — full fallback to category defaults "
-            f"(btc_spot=25%, eth_spot=35%, btc_futures=15%, thematic=50%)."
+            f"0/{_n_total} live on all three. Full fallback to seed "
+            f"category defaults (return/vol/corr)."
         ),
     )
 else:
-    _ret_src_msg = level_text(
+    _provenance = level_text(
         beginner=(
-            f"{_n_live} of {_n_total} ETFs used live price history; the "
-            f"rest fell back to category averages (live data temporarily "
-            f"unavailable for those tickers)."
+            f"Mixed sources. Return: {_n_live_ret} of {_n_total} live. "
+            f"Volatility: {_n_live_vol} of {_n_total} live. "
+            f"BTC correlation: {_n_live_corr} of {_n_total} live. "
+            f"Remaining ETFs fall back to category averages for any "
+            f"input that isn't live."
         ),
         intermediate=(
-            f"{_n_live}/{_n_total} ETFs: live CAGR. "
-            f"{_n_total - _n_live}/{_n_total}: category-default fallback."
+            f"Live by metric — return: {_n_live_ret}/{_n_total} · "
+            f"vol: {_n_live_vol}/{_n_total} · "
+            f"corr: {_n_live_corr}/{_n_total}. "
+            f"Any missing input falls back to category default."
         ),
         advanced=(
-            f"{_n_live}/{_n_total} live, {_n_total - _n_live}/{_n_total} "
-            f"category-default fallback. Mixed-source weighted return."
+            f"Return {_n_live_ret}/{_n_total} live · "
+            f"Vol {_n_live_vol}/{_n_total} live · "
+            f"Corr {_n_live_corr}/{_n_total} live (inc. self). "
+            f"Mixed-source portfolio metrics."
         ),
     )
-st.caption(_ret_src_msg)
+st.caption(_provenance)
 data_source_badge("risk_free_rate")   # Sharpe consumed FRED → show state
 
 

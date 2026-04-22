@@ -169,6 +169,83 @@ def load_universe_with_live_returns(
     return base
 
 
+def load_universe_with_live_analytics(
+    scanner_additions: list[dict] | None = None,
+    vol_lookback_days: int = 90,
+    corr_lookback_days: int = 90,
+) -> list[dict]:
+    """
+    Superset of load_universe_with_live_returns: also replaces each
+    ETF's category-default `volatility` with its 90-day annualized
+    realized volatility, and `correlation_with_btc` with its 90-day
+    Pearson correlation against the IBIT BTC proxy, when live data
+    is available.
+
+    Sets three provenance flags per ETF:
+        expected_return_source   ∈ {"live", "category_default"}
+        volatility_source        ∈ {"live", "category_default"}
+        correlation_source       ∈ {"live", "self", "category_default"}
+
+    "self" for correlation means the ETF IS the BTC proxy (IBIT or
+    FBTC) — trivially correlated with itself at 1.0.
+
+    All three enrichments reuse the same underlying price bundle
+    per ticker (cached in data_feeds._yf_memo), so the marginal cost
+    over the returns-only variant is pure math, no extra network calls.
+    """
+    from integrations.data_feeds import (
+        get_btc_correlation,
+        get_historical_cagr,
+        get_realized_volatility,
+    )
+
+    base = load_universe(scanner_additions)
+    for etf in base:
+        tkr = etf["ticker"]
+
+        # Expected return
+        try:
+            cagr_info = get_historical_cagr(tkr)
+            if cagr_info.get("cagr_pct") is not None:
+                etf["expected_return"] = round(float(cagr_info["cagr_pct"]), 2)
+                etf["expected_return_source"] = "live"
+                etf["cagr_days_observed"] = cagr_info.get("days_observed")
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning("CAGR failed for %s: %s", tkr, exc)
+
+        # Volatility
+        try:
+            vol_info = get_realized_volatility(tkr, lookback_days=vol_lookback_days)
+            if vol_info.get("volatility_pct") is not None:
+                etf["volatility"] = round(float(vol_info["volatility_pct"]), 2)
+                etf["volatility_source"] = "live"
+                etf["vol_n_returns"] = vol_info.get("n_returns")
+            else:
+                etf.setdefault("volatility_source", "category_default")
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning("realized_vol failed for %s: %s", tkr, exc)
+            etf.setdefault("volatility_source", "category_default")
+
+        # Correlation with BTC
+        try:
+            corr_info = get_btc_correlation(tkr, lookback_days=corr_lookback_days)
+            corr = corr_info.get("correlation")
+            if corr is not None:
+                etf["correlation_with_btc"] = round(float(corr), 4)
+                etf["correlation_source"] = (
+                    "self" if corr_info.get("source") == "self" else "live"
+                )
+                etf["corr_n_returns"] = corr_info.get("n_returns")
+                etf["btc_proxy_used"] = corr_info.get("btc_proxy_used")
+            else:
+                etf.setdefault("correlation_source", "category_default")
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning("btc_corr failed for %s: %s", tkr, exc)
+            etf.setdefault("correlation_source", "category_default")
+
+    return base
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Daily scanner — SEC EDGAR new-filing query
 # ═══════════════════════════════════════════════════════════════════════════

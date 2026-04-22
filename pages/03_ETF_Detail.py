@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from config import BRAND_NAME
-from core.etf_universe import load_universe
+from core.etf_universe import load_universe_with_live_analytics
 from core.portfolio_engine import build_portfolio, run_monte_carlo
 from core.signal_adapter import composite_signal
 from integrations.data_feeds import get_etf_prices
@@ -44,7 +44,13 @@ section_header(
     ),
 )
 
-universe = load_universe()
+@st.cache_data(ttl=600)
+def _universe_with_live_analytics_cached() -> list[dict]:
+    return load_universe_with_live_analytics()
+
+
+with st.spinner("Loading live ETF analytics..."):
+    universe = _universe_with_live_analytics_cached()
 tickers = [u["ticker"] for u in universe]
 chosen = st.selectbox("Ticker", options=tickers, index=0)
 etf = next(u for u in universe if u["ticker"] == chosen)
@@ -120,14 +126,48 @@ with k1:
     er_bps = etf.get("expense_ratio_bps")
     kpi_tile("Expense ratio", f"{er_bps} bps" if er_bps else "—")
 with k2:
-    kpi_tile("Volatility (ann.)", f"{etf['volatility']:.1f}%")
+    kpi_tile("Volatility (90d ann.)", f"{etf['volatility']:.1f}%")
 with k3:
-    kpi_tile("Corr with BTC", f"{etf['correlation_with_btc']:.2f}")
+    kpi_tile("Corr with BTC (90d)", f"{etf['correlation_with_btc']:.2f}")
 with k4:
     from core.portfolio_engine import _issuer_tier_nudge
     nudge = _issuer_tier_nudge(etf)
     tier_label = "A (preferred)" if nudge > 0 else ("C (discouraged)" if nudge < 0 else "B (neutral)")
     kpi_tile("Issuer tier", tier_label)
+
+# Per-tile provenance — makes live/fallback explicit on ETF Detail.
+_vol_src = etf.get("volatility_source", "category_default")
+_corr_src = etf.get("correlation_source", "category_default")
+_ret_src = etf.get("expected_return_source", "category_default")
+
+
+def _src_label(src: str) -> str:
+    return {
+        "live":             "live",
+        "self":             "self (BTC proxy)",
+        "category_default": "category default (live unavailable)",
+    }.get(src, src)
+
+
+st.caption(level_text(
+    beginner=(
+        f"Source — expected return: {_src_label(_ret_src)} · "
+        f"volatility: {_src_label(_vol_src)} · "
+        f"correlation with BTC: {_src_label(_corr_src)}. "
+        f"\"Live\" means derived from this fund's actual price history."
+    ),
+    intermediate=(
+        f"Return src: {_ret_src} · "
+        f"Vol src (90d σ·√252): {_vol_src} · "
+        f"BTC-corr src (90d Pearson vs IBIT): {_corr_src}."
+    ),
+    advanced=(
+        f"return={_ret_src} vol={_vol_src} corr={_corr_src} · "
+        f"BTC proxy: {etf.get('btc_proxy_used', 'IBIT')} · "
+        f"n_returns vol={etf.get('vol_n_returns', '—')} "
+        f"corr={etf.get('corr_n_returns', '—')}."
+    ),
+))
 
 
 # Historical returns

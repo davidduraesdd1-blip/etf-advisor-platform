@@ -237,3 +237,166 @@ class TestHistoricalCagr:
         result = df.get_historical_cagr("WILD")
         assert result["cagr_pct"] is not None
         assert result["cagr_pct"] == 300.0  # exact cap
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Q2 — realized volatility + BTC correlation
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestRealizedVolatility:
+    """
+    90-day annualized realized volatility derived from daily log returns.
+    Math: σ_annual = stdev(log_returns) × √252 × 100.
+    """
+
+    def _random_walk(self, n_days: int, daily_sigma: float, seed: int = 42):
+        """Fixed-seed Gaussian walk — exact daily σ lets us assert on vol."""
+        import random
+        from datetime import date, timedelta
+        rng = random.Random(seed)
+        closes = [100.0]
+        for _ in range(n_days - 1):
+            r = rng.gauss(0.0, daily_sigma)
+            closes.append(closes[-1] * (2.718281828 ** r))
+        dates = [(date(2024, 1, 1) + timedelta(days=i)).isoformat()
+                 for i in range(n_days)]
+        return {"source": "yfinance",
+                "prices": [{"date": d, "close": c}
+                           for d, c in zip(dates, closes)]}
+
+    def test_empty_bundle_returns_none(self, monkeypatch):
+        from integrations import data_feeds as df
+        monkeypatch.setattr(df, "get_etf_prices",
+                            lambda tickers, **kw: {tickers[0]: {"source": "unavailable",
+                                                                 "prices": []}})
+        result = df.get_realized_volatility("NOPE")
+        assert result["volatility_pct"] is None
+
+    def test_short_series_returns_none(self, monkeypatch):
+        from integrations import data_feeds as df
+        bundle = self._random_walk(n_days=15, daily_sigma=0.02)
+        monkeypatch.setattr(df, "get_etf_prices",
+                            lambda tickers, **kw: {tickers[0]: bundle})
+        result = df.get_realized_volatility("SHORT")
+        assert result["volatility_pct"] is None
+
+    def test_higher_input_sigma_yields_higher_output_vol(self, monkeypatch):
+        """Monotonicity check — larger daily σ must produce larger annualized σ."""
+        from integrations import data_feeds as df
+
+        bundle_low = self._random_walk(n_days=150, daily_sigma=0.01, seed=1)
+        bundle_high = self._random_walk(n_days=150, daily_sigma=0.05, seed=1)
+
+        monkeypatch.setattr(df, "get_etf_prices",
+                            lambda tickers, **kw: {tickers[0]: bundle_low})
+        vol_low = df.get_realized_volatility("LOW")["volatility_pct"]
+
+        monkeypatch.setattr(df, "get_etf_prices",
+                            lambda tickers, **kw: {tickers[0]: bundle_high})
+        vol_high = df.get_realized_volatility("HIGH")["volatility_pct"]
+
+        assert vol_low is not None and vol_high is not None
+        assert vol_high > vol_low * 3, \
+            f"5x sigma should give ~5x vol, got low={vol_low:.1f} high={vol_high:.1f}"
+
+    def test_annualization_math_is_correct(self, monkeypatch):
+        """σ_annual ≈ σ_daily × √252 × 100. Target vol ~32% for σ_daily = 0.02."""
+        from integrations import data_feeds as df
+        bundle = self._random_walk(n_days=200, daily_sigma=0.02, seed=7)
+        monkeypatch.setattr(df, "get_etf_prices",
+                            lambda tickers, **kw: {tickers[0]: bundle})
+        result = df.get_realized_volatility("IBIT", lookback_days=90)
+        # σ_daily=0.02 → σ_annual = 0.02 × √252 × 100 ≈ 31.75%.
+        # Random walk introduces sample noise, allow ±30% around expected.
+        assert result["volatility_pct"] is not None
+        assert 20 < result["volatility_pct"] < 45
+
+
+class TestBtcCorrelation:
+    """
+    90-day Pearson correlation of daily log returns vs IBIT.
+    """
+
+    def _paired_walks(self, n_days: int, corr_target: float, seed: int = 3):
+        """Generate two correlated walks from a shared driver."""
+        import random
+        from datetime import date, timedelta
+        rng = random.Random(seed)
+        common, idiosync_a, idiosync_b = [], [], []
+        for _ in range(n_days - 1):
+            common.append(rng.gauss(0.0, 0.02))
+            idiosync_a.append(rng.gauss(0.0, 0.02))
+            idiosync_b.append(rng.gauss(0.0, 0.02))
+
+        # Weight: corr_target via √corr on common factor, √(1-corr) on idio.
+        import math
+        w_c = math.sqrt(abs(corr_target))
+        w_i = math.sqrt(max(0.0, 1.0 - abs(corr_target)))
+        sign = 1.0 if corr_target >= 0 else -1.0
+
+        close_a, close_b = [100.0], [100.0]
+        for i in range(n_days - 1):
+            r_a = w_c * common[i] + w_i * idiosync_a[i]
+            r_b = sign * w_c * common[i] + w_i * idiosync_b[i]
+            close_a.append(close_a[-1] * math.exp(r_a))
+            close_b.append(close_b[-1] * math.exp(r_b))
+
+        dates = [(date(2024, 1, 1) + timedelta(days=i)).isoformat()
+                 for i in range(n_days)]
+        to_bundle = lambda closes: {
+            "source": "yfinance",
+            "prices": [{"date": d, "close": c} for d, c in zip(dates, closes)],
+        }
+        return to_bundle(close_a), to_bundle(close_b)
+
+    def test_self_correlation_is_one(self):
+        from integrations import data_feeds as df
+        result = df.get_btc_correlation("IBIT")
+        assert result["correlation"] == 1.0
+        assert result["source"] == "self"
+
+    def test_uncorrelated_inputs_give_near_zero(self, monkeypatch):
+        from integrations import data_feeds as df
+        bundle_a, bundle_b = self._paired_walks(200, corr_target=0.0, seed=11)
+
+        def fake_get_prices(tickers, **kw):
+            return {tickers[0]: bundle_a if tickers[0] == "ARKB" else bundle_b}
+
+        monkeypatch.setattr(df, "get_etf_prices", fake_get_prices)
+        result = df.get_btc_correlation("ARKB")
+        assert result["correlation"] is not None
+        assert abs(result["correlation"]) < 0.35
+
+    def test_positively_correlated_inputs_give_positive_correlation(self, monkeypatch):
+        from integrations import data_feeds as df
+        bundle_a, bundle_b = self._paired_walks(200, corr_target=0.75, seed=13)
+
+        def fake_get_prices(tickers, **kw):
+            return {tickers[0]: bundle_a if tickers[0] == "FETH" else bundle_b}
+
+        monkeypatch.setattr(df, "get_etf_prices", fake_get_prices)
+        result = df.get_btc_correlation("FETH")
+        assert result["correlation"] is not None
+        assert result["correlation"] > 0.4
+
+    def test_result_clamped_to_valid_range(self, monkeypatch):
+        """Pearson correlation must always land in [-1, +1]."""
+        from integrations import data_feeds as df
+        for target in [-0.8, -0.3, 0.0, 0.5, 0.9]:
+            bundle_a, bundle_b = self._paired_walks(200, corr_target=target, seed=17)
+
+            def fake_get_prices(tickers, bundle_a=bundle_a, bundle_b=bundle_b, **kw):
+                return {tickers[0]: bundle_a if tickers[0] == "X" else bundle_b}
+
+            monkeypatch.setattr(df, "get_etf_prices", fake_get_prices)
+            result = df.get_btc_correlation("X")
+            if result["correlation"] is not None:
+                assert -1.0 <= result["correlation"] <= 1.0
+
+    def test_empty_bundle_returns_none(self, monkeypatch):
+        from integrations import data_feeds as df
+        monkeypatch.setattr(df, "get_etf_prices",
+                            lambda tickers, **kw: {tickers[0]: {"source": "unavailable",
+                                                                 "prices": []}})
+        result = df.get_btc_correlation("NOPE")
+        assert result["correlation"] is None

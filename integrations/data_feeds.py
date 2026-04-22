@@ -283,6 +283,179 @@ def get_historical_cagr(ticker: str, period: str = "5y") -> dict:
     return {"cagr_pct": cagr_pct, "source": source, "days_observed": days}
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Realized volatility + BTC correlation (Q2 — live ETF analytics)
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Both derive from the same daily-close series we already fetch for CAGR,
+# so cost is effectively zero — we piggyback on the _yf_memo cache. These
+# replace the category-default `volatility` and `correlation_with_btc`
+# values that portfolio_engine has been consuming up to now.
+#
+# BTC proxy = IBIT (most liquid spot BTC ETF with full 2024+ history).
+# Falls back to FBTC if IBIT history is empty for any reason.
+_BTC_PROXY_TICKER: str = "IBIT"
+_BTC_PROXY_FALLBACK: str = "FBTC"
+_VOL_TRADING_DAYS: int = 252
+_MIN_RETURNS_FOR_STATS: int = 30
+
+
+def _daily_log_returns_from_bundle(bundle: dict) -> list[float]:
+    """Extract positive-close daily log returns from a price bundle."""
+    import math
+    closes: list[float] = []
+    for row in bundle.get("prices", []) or []:
+        try:
+            c = float(row.get("close"))
+            if c > 0:
+                closes.append(c)
+        except (TypeError, ValueError):
+            continue
+    returns: list[float] = []
+    for prev, curr in zip(closes[:-1], closes[1:]):
+        if prev > 0 and curr > 0:
+            returns.append(math.log(curr / prev))
+    return returns
+
+
+def _aligned_log_returns(
+    bundle_a: dict, bundle_b: dict,
+) -> tuple[list[float], list[float]]:
+    """
+    Intersect two price bundles by date and return aligned log-return
+    arrays. Used only by get_btc_correlation; handles the real-world
+    case where listing dates differ (e.g., ETHA vs IBIT).
+    """
+    import math
+
+    def _date_to_close(bundle: dict) -> dict[str, float]:
+        out: dict[str, float] = {}
+        for row in bundle.get("prices", []) or []:
+            try:
+                c = float(row.get("close"))
+                d = str(row.get("date", ""))
+                if c > 0 and d:
+                    out[d.split("T")[0]] = c
+            except (TypeError, ValueError):
+                continue
+        return out
+
+    map_a = _date_to_close(bundle_a)
+    map_b = _date_to_close(bundle_b)
+    common_dates = sorted(set(map_a) & set(map_b))
+    if len(common_dates) < _MIN_RETURNS_FOR_STATS + 1:
+        return ([], [])
+
+    closes_a = [map_a[d] for d in common_dates]
+    closes_b = [map_b[d] for d in common_dates]
+
+    ret_a: list[float] = []
+    ret_b: list[float] = []
+    for p_a, c_a, p_b, c_b in zip(closes_a[:-1], closes_a[1:],
+                                   closes_b[:-1], closes_b[1:]):
+        if p_a > 0 and c_a > 0 and p_b > 0 and c_b > 0:
+            ret_a.append(math.log(c_a / p_a))
+            ret_b.append(math.log(c_b / p_b))
+    return (ret_a, ret_b)
+
+
+def get_realized_volatility(ticker: str, lookback_days: int = 90) -> dict:
+    """
+    Annualized realized volatility as a percent, derived from daily log
+    returns over the trailing `lookback_days` sessions. Shape:
+        {"volatility_pct": float|None, "source": str, "n_returns": int}
+    Returns None if fewer than _MIN_RETURNS_FOR_STATS daily returns are
+    available. source mirrors the price-bundle source.
+    """
+    import statistics
+
+    # ~1.25x lookback in calendar days to allow for weekends / holidays
+    period = f"{max(90, int(lookback_days * 1.6))}d"
+    bundle = get_etf_prices([ticker], period=period, interval="1d")
+    entry = bundle.get(ticker, {}) or {}
+    source = entry.get("source", "unavailable")
+
+    returns = _daily_log_returns_from_bundle(entry)[-lookback_days:]
+    if len(returns) < _MIN_RETURNS_FOR_STATS:
+        return {"volatility_pct": None, "source": source, "n_returns": len(returns)}
+
+    try:
+        daily_std = statistics.stdev(returns)
+    except statistics.StatisticsError:
+        return {"volatility_pct": None, "source": source, "n_returns": len(returns)}
+
+    annualized_pct = daily_std * (_VOL_TRADING_DAYS ** 0.5) * 100.0
+    return {"volatility_pct": annualized_pct, "source": source,
+            "n_returns": len(returns)}
+
+
+def get_btc_correlation(
+    ticker: str,
+    lookback_days: int = 90,
+    btc_proxy: str = _BTC_PROXY_TICKER,
+) -> dict:
+    """
+    Pearson correlation of daily log returns between `ticker` and a BTC
+    spot ETF proxy (IBIT by default; FBTC fallback) over the trailing
+    `lookback_days` sessions. Shape:
+        {"correlation": float|None, "source": str, "n_returns": int,
+         "btc_proxy_used": str}
+    Correlation is in [-1, +1]. If ticker IS the BTC proxy, returns
+    exactly 1.0. Returns None if fewer than _MIN_RETURNS_FOR_STATS
+    overlapping daily returns are available.
+    """
+    import statistics
+
+    tkr_upper = ticker.upper()
+    if tkr_upper in (btc_proxy.upper(), _BTC_PROXY_FALLBACK):
+        # Trivially perfectly correlated with itself
+        return {"correlation": 1.0, "source": "self",
+                "n_returns": lookback_days, "btc_proxy_used": tkr_upper}
+
+    period = f"{max(90, int(lookback_days * 1.6))}d"
+
+    tkr_bundle = get_etf_prices([ticker], period=period, interval="1d")
+    tkr_entry = tkr_bundle.get(ticker, {}) or {}
+    source = tkr_entry.get("source", "unavailable")
+
+    btc_bundle = get_etf_prices([btc_proxy], period=period, interval="1d")
+    btc_entry = btc_bundle.get(btc_proxy, {}) or {}
+    if not btc_entry.get("prices"):
+        # BTC proxy failed — try fallback
+        btc_proxy = _BTC_PROXY_FALLBACK
+        btc_bundle = get_etf_prices([btc_proxy], period=period, interval="1d")
+        btc_entry = btc_bundle.get(btc_proxy, {}) or {}
+
+    ret_tkr, ret_btc = _aligned_log_returns(tkr_entry, btc_entry)
+    # Keep only the trailing `lookback_days` windows
+    ret_tkr = ret_tkr[-lookback_days:]
+    ret_btc = ret_btc[-lookback_days:]
+
+    if len(ret_tkr) < _MIN_RETURNS_FOR_STATS or len(ret_btc) < _MIN_RETURNS_FOR_STATS:
+        return {"correlation": None, "source": source,
+                "n_returns": len(ret_tkr), "btc_proxy_used": btc_proxy}
+
+    try:
+        std_t = statistics.stdev(ret_tkr)
+        std_b = statistics.stdev(ret_btc)
+    except statistics.StatisticsError:
+        return {"correlation": None, "source": source,
+                "n_returns": len(ret_tkr), "btc_proxy_used": btc_proxy}
+    if std_t == 0 or std_b == 0:
+        return {"correlation": None, "source": source,
+                "n_returns": len(ret_tkr), "btc_proxy_used": btc_proxy}
+
+    mean_t = sum(ret_tkr) / len(ret_tkr)
+    mean_b = sum(ret_btc) / len(ret_btc)
+    cov = sum((a - mean_t) * (b - mean_b) for a, b in zip(ret_tkr, ret_btc))
+    cov /= (len(ret_tkr) - 1)
+    corr = cov / (std_t * std_b)
+    # Clamp to [-1, +1] against floating-point drift
+    corr = max(-1.0, min(1.0, corr))
+    return {"correlation": corr, "source": source,
+            "n_returns": len(ret_tkr), "btc_proxy_used": btc_proxy}
+
+
 def _fetch_yfinance(ticker: str, period: str, interval: str) -> list[dict]:
     """Primary source. Returns [] on empty / failure (caller records miss)."""
     try:
