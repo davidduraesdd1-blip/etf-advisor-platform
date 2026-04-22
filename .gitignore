@@ -19,6 +19,10 @@ data/*.tmp
 data/*.bak
 data/cache/
 !data/.gitkeep
+# Scanner output — committed by GitHub Actions daily cron so Streamlit
+# Cloud picks up fresh state on next auto-redeploy. Everything else
+# under data/ is runtime / per-session state and stays gitignored.
+!data/scanner_health.json
 
 # ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
