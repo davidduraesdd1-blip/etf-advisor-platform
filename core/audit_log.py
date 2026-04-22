@@ -58,16 +58,27 @@ def _save_entries(entries: list[dict]) -> None:
     ) as tf:
         json.dump(payload, tf, indent=2)
         tmp_name = tf.name
+    last_exc: Exception | None = None
     for attempt in range(5):
         try:
             os.replace(tmp_name, str(AUDIT_LOG_PATH))
             return
-        except PermissionError:
+        except PermissionError as exc:
+            last_exc = exc
             time.sleep(0.1 * (attempt + 1))
+    # All 5 retries exhausted. Clean up the tempfile and log the failure
+    # at ERROR level so the operator can see why the audit log stopped
+    # persisting. Previously this swallowed the failure silently.
     try:
         os.remove(tmp_name)
     except OSError:
         pass
+    if last_exc is not None:
+        logger.error(
+            "audit_log persist failed after 5 retries — entries lost this "
+            "session window. Last error: %s",
+            last_exc,
+        )
 
 
 def append_entry(client_id: str, action: str, detail: str = "",

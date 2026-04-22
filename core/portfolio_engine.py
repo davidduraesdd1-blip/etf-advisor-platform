@@ -419,15 +419,15 @@ def build_portfolio(
 
         # Phase-2 issuer-tier preference nudge: apply +/- within the
         # category, then renormalize so the category total still equals cat_weight.
-        raw_weights: list[float] = []
-        for etf in chosen:
-            nudge = _issuer_tier_nudge(etf)
-            raw = max(0.5, per_asset_weight + nudge)   # floor to keep it positive
-            raw_weights.append(raw)
-        scale = cat_weight / sum(raw_weights) if sum(raw_weights) > 0 else 0
+        nudges = [_issuer_tier_nudge(etf) for etf in chosen]
+        raw_weights: list[float] = [
+            max(0.5, per_asset_weight + n) for n in nudges
+        ]
+        total_raw = sum(raw_weights)
+        scale = cat_weight / total_raw if total_raw > 0 else 0
         adjusted = [min(w * scale, MAX_SINGLE_POSITION_PCT) for w in raw_weights]
 
-        for etf, weight in zip(chosen, adjusted):
+        for etf, weight, nudge in zip(chosen, adjusted, nudges):
             usd_val = portfolio_value_usd * weight / 100
             holdings.append({
                 "ticker":               etf["ticker"],
@@ -440,7 +440,7 @@ def build_portfolio(
                 "volatility_pct":       float(etf.get("volatility", 0.0)),
                 "correlation_with_btc": float(etf.get("correlation_with_btc", 1.0)),
                 "expense_ratio_bps":    etf.get("expense_ratio_bps"),
-                "issuer_tier_nudge":    _issuer_tier_nudge(etf),
+                "issuer_tier_nudge":    nudge,
             })
             used_weight_pct += weight
 

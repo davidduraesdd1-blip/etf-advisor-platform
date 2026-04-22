@@ -295,10 +295,8 @@ def _plain_english(signal: Signal, source: str) -> str:
     return base
 
 
-def composite_signals_for_universe(universe: list[dict]) -> list[dict]:
-    """
-    Batch-compute signals. No live price fetching inside this helper —
-    the caller is responsible for passing `closes` per-ETF where
-    available. Universe entries without closes get the Phase-1 fallback.
-    """
-    return [composite_signal(etf) for etf in universe]
+# (composite_signals_for_universe removed — was defined but never called
+# anywhere. Callers use composite_signal per-ETF with a live close series,
+# which is the only useful path. Keeping a batch helper that just maps
+# composite_signal without closes would produce a universe full of
+# Phase-1 fallbacks — not a useful batch operation.)

@@ -350,3 +350,106 @@ class TestIssuerTierNudge:
         from core.portfolio_engine import _issuer_tier_nudge
         assert _issuer_tier_nudge({"ticker": "BITB", "issuer": "Bitwise"}) == 0
         assert _issuer_tier_nudge({"ticker": "HODL", "issuer": "VanEck"}) == 0
+
+
+class TestPairCorrMissingPairWarning:
+    """
+    Audit 2026-04-22 fix: _pair_corr used to silently return 0.70 for
+    unknown pairs, which would mask incomplete coverage in the category
+    correlation table. Now logs a one-time warning per missing pair.
+    """
+
+    def test_missing_pair_returns_fallback_and_logs_once(self, caplog):
+        import logging
+        from core import portfolio_engine as pe
+
+        # Clear any prior warnings from other tests
+        pe._warned_missing_pairs.clear()
+
+        with caplog.at_level(logging.WARNING, logger="core.portfolio_engine"):
+            val1 = pe._pair_corr("made_up_a", "made_up_b")
+            val2 = pe._pair_corr("made_up_a", "made_up_b")   # second call
+
+        assert val1 == 0.70   # default cross-category fallback
+        assert val2 == 0.70   # still falls back
+        # Only ONE warning, not two — cached in _warned_missing_pairs
+        missing_warnings = [
+            r for r in caplog.records
+            if "Missing cross-category correlation" in r.getMessage()
+        ]
+        assert len(missing_warnings) == 1
+
+    def test_same_category_missing_returns_higher_fallback(self, caplog):
+        import logging
+        from core import portfolio_engine as pe
+        pe._warned_missing_pairs.clear()
+
+        with caplog.at_level(logging.WARNING, logger="core.portfolio_engine"):
+            val = pe._pair_corr("new_cat_x", "new_cat_x")
+
+        assert val == 0.90   # within-category default is higher
+        assert any(
+            "Missing within-category correlation" in r.getMessage()
+            for r in caplog.records
+        )
+
+    def test_known_pair_does_not_warn(self, caplog):
+        import logging
+        from core import portfolio_engine as pe
+        pe._warned_missing_pairs.clear()
+
+        with caplog.at_level(logging.WARNING, logger="core.portfolio_engine"):
+            val = pe._pair_corr("btc_spot", "eth_spot")
+
+        assert val == 0.75  # known cross-category value
+        assert not any(
+            "Missing" in r.getMessage() for r in caplog.records
+        )
+
+
+class TestTierAllocationMatrix:
+    """
+    Every tier's category allocations must sum to exactly 100% — otherwise
+    the portfolio builder's renormalization produces off-by-epsilon
+    weight distributions.
+    """
+
+    def test_every_tier_allocations_sum_to_100(self):
+        from core.risk_tiers import TIER_CATEGORY_ALLOCATIONS
+        for tier_name, allocs in TIER_CATEGORY_ALLOCATIONS.items():
+            total = sum(allocs.values())
+            assert abs(total - 100.0) < 1e-6, (
+                f"Tier {tier_name!r} sums to {total}, not 100"
+            )
+
+    def test_allocation_for_tier_returns_copy(self):
+        """Must return a NEW dict each call — mutating the result
+        should not corrupt the shared matrix."""
+        from core.risk_tiers import allocation_for_tier
+        a = allocation_for_tier("Ultra Conservative")
+        a["fake_category"] = 999.0
+        b = allocation_for_tier("Ultra Conservative")
+        assert "fake_category" not in b
+
+    def test_allocation_for_tier_raises_on_unknown(self):
+        import pytest as _pt
+        from core.risk_tiers import allocation_for_tier
+        with _pt.raises(ValueError, match="Unknown tier"):
+            allocation_for_tier("nonexistent_tier")
+
+    def test_every_used_category_is_in_defaults(self):
+        """
+        Any category a tier allocates to must have default return / vol /
+        correlation values, otherwise universe enrichment silently
+        falls back to btc_spot defaults.
+        """
+        from core.risk_tiers import TIER_CATEGORY_ALLOCATIONS
+        from core.etf_universe import _CATEGORY_DEFAULTS
+
+        used = set()
+        for allocs in TIER_CATEGORY_ALLOCATIONS.values():
+            used.update(allocs.keys())
+        missing = used - set(_CATEGORY_DEFAULTS.keys())
+        assert not missing, (
+            f"Tiers reference categories with no _CATEGORY_DEFAULTS entry: {missing}"
+        )

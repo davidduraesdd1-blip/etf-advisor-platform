@@ -402,13 +402,40 @@ with card("Composition"):
 
 # Single-ticker Monte Carlo projection
 with card("Forward projection"):
-    # Build a 1-ETF portfolio using the universe-derived analytics so the
-    # MC path is consistent with Portfolio-page construction math.
-    temp_universe = [etf]
+    # Build a synthetic 1-holding "portfolio" at 100% weight so the MC
+    # engine has the single ETF's own expected_return + volatility as
+    # portfolio-level drift + diffusion. Going through build_portfolio
+    # with a tier mix would require the ETF's category to be allocated
+    # by whatever tier we picked — which fails silently for categories
+    # the tier doesn't touch (e.g., btc_futures, eth_futures are
+    # EXCLUDED_CATEGORIES and wouldn't get any allocation).
     try:
-        p = build_portfolio("Ultra Aggressive", temp_universe, portfolio_value_usd=100_000)
+        single_holding = {
+            "ticker":               etf["ticker"],
+            "name":                 etf.get("name", etf["ticker"]),
+            "issuer":               etf.get("issuer", ""),
+            "category":             etf.get("category", "btc_spot"),
+            "weight_pct":           100.0,
+            "usd_value":            100_000.0,
+            "expected_return_pct":  float(etf.get("expected_return", 0.0)),
+            "volatility_pct":       float(etf.get("volatility", 0.0)),
+            "correlation_with_btc": float(etf.get("correlation_with_btc", 1.0)),
+            "expense_ratio_bps":    etf.get("expense_ratio_bps"),
+        }
+        from core.portfolio_engine import compute_portfolio_metrics as _metrics
+        synthetic_metrics = _metrics([single_holding], 100_000.0, "Ultra Aggressive")
+        p = {
+            "tier_name":            "single_etf",
+            "portfolio_value_usd":  100_000.0,
+            "holdings":             [single_holding],
+            "metrics":              synthetic_metrics,
+        }
         mc = run_monte_carlo(p, horizon_days=252)
-    except Exception:
+    except Exception as exc:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "ETF Detail forward projection failed for %s: %s", etf.get("ticker"), exc
+        )
         p = None
         mc = None
 
