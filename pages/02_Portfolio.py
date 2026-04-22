@@ -275,15 +275,44 @@ with card("Allocation"):
     st.plotly_chart(fig, use_container_width=True)
 
     display_cols = ["ticker", "name", "issuer", "category", "weight_pct", "usd_value"]
-    st.dataframe(
-        alloc_df[display_cols],
+    _alloc_view = alloc_df[display_cols].reset_index(drop=True)
+    _alloc_event = st.dataframe(
+        _alloc_view,
         use_container_width=True,
         hide_index=True,
         column_config={
             "weight_pct": st.column_config.NumberColumn("Weight %", format="%.2f"),
             "usd_value":  st.column_config.NumberColumn("USD", format="$%,.0f"),
         },
+        on_select="rerun",
+        selection_mode="single-row",
+        key="alloc_table_select",
     )
+    st.caption(
+        "Click any row to open that ETF's detail page — signal, composition, "
+        "volatility, and full research view."
+    )
+
+    # Row-click → ETF Detail navigation. Streamlit's dataframe selection
+    # API returns .selection.rows as a list of row-index integers.
+    _selected_rows = []
+    if _alloc_event is not None:
+        _sel = getattr(_alloc_event, "selection", None)
+        if _sel is not None:
+            _selected_rows = list(_sel.rows) if hasattr(_sel, "rows") else list(
+                _sel.get("rows", []) if isinstance(_sel, dict) else []
+            )
+    if _selected_rows:
+        _row_idx = _selected_rows[0]
+        if 0 <= _row_idx < len(_alloc_view):
+            _chosen_ticker = str(_alloc_view.iloc[_row_idx]["ticker"])
+            # Only fire the switch on a *new* selection — prevents an
+            # infinite "jump back to Portfolio → jump to Detail" loop
+            # if the user hits the browser back button.
+            if st.session_state.get("_last_alloc_nav_ticker") != _chosen_ticker:
+                st.session_state["_last_alloc_nav_ticker"] = _chosen_ticker
+                st.session_state["selected_etf_ticker"] = _chosen_ticker
+                st.switch_page("pages/03_ETF_Detail.py")
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -52,7 +52,17 @@ def _universe_with_live_analytics_cached() -> list[dict]:
 with st.spinner("Loading live ETF analytics..."):
     universe = _universe_with_live_analytics_cached()
 tickers = [u["ticker"] for u in universe]
-chosen = st.selectbox("Ticker", options=tickers, index=0)
+
+# Cross-page landing hook: if the FA clicked a row on the Portfolio
+# allocation table, `selected_etf_ticker` carries the target ticker.
+# Honor it once, then clear so a subsequent manual selectbox change
+# doesn't get silently overridden.
+_default_idx = 0
+_incoming = st.session_state.pop("selected_etf_ticker", None)
+if _incoming and _incoming in tickers:
+    _default_idx = tickers.index(_incoming)
+
+chosen = st.selectbox("Ticker", options=tickers, index=_default_idx)
 etf = next(u for u in universe if u["ticker"] == chosen)
 
 # Fetch live price history so signal_adapter can run its Day-4 upgrade
