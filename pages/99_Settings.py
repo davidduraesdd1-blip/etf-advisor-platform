@@ -108,8 +108,9 @@ with card("EDGAR scanner health"):
     if health["last_success_ts"] is None:
         st.warning(
             "Scanner has never run in this environment. "
-            "Expected: daily at 16:30 ET after US market close. "
-            "Click Run Scanner below to trigger manually."
+            "Production cron runs daily at 17:00 UTC via GitHub Actions "
+            "(.github/workflows/daily_scanner.yml). Use the button below "
+            "to run it on demand."
         )
     else:
         age = health["age_hours"]
@@ -137,9 +138,19 @@ with card("EDGAR scanner health"):
     if EDGAR_CONTACT_EMAIL.startswith("REPLACE_BEFORE_DEPLOY"):
         st.info(
             "EDGAR_CONTACT_EMAIL is still the placeholder — scanner will "
-            "refuse to run. Set EDGAR_CONTACT_EMAIL in .env (preferred) "
-            "or edit config.py before deploying."
+            "refuse to run. Set EDGAR_CONTACT_EMAIL in .env locally or "
+            "in Streamlit Cloud Secrets + GitHub Actions Secrets for prod."
         )
+    elif st.button("Run scanner now", use_container_width=False):
+        with st.spinner("Querying EDGAR full-text index…"):
+            try:
+                from core.etf_universe import daily_scanner
+                matches = daily_scanner(days_back=3)
+                st.success(f"Scan complete — {len(matches)} unique filings matched.")
+            except RuntimeError as exc:
+                st.error(f"Scanner refused to run: {exc}")
+            except Exception as exc:
+                st.warning(f"Scanner errored (will retry on next cron): {exc}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -72,7 +72,8 @@ class TestDailyScannerGuard:
             daily_scanner(days_back=1)
 
     def test_raises_even_with_empty_email(self, monkeypatch):
-        monkeypatch.setattr("core.etf_universe.EDGAR_CONTACT_EMAIL", "")
+        # Guard now lives in integrations.edgar; patch there.
+        monkeypatch.setattr("integrations.edgar.EDGAR_CONTACT_EMAIL", "")
         with pytest.raises(RuntimeError):
             daily_scanner(days_back=1)
 
@@ -81,10 +82,9 @@ class TestDailyScannerGuard:
         # attempt a network call which may fail — that's out of scope.
         # We just assert the guard is NOT what raises.
         monkeypatch.setattr(
-            "core.etf_universe.EDGAR_CONTACT_EMAIL",
+            "integrations.edgar.EDGAR_CONTACT_EMAIL",
             "ops@example.org",
         )
-        # Don't actually hit network: patch requests.get to raise immediately
         import core.etf_universe as eu
         try:
             eu.daily_scanner(days_back=1)
