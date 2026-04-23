@@ -543,10 +543,13 @@ class TestForwardReturnEstimate:
 
         lev = df.get_forward_return_estimate("leveraged", expense_ratio_bps=185)
         btc = df.get_forward_return_estimate("btc_spot", expense_ratio_bps=25)
-        # 2x should exceed 1x but not by 2x (vol decay)
+        # 2x should exceed 1x but NOT by 2x — vol decay. Apr 2026
+        # recalibration dropped multiplier from 1.40 to 1.10 per
+        # Cheng & Madhavan 2009 + empirical BITX issuer data: realized
+        # cumulative return tracks ~1× spot in volatile regimes, not
+        # 2×. Expected ≈ 60 × 1.10 - 1.85 = 64.15%
         assert lev["forward_return_pct"] > btc["forward_return_pct"]
-        # Expected ≈ 60 × 1.40 - 1.85 = 82.15% — well below naive 2×60=120%
-        assert 80 < lev["forward_return_pct"] < 85
+        assert 62 < lev["forward_return_pct"] < 66
 
     def test_income_covered_call_caps_upside(self, monkeypatch):
         """Covered-call wrappers at BTC × 0.55 for option cap."""

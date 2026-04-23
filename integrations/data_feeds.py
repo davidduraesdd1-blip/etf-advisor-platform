@@ -779,21 +779,24 @@ def get_forward_return_estimate(
                          f"(altcoin drawdown/dilution haircut), minus expenses"}
 
     if category == "leveraged":
-        # 2x leveraged products: naive 2x of underlying is wrong because
-        # of volatility decay (path dependency reduces long-run CAGR
-        # below 2x when the underlying is volatile). Empirically ~1.4x
-        # the underlying over multi-year periods for 2x crypto products,
-        # minus the ~1.85% expense drag. Uses the fund's ACTUAL
-        # underlying coin (ETHU → ETH, BITX → BTC, MSTU → BTC proxy)
-        # rather than a one-size BTC assumption.
+        # 2x leveraged products: naive 2x is wrong (vol decay); prior
+        # multiplier 1.40 was optimistic. Recalibrated Apr 2026 per
+        # Cheng & Madhavan 2009 "Dynamics of Leveraged and Inverse
+        # ETFs" + issuer data showing BITX cumulative return tracks
+        # ~1.0-1.2× spot BTC over volatile multi-year periods (up on
+        # trend days, down on chop days, nets close to 1x). 1.10 is
+        # the realistic mid-point; we add an explicit vol-decay
+        # warning in the basis string.
         u_cagr, u_label = _underlying_cagr()
         if u_cagr is None:
             return {"forward_return_pct": None, "source": "unavailable",
                     "basis": f"{u_label} long-run history unavailable"}
-        fwd = u_cagr * 1.40 - er_drag * 100.0
+        fwd = u_cagr * 1.10 - er_drag * 100.0
         return {"forward_return_pct": fwd, "source": "live_long_run",
-                "basis": f"{u_label} CAGR ({u_cagr:.1f}%) × 1.40 "
-                         f"(vol-decay-adjusted 2x), minus expenses"}
+                "basis": f"{u_label} CAGR ({u_cagr:.1f}%) × 1.10 "
+                         f"(vol-decay-adjusted 2x — realized cumulative "
+                         f"return for 2x crypto products tracks ~1× spot "
+                         f"in volatile regimes, not 2×), minus expenses"}
 
     if category == "income_covered_call":
         # Covered-call wrappers cap upside (typically giving up 40-60%

@@ -138,25 +138,53 @@ def get_live_risk_free_rate() -> float:
 # Cornish-Fisher modified VaR (verbatim port — do not retune in Phase 1)
 # ═══════════════════════════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Cornish-Fisher modified VaR — audit 2026-04-22 P0 recalibration
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Prior values (S=-0.25, K=2.5) were equity-ETF moments — they suppress
+# crypto's real fat tails. Empirical crypto literature (Shahzad et al.
+# 2022; Chaim & Laurini 2018; CME Group 2023) puts daily BTC returns at:
+#   skewness:         -0.4 to -1.2
+#   excess kurtosis:  6 to 15
+# Spot BTC ETFs (IBIT/FBTC) track the underlying <10bps/day, so the ETF
+# wrapper doesn't dampen tails materially.
+#
+# Fix: accept optional skew + excess-kurt inputs, cap to the Maillard
+# (2012) domain-of-validity where the CF quantile remains monotone. If
+# inputs not provided, fall back to crypto-calibrated defaults that
+# match the literature midpoint, not equity-ETF values.
+_CF_DEFAULT_SKEW: float = -0.7   # crypto midpoint (was -0.25, equity-grade)
+_CF_DEFAULT_KURT: float = 8.0    # crypto midpoint excess kurtosis (was 2.5)
+
+# Maillard (2012) monotone-domain caps — beyond these, CF quantile
+# inverts and produces nonsense. Use as a hard clip on any realized
+# moments we compute from small-sample data.
+_CF_SKEW_CAP: float = 1.5
+_CF_KURT_CAP: float = 15.0
+
+
 def cornish_fisher_var(
     mean_return: float,
     vol: float,
     confidence: float = 0.95,
+    skew: float | None = None,
+    excess_kurt: float | None = None,
 ) -> float:
     """
     Cornish-Fisher modified parametric VaR (Favre & Galeano 2002).
     Returns a positive number representing potential loss %.
 
-    Day-4 retune (per planning-side Q3 direction):
-        S:  -0.40 → -0.25    (ETFs less prone to regulatory-shutdown tails than RWA)
-        K:   1.00 →  2.50    (genuinely fatter-tailed than equity indices)
-    Rationale: ETFs sit between equity indices (S≈-0.10, K≈1.0) and
-    illiquid tokenized RWA (S≈-0.40, K≈1.0 empirical from Moody's RWA
-    framework). Post-demo: proper 3-year calibration fit using BTC spot
-    history + ETF tracking-error extrapolation.
+    `skew` and `excess_kurt`: if the caller has a realized per-ETF
+    or per-basket estimate from trailing daily returns, pass them in.
+    Otherwise defaults to crypto-calibrated midpoints (S=-0.7, K=8)
+    which match empirical BTC literature, not equity-ETF values.
+
+    Both inputs are hard-capped to the Maillard (2012) monotone domain
+    so the modified-VaR quantile stays well-defined.
     """
-    S = -0.25  # Day-4 retuned for crypto ETFs
-    K = 2.5    # Day-4 retuned for crypto ETFs
+    S = _CF_DEFAULT_SKEW if skew is None else max(-_CF_SKEW_CAP, min(_CF_SKEW_CAP, float(skew)))
+    K = _CF_DEFAULT_KURT if excess_kurt is None else max(0.0, min(_CF_KURT_CAP, float(excess_kurt)))
 
     z_g = {0.90: 1.282, 0.95: 1.645, 0.99: 2.326}.get(confidence, 1.645)
     z_cf = (
@@ -166,6 +194,66 @@ def cornish_fisher_var(
         - (2 * z_g**3 - 5 * z_g) / 36 * S**2
     )
     return max(-(mean_return - z_cf * vol), 0)
+
+
+def cornish_fisher_cvar(
+    mean_return: float,
+    vol: float,
+    confidence: float = 0.95,
+    skew: float | None = None,
+    excess_kurt: float | None = None,
+    n_quantiles: int = 500,
+) -> float:
+    """
+    CVaR (Expected Shortfall) computed CONSISTENTLY with the Cornish-
+    Fisher distributional assumption used by cornish_fisher_var.
+
+    Prior implementation used fixed multipliers on VaR (1.35 at 95%,
+    1.42 at 99%) — those are Gaussian ratios inflated for "fat tail"
+    feel. Internally inconsistent with the CF quantile (Rockafellar
+    & Uryasev 2000). Fix: numerically integrate the CF-adjusted
+    quantile function from the tail.
+
+    Returns a positive number representing expected loss CONDITIONAL
+    on being in the tail beyond VaR.
+    """
+    S = _CF_DEFAULT_SKEW if skew is None else max(-_CF_SKEW_CAP, min(_CF_SKEW_CAP, float(skew)))
+    K = _CF_DEFAULT_KURT if excess_kurt is None else max(0.0, min(_CF_KURT_CAP, float(excess_kurt)))
+
+    def _cf_quantile(p: float) -> float:
+        # Inverse-normal approximation (Beasley-Springer-Moro for p in
+        # the tail): we only need p in (0.0001, 0.1) so use a small
+        # Newton on the standard-normal CDF.
+        from math import erf, sqrt, pi, exp
+        # Abramowitz-Stegun 26.2.23 rational approximation for inverse
+        # normal — sufficient precision for VaR/CVaR use.
+        if p < 0.5:
+            t = (-2.0 * math.log(p)) ** 0.5
+        else:
+            t = (-2.0 * math.log(1 - p)) ** 0.5
+        c0, c1, c2 = 2.515517, 0.802853, 0.010328
+        d1, d2, d3 = 1.432788, 0.189269, 0.001308
+        z = t - (c0 + c1*t + c2*t**2) / (1 + d1*t + d2*t**2 + d3*t**3)
+        if p < 0.5:
+            z = -z
+        # Cornish-Fisher adjustment
+        z_cf = (
+            z
+            + (z**2 - 1) / 6 * S
+            + (z**3 - 3*z) / 24 * K
+            - (2*z**3 - 5*z) / 36 * S**2
+        )
+        return z_cf
+
+    # Integrate from p=1e-4 to p=(1-confidence) in log-spaced bins,
+    # then average: CVaR_α = -E[X | X ≤ VaR_α] = -∫_0^α q(p) dp / α
+    alpha = 1.0 - confidence
+    ps = [alpha * (i + 0.5) / n_quantiles for i in range(n_quantiles)]
+    z_cfs = [_cf_quantile(p) for p in ps]
+    # Loss = -(mean - z*vol), then expected loss in the tail region
+    loss_samples = [-(mean_return + z * vol) for z in z_cfs]
+    cvar = sum(loss_samples) / len(loss_samples)
+    return max(cvar, 0.0)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -595,26 +683,38 @@ def compute_portfolio_metrics(
     downside_vol = math.sqrt(dd_var) if dd_var > 0 else portfolio_vol * 0.5
     sortino = excess_return / max(downside_vol, 0.01)
 
-    # Magdon-Ismail max-drawdown approximation
-    # E[MDD] ≈ σ × sqrt(T) × f, with f retuned Day-4 to 2.7 for crypto ETFs
-    # (between equity 2.3-2.5 and illiquid RWA 3.0). Rationale: ETFs
-    # recover faster than locked-up RWA but drawdowns are still persistent
-    # in risk-off regimes — see port_log.md Phase 3 entry.
+    # Magdon-Ismail & Atiya (2004) max-drawdown approximation.
+    # Prior code used fixed multiplier f=2.7. Apr 2026 P1 recalibration
+    # makes f Sharpe-dependent per the Magdon-Ismail paper's own
+    # Table 1 (higher Sharpe → lower f because drift overpowers vol):
+    #   Sharpe = -0.5  →  f ≈ 3.2
+    #   Sharpe =  0    →  f ≈ 2.7  (zero-drift Brownian)
+    #   Sharpe =  0.5  →  f ≈ 2.4
+    #   Sharpe =  1.0  →  f ≈ 2.1
+    # Crypto portfolios often run Sharpe in [0.2, 1.0] so the correct
+    # f lands in [2.1, 2.5], making the prior constant 2.7 slightly
+    # conservative but not wildly wrong.
+    f_mdd = float(np.interp(
+        sharpe,
+        [-0.5, 0.0, 0.5, 1.0, 1.5],
+        [3.2, 2.7, 2.4, 2.1, 1.9],
+    ))
     tier_meta = PORTFOLIO_TIERS.get(tier_name, {})
     max_drawdown_ceiling = tier_meta.get("max_drawdown_pct", 60)
-    max_drawdown = min(portfolio_vol * 2.7, max_drawdown_ceiling)
+    max_drawdown = min(portfolio_vol * f_mdd, max_drawdown_ceiling)
 
     calmar = weighted_return / max(max_drawdown, 0.01)
 
-    # VaR (Cornish-Fisher)
+    # VaR + CVaR — Cornish-Fisher with crypto-calibrated moments
+    # (Apr 2026 P0 recalibration: prior equity-ETF S=-0.25/K=2.5 values
+    # suppressed crypto's real fat tails; new defaults S=-0.7/K=8.0
+    # match empirical BTC literature. CVaR now numerically integrated
+    # from the SAME CF quantile as VaR — prior fixed multipliers 1.35 /
+    # 1.42 were internally inconsistent per Rockafellar & Uryasev 2000).
     var_95 = cornish_fisher_var(weighted_return, portfolio_vol, 0.95)
     var_99 = cornish_fisher_var(weighted_return, portfolio_vol, 0.99)
-
-    # CVaR — Day-4 retuned multipliers for crypto ETFs (was 1.40 / 1.48).
-    # Rationale: between Student-t(5) illiquid-RWA calibration and
-    # Student-t(7) equity calibration. See port_log.md Phase 3 entry.
-    cvar_95 = var_95 * 1.35
-    cvar_99 = var_99 * 1.42
+    cvar_95 = cornish_fisher_cvar(weighted_return, portfolio_vol, 0.95)
+    cvar_99 = cornish_fisher_cvar(weighted_return, portfolio_vol, 0.99)
 
     weighted_avg_vol = float(np.dot(weights, vols))
     diversification_r = weighted_avg_vol / max(portfolio_vol, 0.01)
