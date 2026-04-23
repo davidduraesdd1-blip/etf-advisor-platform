@@ -74,6 +74,43 @@ EXCLUDED_CATEGORIES: frozenset[str] = frozenset({
     "inverse", "short", "btc_futures", "eth_futures",
 })
 
+# Categories restricted when the "fiduciary-appropriate instruments"
+# compliance filter is ON (default). Partner + Claude Design feedback
+# 2026-04-22: many RIA compliance departments explicitly prohibit
+# leveraged crypto ETFs and single-stock-wrapper covered-call ETFs
+# (YieldMax MSTY, CONY, Defiance MSFO / COII) with retail clients.
+# Product-class restrictions are real-world FA constraints we should
+# honor by default.
+COMPLIANCE_RESTRICTED_CATEGORIES: frozenset[str] = frozenset({
+    "leveraged",
+})
+
+# Specific tickers flagged for restricted use in fiduciary contexts.
+# All covered-call wrappers on individual public equities (MSTR, COIN,
+# MARA) — the tax-inefficient high-yield income profile + return-of-
+# capital distributions attract FA + compliance scrutiny.
+COMPLIANCE_RESTRICTED_TICKERS: frozenset[str] = frozenset({
+    "MSTY", "CONY", "MARO", "MSFO", "COII",
+})
+
+
+def category_allowed(category: str, ticker: str, compliance_filter_on: bool) -> bool:
+    """
+    Returns True if an ETF should be eligible for tier allocation
+    under the current compliance-filter setting. When the filter is
+    OFF (advisor explicitly opts into aggressive product classes),
+    only the hard EXCLUDED_CATEGORIES block. When ON, also blocks
+    COMPLIANCE_RESTRICTED_CATEGORIES and COMPLIANCE_RESTRICTED_TICKERS.
+    """
+    if category in EXCLUDED_CATEGORIES:
+        return False
+    if compliance_filter_on:
+        if category in COMPLIANCE_RESTRICTED_CATEGORIES:
+            return False
+        if ticker in COMPLIANCE_RESTRICTED_TICKERS:
+            return False
+    return True
+
 # Maximum single-ETF weight (diversification cap), per CLAUDE.md §13 /
 # rwa-infinity-model convention.
 MAX_SINGLE_POSITION_PCT: float = 30.0

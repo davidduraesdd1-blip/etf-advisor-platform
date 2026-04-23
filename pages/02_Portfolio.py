@@ -125,18 +125,37 @@ def _universe_with_live_analytics_cached() -> list[dict]:
 
 @st.cache_data(ttl=600)
 def _build_cached(tier_name: str, portfolio_value: float,
-                  universe_key: int) -> dict:
+                  universe_key: int, compliance_filter: bool) -> dict:
     # universe_key is a cache discriminator: when the live-enriched
     # universe changes (ticker analytics drift), Streamlit invalidates.
+    # compliance_filter is part of the cache key so toggling it on/off
+    # in Settings produces a fresh build instead of reusing a stale one.
     universe = _universe_with_live_analytics_cached()
-    return build_portfolio(tier_name, universe, portfolio_value_usd=portfolio_value)
+    return build_portfolio(
+        tier_name, universe,
+        portfolio_value_usd=portfolio_value,
+        compliance_filter_on=compliance_filter,
+    )
 
 
 crypto_sleeve_usd = client["total_portfolio_usd"] * client["crypto_allocation_pct"] / 100
 with st.spinner("Deriving live analytics (returns, vol, correlation) from price history..."):
     universe_live = _universe_with_live_analytics_cached()
 # id(universe_live) is stable per cache entry so we reuse the 10-min bucket.
-portfolio = _build_cached(tier_name, crypto_sleeve_usd, id(universe_live))
+# Pick up the session-state compliance filter (default ON).
+_compliance_filter = bool(st.session_state.get("compliance_filter_on", True))
+portfolio = _build_cached(tier_name, crypto_sleeve_usd,
+                          id(universe_live), _compliance_filter)
+
+# Compliance-filter status banner — makes the active state visible
+# so the FA isn't surprised when the Ultra-Aggressive basket has no
+# leveraged sleeve even though the tier allocation specifies one.
+if _compliance_filter:
+    st.caption(
+        "🛡 **Fiduciary-appropriate filter ON** — leveraged and single-stock "
+        "covered-call wrappers excluded from this basket. "
+        "Toggle in Settings for aggressive-sleeve-approved IPS clients."
+    )
 holdings = portfolio["holdings"]
 metrics = portfolio["metrics"]
 

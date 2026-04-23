@@ -47,8 +47,9 @@ data_sources_panel(expanded=True, key="ds_panel_settings")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Broker routing
+# Preferences — FA-facing settings
 # ═══════════════════════════════════════════════════════════════════════════
+st.markdown("## Preferences")
 
 with card("Broker routing"):
     options = ["mock", "alpaca_paper", "alpaca"]
@@ -103,9 +104,48 @@ with card("Extended modules (Framing A / B demo toggle)"):
     st.session_state["extended_modules_override"] = toggled
 
 
+# Compliance filter — partner + Claude Design feedback 2026-04-22.
+# Default ON. Blocks leveraged crypto ETFs + single-stock covered-call
+# wrappers (MSTY/CONY/MSFO/COII/MARO) from tier allocations — many RIA
+# compliance departments prohibit these product classes with retail
+# clients. FA turns OFF explicitly when advising a client (family
+# office, qualified-purchaser, or IPS-specified) who can hold them.
+with card("Fiduciary-appropriate instrument filter"):
+    st.caption(level_text(
+        beginner=(
+            "When ON (default), the platform hides leveraged crypto ETFs "
+            "and single-stock income wrappers (MSTY, CONY, MSFO) from "
+            "tier allocations. Most RIA compliance departments prohibit "
+            "these with retail clients. Turn OFF only when advising a "
+            "client whose IPS explicitly permits aggressive product classes."
+        ),
+        intermediate=(
+            "ON blocks categories: leveraged. Blocked tickers: MSTY, CONY, "
+            "MSFO, COII, MARO. Weight redistributes proportionally to "
+            "remaining categories. OFF shows the full universe."
+        ),
+        advanced=(
+            "core.risk_tiers.COMPLIANCE_RESTRICTED_CATEGORIES + "
+            "COMPLIANCE_RESTRICTED_TICKERS. Threaded through "
+            "build_portfolio(compliance_filter_on=) and "
+            "_select_etfs_for_category(compliance_filter_on=)."
+        ),
+    ))
+    compliance_on = st.toggle(
+        "Restrict to fiduciary-appropriate instruments",
+        value=st.session_state.get("compliance_filter_on", True),
+        key="compliance_filter_toggle",
+        help="Default ON. Hides leveraged + single-stock covered-call "
+             "wrappers from tier allocations. Turn off when advising "
+             "a client whose IPS explicitly permits them.",
+    )
+    st.session_state["compliance_filter_on"] = compliance_on
+
+
 # ═══════════════════════════════════════════════════════════════════════════
-# Scanner health indicator (Day-3 item B)
+# Diagnostics — operator-facing runtime state
 # ═══════════════════════════════════════════════════════════════════════════
+st.markdown("## Diagnostics")
 
 with card("EDGAR scanner health"):
     health = get_scanner_health()

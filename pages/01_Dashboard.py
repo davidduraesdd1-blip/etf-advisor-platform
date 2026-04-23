@@ -158,22 +158,41 @@ _n_live_vol = sum(1 for e in universe_live
 _n_live_corr = sum(1 for e in universe_live
                    if e.get("correlation_source") in ("live", "self"))
 
-# Build the roster table
+# FA-workflow simplification per partner feedback (2026-04-22):
+# advisors scan for "what needs attention today" — not for data-source
+# provenance or per-client analytics at a glance. Collapsed to 6 columns
+# with a top-of-page "needs attention" summary + analytics behind an
+# expander for advisors who want the full picture.
+
+_n_need_rebalance = sum(1 for c in DEMO_CLIENTS if c["rebalance_needed"])
+_n_aligned = len(DEMO_CLIENTS) - _n_need_rebalance
+
+sum_col1, sum_col2 = st.columns(2)
+with sum_col1:
+    st.metric(
+        "Clients needing attention",
+        _n_need_rebalance,
+        help="Count of clients whose basket has drifted past rebalance "
+             "threshold for their assigned risk tier.",
+    )
+with sum_col2:
+    st.metric(
+        "Aligned",
+        _n_aligned,
+        help="Clients whose basket allocations are within tolerance "
+             "for their assigned risk tier.",
+    )
+
+# Core roster — 6 columns only
 df = pd.DataFrame([
     {
-        "Client":       f"{c['name']} · DEMO",
-        "Label":        c["label"],
-        "Age":          c["age"],
-        "Tier":         c["assigned_tier"],
-        "Portfolio $":  c["total_portfolio_usd"],
-        "Crypto %":     c["crypto_allocation_pct"],
-        "Hist return":  per_client_metrics[c["id"]]["hist_return"],
-        "Fwd estimate": per_client_metrics[c["id"]]["fwd_return"],
-        "Port vol":     per_client_metrics[c["id"]]["port_vol"],
-        "30d change":   per_client_metrics[c["id"]]["delta_30d"],
-        "Drift %":      c["drift_pct"],
-        "Rebalance":    "⚠ Needed" if c["rebalance_needed"] else "Aligned",
-        "Last rebalance": pd.to_datetime(c["last_rebalance_iso"]).strftime("%Y-%m-%d"),
+        "Client":           f"{c['name']} · DEMO",
+        "Tier":             c["assigned_tier"],
+        "Portfolio $":      c["total_portfolio_usd"],
+        "Crypto %":         c["crypto_allocation_pct"],
+        "Drift %":          c["drift_pct"],
+        "Rebalance":        "⚠ Needed" if c["rebalance_needed"] else "Aligned",
+        "Last rebalance":   pd.to_datetime(c["last_rebalance_iso"]).strftime("%Y-%m-%d"),
     }
     for c in DEMO_CLIENTS
 ])
@@ -186,52 +205,50 @@ with card("Clients"):
         column_config={
             "Portfolio $":  st.column_config.NumberColumn(format="$%,.0f"),
             "Crypto %":     st.column_config.NumberColumn(format="%.1f%%"),
-            "Hist return":  st.column_config.NumberColumn(
-                format="%.1f%%",
-                help="Annualized CAGR of each client's crypto sleeve "
-                     "over the ETFs' available price history "
-                     "(~2 years since Jan 2024 launches). Backward-looking.",
-            ),
-            "Fwd estimate": st.column_config.NumberColumn(
-                format="%.1f%%",
-                help="Model forward-return estimate using 10-year BTC-USD "
-                     "and ETH-USD CAGR with category-specific drag/premium. "
-                     "Represents cross-cycle steady-state expected return.",
-            ),
-            "Port vol":     st.column_config.NumberColumn(
-                format="%.1f%%",
-                help="Portfolio volatility — 90-day annualized σ, "
-                     "derived live per ETF and aggregated by basket weight.",
-            ),
-            "30d change":   st.column_config.NumberColumn(
-                format="%.2f%%",
-                help="Weighted basket return over the last 30 trading days.",
-            ),
             "Drift %":      st.column_config.NumberColumn(format="%.1f%%"),
         },
     )
-    st.caption(level_text(
-        beginner=(
-            f"Live metrics — {_n_live_ret} of {_n_total} ETFs report live "
-            f"expected returns, {_n_live_vol} of {_n_total} report live "
-            f"volatility, {_n_live_corr} of {_n_total} report live BTC "
-            f"correlation. Anything that isn't live uses category averages "
-            f"as a fallback and is flagged on the ETF detail page."
-        ),
-        intermediate=(
-            f"Live coverage — return: {_n_live_ret}/{_n_total} · "
-            f"vol: {_n_live_vol}/{_n_total} · "
-            f"corr: {_n_live_corr}/{_n_total}. "
-            f"30d change weighted by basket allocation."
-        ),
-        advanced=(
-            f"Live: return={_n_live_ret}/{_n_total}, "
-            f"vol={_n_live_vol}/{_n_total}, "
-            f"corr={_n_live_corr}/{_n_total}. "
-            f"30d delta = Σ(weight × 30trading-day return), rescaled by "
-            f"covered weight."
-        ),
-    ))
+
+    # Per-client analytics behind an expander — for advisors who want
+    # the return/vol detail without it cluttering the at-a-glance view.
+    with st.expander("Per-client analytics (expand for live return / vol / 30d change)"):
+        analytics_df = pd.DataFrame([
+            {
+                "Client":       c["name"],
+                "Hist return":  per_client_metrics[c["id"]]["hist_return"],
+                "Fwd estimate": per_client_metrics[c["id"]]["fwd_return"],
+                "Port vol":     per_client_metrics[c["id"]]["port_vol"],
+                "30d change":   per_client_metrics[c["id"]]["delta_30d"],
+            }
+            for c in DEMO_CLIENTS
+        ])
+        st.dataframe(
+            analytics_df,
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "Hist return":  st.column_config.NumberColumn(
+                    format="%.1f%%",
+                    help="Annualized CAGR of each client's crypto sleeve "
+                         "over the ETFs' available price history (~2 years). "
+                         "Backward-looking.",
+                ),
+                "Fwd estimate": st.column_config.NumberColumn(
+                    format="%.1f%%",
+                    help="Model forward-return using 10-year BTC-USD / "
+                         "ETH-USD CAGR with category-specific drag/premium.",
+                ),
+                "Port vol":     st.column_config.NumberColumn(
+                    format="%.1f%%",
+                    help="Portfolio volatility — 90-day annualized σ, "
+                         "aggregated by basket weight.",
+                ),
+                "30d change":   st.column_config.NumberColumn(
+                    format="%.2f%%",
+                    help="Weighted basket return over the last 30 trading days.",
+                ),
+            },
+        )
 
 # Per-client detail + navigation
 with card("Open client portfolio"):

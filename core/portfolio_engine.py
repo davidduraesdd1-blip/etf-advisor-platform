@@ -326,14 +326,25 @@ def _build_covariance_matrix(holdings: list[dict]) -> np.ndarray:
 def _select_etfs_for_category(
     category: str,
     universe: list[dict],
+    compliance_filter_on: bool = True,
 ) -> list[dict]:
     """
     Select up to MAX_ETFS_PER_CATEGORY ETFs from a category.
     Prefers lowest expense ratio; breaks ties by issuer diversity.
-    Phase 1 has no expense_ratio data yet, so selection is deterministic
-    by seed order within the category.
+
+    `compliance_filter_on=True` (default) applies the fiduciary-
+    appropriate restrictions — blocks single-stock covered-call
+    wrappers (MSTY/CONY/MSFO/etc.) even when the tier allocates to
+    the income_covered_call category. Leveraged is blocked at the
+    category level upstream of this function.
     """
-    in_cat = [u for u in universe if u.get("category") == category]
+    from core.risk_tiers import category_allowed
+
+    in_cat = [
+        u for u in universe
+        if u.get("category") == category
+        and category_allowed(category, u.get("ticker", ""), compliance_filter_on)
+    ]
     if not in_cat:
         return []
 
@@ -372,6 +383,7 @@ def build_portfolio(
     tier_name: str,
     universe: list[dict],
     portfolio_value_usd: float = 100_000,
+    compliance_filter_on: bool = True,
 ) -> dict:
     """
     Build a fully specified crypto-ETF portfolio for a given risk tier.
@@ -408,10 +420,33 @@ def build_portfolio(
     holdings: list[dict] = []
     used_weight_pct = 0.0
 
+    # When compliance filter is ON, skip categories that are fully
+    # restricted (e.g., leveraged) — their allocation weight redistributes
+    # proportionally to the remaining categories.
+    from core.risk_tiers import COMPLIANCE_RESTRICTED_CATEGORIES
+
+    if compliance_filter_on:
+        blocked_cats = {
+            c for c in category_allocs
+            if c in COMPLIANCE_RESTRICTED_CATEGORIES
+        }
+        if blocked_cats:
+            blocked_weight = sum(category_allocs[c] for c in blocked_cats)
+            kept_allocs = {
+                c: w for c, w in category_allocs.items()
+                if c not in blocked_cats
+            }
+            if kept_allocs:
+                scale = 100.0 / sum(kept_allocs.values())
+                category_allocs = {c: w * scale for c, w in kept_allocs.items()}
+            # else: everything was blocked (unlikely); leave as-is
+
     for category, cat_weight in category_allocs.items():
         if cat_weight <= 0:
             continue
-        chosen = _select_etfs_for_category(category, universe)
+        chosen = _select_etfs_for_category(
+            category, universe, compliance_filter_on=compliance_filter_on
+        )
         if not chosen:
             continue
 
