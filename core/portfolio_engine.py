@@ -343,6 +343,23 @@ _CATEGORY_PAIR_CORR: dict[tuple[str, str], float] = {
     ("income_covered_call", "multi_asset"): 0.58,
 
     ("btc_futures", "thematic"):     0.70,
+
+    # Defined-outcome buffered BTC ETFs (Calamos CBOJ-series).
+    # Within-category: all track BTC with the same buffer structure, so
+    # they are highly self-correlated (~0.95) but decoupled from BTC on
+    # drawdown days (hence the 0.55 cross with btc_spot — asymmetric
+    # correlation in reality, we model the blended annualized number).
+    ("defined_outcome", "defined_outcome"):     0.95,
+    ("defined_outcome", "btc_spot"):            0.55,
+    ("defined_outcome", "eth_spot"):            0.45,
+    ("defined_outcome", "btc_futures"):         0.55,
+    ("defined_outcome", "eth_futures"):         0.42,
+    ("defined_outcome", "altcoin_spot"):        0.45,
+    ("defined_outcome", "thematic"):            0.40,
+    ("defined_outcome", "thematic_equity"):     0.35,
+    ("defined_outcome", "leveraged"):           0.50,
+    ("defined_outcome", "income_covered_call"): 0.45,
+    ("defined_outcome", "multi_asset"):         0.50,
 }
 
 

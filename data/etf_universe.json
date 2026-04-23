@@ -1,14 +1,15 @@
 {
   "_metadata": {
-    "version": "2026-04-22",
-    "description": "US-listed crypto ETF universe. Curated seed kept in sync with SEC EDGAR daily scanner output. Covers spot (BTC/ETH/altcoin), futures (BTC/ETH), leveraged, covered-call income, thematic equity baskets, and multi-asset wrappers. Source inventory: Q1 2026 research dive, 31 authoritative sources cited.",
+    "version": "2026-04-22-evening",
+    "description": "US-listed crypto ETF universe. Curated seed kept in sync with SEC EDGAR daily scanner output. Covers spot (BTC/ETH/altcoin), futures (BTC/ETH), leveraged, covered-call income, thematic equity baskets, multi-asset wrappers, and defined-outcome buffered products. Source inventory: Q1 2026 research + evening 2026-04-22 competitive audit.",
     "category_taxonomy": [
       "btc_spot", "eth_spot", "altcoin_spot",
       "btc_futures", "eth_futures",
       "leveraged", "income_covered_call",
-      "thematic_equity", "multi_asset"
+      "thematic_equity", "multi_asset",
+      "defined_outcome"
     ],
-    "ticker_count": 68
+    "ticker_count": 82
   },
   "etfs": [
     {"ticker": "IBIT", "issuer": "BlackRock iShares", "category": "btc_spot", "name": "iShares Bitcoin Trust", "expense_ratio_bps": 25, "inception": "2024-01-11"},
@@ -90,6 +91,17 @@
     {"ticker": "DTCR", "issuer": "Global X", "category": "thematic_equity", "name": "Global X Digital Assets & Blockchain ETF", "expense_ratio_bps": 50, "inception": "2021-10-27"},
 
     {"ticker": "BITW", "issuer": "Bitwise", "category": "multi_asset", "name": "Bitwise 10 Crypto Index Fund", "expense_ratio_bps": 250, "inception": "2017-11-22"},
-    {"ticker": "EFBC", "issuer": "Hashdex", "category": "multi_asset", "name": "Hashdex Nasdaq Crypto Index US ETF", "expense_ratio_bps": 90, "inception": "2024-02-14"}
+    {"ticker": "EFBC", "issuer": "Hashdex", "category": "multi_asset", "name": "Hashdex Nasdaq Crypto Index US ETF", "expense_ratio_bps": 90, "inception": "2024-02-14"},
+
+    {"ticker": "CBOJ", "issuer": "Calamos", "category": "defined_outcome", "underlying": "BTC", "name": "Calamos Bitcoin Structured Alt Protection ETF — January", "expense_ratio_bps": 69, "inception": "2025-01-22"},
+    {"ticker": "CBXJ", "issuer": "Calamos", "category": "defined_outcome", "underlying": "BTC", "name": "Calamos Bitcoin 80% Structured Alt Protection ETF — January", "expense_ratio_bps": 69, "inception": "2025-04-01"},
+    {"ticker": "CBTJ", "issuer": "Calamos", "category": "defined_outcome", "underlying": "BTC", "name": "Calamos Bitcoin 90% Structured Alt Protection ETF — January", "expense_ratio_bps": 69, "inception": "2025-04-01"},
+    {"ticker": "CBOQ", "issuer": "Calamos", "category": "defined_outcome", "underlying": "BTC", "name": "Calamos Bitcoin Structured Alt Protection ETF — April", "expense_ratio_bps": 69, "inception": "2025-04-01"},
+    {"ticker": "CBOS", "issuer": "Calamos", "category": "defined_outcome", "underlying": "BTC", "name": "Calamos Bitcoin Structured Alt Protection ETF — July", "expense_ratio_bps": 69, "inception": "2025-07-01"},
+    {"ticker": "CBOO", "issuer": "Calamos", "category": "defined_outcome", "underlying": "BTC", "name": "Calamos Bitcoin Structured Alt Protection ETF — October", "expense_ratio_bps": 69, "inception": "2025-10-01"},
+
+    {"ticker": "BMAX", "issuer": "REX Shares", "category": "income_covered_call", "underlying": "MSTR", "name": "REX Bitcoin Corporate Treasury Convertible Bond ETF", "expense_ratio_bps": 85, "inception": "2025-03-14"},
+    {"ticker": "IMST", "issuer": "Bitwise", "category": "income_covered_call", "underlying": "MSTR", "name": "Bitwise MSTR Option Income ETF", "expense_ratio_bps": 98, "inception": "2025-05-20"},
+    {"ticker": "ETHV", "issuer": "VanEck", "category": "eth_spot", "name": "VanEck Ethereum ETF", "expense_ratio_bps": 20, "inception": "2024-07-23"}
   ]
 }

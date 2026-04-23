@@ -814,6 +814,30 @@ def get_forward_return_estimate(
                          f"(covered-call upside cap), minus expenses. "
                          f"Distribution yield is included in total return."}
 
+    if category == "defined_outcome":
+        # Calamos CBOJ-series: 100% / 90% / 80% downside-buffered BTC ETFs
+        # with corresponding upside caps (typically 10-20% p.a. depending on
+        # series + vol regime at roll). The buffer structure asymmetrically
+        # decouples from BTC on drawdowns, so long-run expected return is
+        # *not* BTC CAGR minus a constant — it's better modeled as a cap-
+        # ceiling-dominated process. Academic treatment: Israelov & Nielsen
+        # 2015 "Covered Calls Uncovered" (same option-overwrite decomposition
+        # applies to protective-puts + short-call combos).
+        # Empirically, structured-outcome products deliver ~30-50% of
+        # underlying CAGR when underlying is up, 0% when underlying is
+        # flat-to-down (within buffer). Model at BTC × 0.40 as the
+        # blended annualized estimate.
+        if btc_cagr is None:
+            return {"forward_return_pct": None, "source": "unavailable",
+                    "basis": "BTC-USD long-run history unavailable"}
+        fwd = btc_cagr * 0.40 - er_drag * 100.0
+        return {"forward_return_pct": fwd, "source": "live_long_run",
+                "basis": f"BTC-USD 10yr CAGR ({btc_cagr:.1f}%) × 0.40 "
+                         f"(defined-outcome upside cap + buffer floor), "
+                         f"minus expenses. Real payoff is capped by the "
+                         f"series outcome period — this is the annualized "
+                         f"average across cap hits and flat periods."}
+
     if category == "multi_asset":
         if btc_cagr is None or eth_cagr is None:
             return {"forward_return_pct": None, "source": "unavailable",

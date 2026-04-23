@@ -102,6 +102,13 @@ _CATEGORY_DEFAULTS: dict[str, dict[str, float]] = {
     "income_covered_call": {"expected_return": 25.0, "volatility": 45.0, "correlation_with_btc": 0.55},
     "thematic_equity":     {"expected_return": 35.0, "volatility": 55.0, "correlation_with_btc": 0.50},
     "multi_asset":         {"expected_return": 30.0, "volatility": 60.0, "correlation_with_btc": 0.85},
+    # Defined-outcome buffered BTC ETFs (Calamos CBOJ-series): 100%/90%/80%
+    # downside protection with corresponding upside caps. Realized vol runs
+    # ~20% (vs BTC spot ~55%) because the buffer decouples on the downside;
+    # correlation with BTC softens to ~0.55 during drawdowns for the same
+    # reason. Expected return averages the cap ceiling (~10-20% p.a.
+    # depending on series) with partial BTC upside above the cap.
+    "defined_outcome":     {"expected_return": 15.0, "volatility": 20.0, "correlation_with_btc": 0.55},
 }
 
 def _enrich(etf: dict[str, Any]) -> dict[str, Any]:

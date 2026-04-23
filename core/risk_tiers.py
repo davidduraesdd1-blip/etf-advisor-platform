@@ -32,17 +32,23 @@ from __future__ import annotations
 TIER_CATEGORY_ALLOCATIONS: dict[str, dict[str, float]] = {
     # Ultra Conservative rewrite (2026-04-22 FA feedback): "don't limit
     # to BTC spot only — consider every category including lower-risk."
-    # Income covered-call wrappers (~45% vol vs ~55% spot BTC, plus
-    # ~25% distribution yield) act as the vol-dampener + income sleeve.
-    # BTC spot stays dominant for correlation simplicity.
+    # Structure (100% crypto sleeve):
+    #   • 60% BTC spot — the core directional crypto beta
+    #   • 25% defined-outcome (Calamos CBOJ-series) — 100%/90%/80% downside-
+    #     buffered BTC; vol ~20% vs spot ~55%; lowers sleeve vol meaningfully
+    #     while preserving capped BTC upside
+    #   • 15% income covered-call — distribution yield + further vol damp
     "Ultra Conservative": {
-        "btc_spot":               80.0,
-        "income_covered_call":    20.0,
+        "btc_spot":               60.0,
+        "defined_outcome":        25.0,
+        "income_covered_call":    15.0,
     },
-    # Conservative — adds a small ETH sleeve and keeps income overlay.
+    # Conservative — adds a small ETH sleeve and keeps income overlay;
+    # retains a 10% defined-outcome buffer floor.
     "Conservative": {
-        "btc_spot":               70.0,
+        "btc_spot":               60.0,
         "eth_spot":               15.0,
+        "defined_outcome":        10.0,
         "income_covered_call":    15.0,
     },
     "Moderate": {
