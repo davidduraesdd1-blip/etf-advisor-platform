@@ -18,7 +18,6 @@ from integrations.data_feeds import get_etf_prices
 from ui.components import (
     card,
     data_source_badge,
-    data_sources_panel,
     disclosure,
     section_header,
 )

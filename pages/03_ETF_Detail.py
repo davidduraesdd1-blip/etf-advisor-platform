@@ -22,7 +22,6 @@ from integrations.edgar_nport import SUPPORTED_TICKERS as NPORT_TICKERS, get_etf
 from ui.components import (
     card,
     data_source_badge,
-    data_sources_panel,
     disclosure,
     kpi_tile,
     safe_page_link,

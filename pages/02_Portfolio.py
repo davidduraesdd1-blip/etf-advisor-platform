@@ -26,7 +26,6 @@ from integrations.data_feeds import get_etf_prices, get_last_close
 from ui.components import (
     card,
     data_source_badge,
-    data_sources_panel,
     disclosure,
     kpi_tile,
     safe_page_link,
