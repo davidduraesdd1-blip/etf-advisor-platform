@@ -197,6 +197,102 @@ with r2:
     kpi_tile("Forward estimate (model)",
              f"{fwd:.1f}%" if fwd is not None else "—")
 
+# KPI row 3 — Market-vs-NAV and upside/downside capture.
+# Partner feedback #4 + #5 (Apr 2026). Both live-fetched per render;
+# results cached at the data_feeds level for 5-10 min so selectbox
+# toggling doesn't re-hit yfinance.
+from integrations.data_feeds import get_premium_discount_pct, get_capture_ratios
+
+@st.cache_data(ttl=600)
+def _prem_disc_cached(ticker: str) -> dict:
+    return get_premium_discount_pct(ticker)
+
+
+@st.cache_data(ttl=600)
+def _capture_cached(ticker: str, underlying: str) -> dict:
+    return get_capture_ratios(ticker, underlying_symbol=underlying)
+
+
+# Choose the right underlying for capture ratios based on category.
+_cap_underlying = "BTC-USD"
+if etf.get("category") == "eth_spot" or etf.get("underlying") in ("ETH", "ETHA", "FETH"):
+    _cap_underlying = "ETH-USD"
+
+pd_info = _prem_disc_cached(chosen)
+cap_info = _capture_cached(chosen, _cap_underlying)
+
+m1, m2, m3 = st.columns(3)
+with m1:
+    pd_pct = pd_info.get("premium_discount_pct")
+    if pd_pct is not None:
+        sign = "+" if pd_pct >= 0 else ""
+        # Flag thresholds: green <0.5%, amber 0.5-2%, red >2%
+        kpi_tile("Premium / Discount to NAV", f"{sign}{pd_pct:.2f}%")
+    else:
+        kpi_tile("Premium / Discount to NAV", "—")
+with m2:
+    up = cap_info.get("up_capture_pct")
+    kpi_tile(
+        f"Upside capture vs {_cap_underlying.split('-')[0]}",
+        f"{up:.1f}%" if up is not None else "—",
+    )
+with m3:
+    dn = cap_info.get("down_capture_pct")
+    kpi_tile(
+        f"Downside capture vs {_cap_underlying.split('-')[0]}",
+        f"{dn:.1f}%" if dn is not None else "—",
+    )
+
+# Explain the capture ratios in FA language
+_nav = pd_info.get("nav")
+_mkt = pd_info.get("market_price")
+_capture_caption_pieces: list[str] = []
+if pd_pct is not None:
+    if abs(pd_pct) < 0.5:
+        _capture_caption_pieces.append(
+            f"Trading within 0.5% of NAV (healthy — AP arbitrage is working). "
+            f"NAV ${_nav:.2f}, market ${_mkt:.2f}."
+        )
+    elif abs(pd_pct) < 2.0:
+        _capture_caption_pieces.append(
+            f"⚠ Trading {abs(pd_pct):.2f}% "
+            f"{'above' if pd_pct > 0 else 'below'} NAV — moderate tracking "
+            f"gap. NAV ${_nav:.2f}, market ${_mkt:.2f}."
+        )
+    else:
+        _capture_caption_pieces.append(
+            f"🚩 Trading {abs(pd_pct):.2f}% "
+            f"{'premium to' if pd_pct > 0 else 'discount to'} NAV — material "
+            f"tracking dislocation. FA red-flag per industry screens."
+        )
+
+if cap_info.get("up_capture_pct") is not None and cap_info.get("down_capture_pct") is not None:
+    _up, _dn = cap_info["up_capture_pct"], cap_info["down_capture_pct"]
+    if 95 <= _up <= 105 and 95 <= _dn <= 105:
+        _capture_caption_pieces.append(
+            f"Tracks {_cap_underlying.split('-')[0]} tightly 1:1 both up and down "
+            f"({cap_info['n_up_days']} up days / {cap_info['n_down_days']} down days)."
+        )
+    elif _up > 130 or _dn > 130:
+        _capture_caption_pieces.append(
+            f"Amplified exposure: {_up:.0f}% up-capture / {_dn:.0f}% down-capture "
+            f"— leveraged or option-income structure. Expect vol-decay drag "
+            f"on multi-week holds."
+        )
+    elif _up < 90:
+        _capture_caption_pieces.append(
+            f"Under-captures up moves ({_up:.0f}%) — structural drag (contango, "
+            f"option cap, or expense). Over-time return lags the underlying."
+        )
+    else:
+        _capture_caption_pieces.append(
+            f"Up: {_up:.0f}%, Down: {_dn:.0f}% ({cap_info['n_up_days']} up / "
+            f"{cap_info['n_down_days']} down days)."
+        )
+
+if _capture_caption_pieces:
+    st.caption(" · ".join(_capture_caption_pieces))
+
 # Count how many ETFs share this fund's category so the user knows
 # why the forward estimate clusters with its category peers.
 _cat = etf.get("category", "")

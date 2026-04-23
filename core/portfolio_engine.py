@@ -611,6 +611,116 @@ def compute_portfolio_metrics(
     }
 
 
+def optimize_min_variance(
+    holdings: list[dict],
+    target_return_pct: float | None = None,
+    max_single_position_pct: float = 30.0,
+) -> dict:
+    """
+    Mean-Variance Optimization (Markowitz 1952) — partner feedback
+    #7: "reduce risk while maintaining the same or similar return."
+
+    Given the CURRENT basket (same tickers, same category weights'
+    constituents), solve for the weight vector that MINIMIZES
+    portfolio variance subject to:
+        1. weights sum to 1
+        2. each weight in [0, max_single_position_pct / 100]
+        3. portfolio expected return >= target_return_pct (if given);
+           default is the current weighted return.
+
+    Returns a dict with:
+        "optimized_weights":   {ticker: pct} — new allocation
+        "original_vol_pct":    float — portfolio σ under current weights
+        "optimized_vol_pct":   float — portfolio σ under optimized weights
+        "vol_reduction_pct":   float — (original - optimized) / original × 100
+        "expected_return_pct": float — met target
+        "status":              "optimal" | "infeasible" | "unchanged"
+
+    Uses scipy.optimize.minimize with SLSQP. Covariance matrix is the
+    same pairwise one that compute_portfolio_metrics uses, so math
+    is internally consistent.
+    """
+    if not holdings or len(holdings) < 2:
+        return {"status": "unchanged",
+                "reason": "need at least 2 holdings to optimize"}
+
+    import numpy as _np
+    try:
+        from scipy.optimize import minimize
+    except ImportError:
+        return {"status": "infeasible",
+                "reason": "scipy not available at runtime"}
+
+    n = len(holdings)
+    w_current = _np.array([h["weight_pct"] / 100.0 for h in holdings])
+    returns = _np.array([h["expected_return_pct"] for h in holdings], dtype=float)
+    cov = _build_covariance_matrix(holdings)
+
+    def _portfolio_variance(w: _np.ndarray) -> float:
+        return float(w @ cov @ w)
+
+    def _portfolio_return(w: _np.ndarray) -> float:
+        return float(w @ returns)
+
+    # Current-state benchmarks
+    current_vol = math.sqrt(max(_portfolio_variance(w_current), 0))
+    current_return = _portfolio_return(w_current)
+
+    # If no target given, use the current portfolio return as the
+    # constraint — "same return, lower vol."
+    target = target_return_pct if target_return_pct is not None else current_return
+
+    w_max = max_single_position_pct / 100.0
+    bounds = [(0.0, w_max) for _ in range(n)]
+    constraints = [
+        {"type": "eq", "fun": lambda w: float(_np.sum(w) - 1.0)},
+        {"type": "ineq", "fun": lambda w, t=target: _portfolio_return(w) - t},
+    ]
+
+    try:
+        result = minimize(
+            _portfolio_variance,
+            w_current,
+            method="SLSQP",
+            bounds=bounds,
+            constraints=constraints,
+            options={"maxiter": 200, "ftol": 1e-8},
+        )
+    except Exception as exc:  # pragma: no cover — defensive
+        return {"status": "infeasible", "reason": f"solver error: {exc}"}
+
+    if not result.success:
+        return {"status": "infeasible",
+                "reason": result.message or "SLSQP did not converge",
+                "original_vol_pct":    round(current_vol, 3),
+                "expected_return_pct": round(current_return, 3)}
+
+    w_opt = _np.clip(result.x, 0.0, w_max)
+    # Re-normalize in case the solver drifts fractionally.
+    w_opt = w_opt / max(_np.sum(w_opt), 1e-9)
+
+    opt_vol = math.sqrt(max(float(w_opt @ cov @ w_opt), 0))
+    opt_return = float(w_opt @ returns)
+
+    optimized_weights = {
+        holdings[i]["ticker"]: round(float(w_opt[i]) * 100.0, 3)
+        for i in range(n)
+    }
+
+    reduction = (current_vol - opt_vol) / current_vol * 100.0 if current_vol > 0 else 0.0
+
+    return {
+        "status":               "optimal",
+        "optimized_weights":    optimized_weights,
+        "original_vol_pct":     round(current_vol, 3),
+        "optimized_vol_pct":    round(opt_vol, 3),
+        "vol_reduction_pct":    round(reduction, 2),
+        "expected_return_pct":  round(opt_return, 3),
+        "target_return_pct":    round(target, 3),
+        "n_holdings":           n,
+    }
+
+
 def _empty_metrics() -> dict:
     return {
         "weighted_return_pct": 0, "annual_return_usd": 0, "monthly_income_usd": 0,

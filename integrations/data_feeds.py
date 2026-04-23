@@ -358,6 +358,119 @@ def get_historical_cagr(ticker: str, period: str = "5y") -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Premium / discount to NAV — partner feedback #4 (Apr 2026)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def get_premium_discount_pct(ticker: str) -> dict:
+    """
+    Fetch the current market-price-vs-NAV premium/discount for an ETF.
+
+    Returns:
+        {"premium_discount_pct": float|None,
+         "nav": float|None, "market_price": float|None,
+         "source": str}
+
+    Positive number = market trades above NAV (premium).
+    Negative number = market trades below NAV (discount).
+    For spot BTC/ETH ETFs with efficient AP arbitrage, |prem/disc|
+    should stay < 0.5% during market hours. GBTC's notorious 40%+
+    discount in 2022 is the tail-risk case this metric surfaces.
+
+    Source priority:
+        1. yfinance Ticker.info["navPrice"] (free, no key)
+        2. None if unavailable — caller shows "—"
+    """
+    try:
+        import yfinance as yf
+        info = yf.Ticker(ticker).info or {}
+        nav = info.get("navPrice") or info.get("nav")
+        # Market price: use previous close as a stable anchor so the
+        # premium reading doesn't jitter intraday with every tick.
+        market = info.get("previousClose") or info.get("regularMarketPrice")
+        if nav is None or market is None or nav <= 0:
+            return {"premium_discount_pct": None, "nav": None,
+                    "market_price": None, "source": "unavailable"}
+        pd_pct = ((float(market) - float(nav)) / float(nav)) * 100.0
+        return {"premium_discount_pct": round(pd_pct, 3),
+                "nav": float(nav),
+                "market_price": float(market),
+                "source": "yfinance_info"}
+    except Exception as exc:
+        logger.info("premium/discount fetch failed for %s: %s", ticker, exc)
+        return {"premium_discount_pct": None, "nav": None,
+                "market_price": None, "source": "unavailable"}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Upside / downside capture vs underlying — partner feedback #5
+# ═══════════════════════════════════════════════════════════════════════════
+
+def get_capture_ratios(
+    ticker: str,
+    underlying_symbol: str = "BTC-USD",
+    lookback_days: int = 252,
+) -> dict:
+    """
+    Classic Morningstar-style capture ratios vs the ETF's underlying
+    coin. Classify each trading day by sign of the underlying's
+    return; then:
+
+        up_capture   = Σ(fund_ret_on_up_days)   / Σ(underlying_ret_on_up_days)
+        down_capture = Σ(fund_ret_on_down_days) / Σ(underlying_ret_on_down_days)
+
+    A well-tracking spot ETF (IBIT, FBTC) should land near 99/99.
+    A futures-based ETF (BITO) typically shows up-capture < 95%
+    because contango erodes on the way up. A 2x leveraged ETF
+    (BITX, ETHU) should show both > 150% with vol-decay slippage.
+
+    Returns:
+        {"up_capture_pct": float|None, "down_capture_pct": float|None,
+         "n_up_days": int, "n_down_days": int,
+         "source": str, "underlying": str}
+    """
+    import math
+    period = f"{max(60, int(lookback_days * 1.25))}d"
+    fund_bundle  = get_etf_prices([ticker], period=period, interval="1d")
+    under_bundle = get_etf_prices([underlying_symbol], period=period, interval="1d")
+    fund_entry  = fund_bundle.get(ticker, {}) or {}
+    under_entry = under_bundle.get(underlying_symbol, {}) or {}
+
+    ret_f, ret_u = _aligned_log_returns(fund_entry, under_entry)
+    # Trim to the trailing lookback_days window
+    ret_f = ret_f[-lookback_days:]
+    ret_u = ret_u[-lookback_days:]
+
+    if len(ret_f) < _MIN_RETURNS_FOR_STATS or len(ret_u) < _MIN_RETURNS_FOR_STATS:
+        return {"up_capture_pct": None, "down_capture_pct": None,
+                "n_up_days": 0, "n_down_days": 0,
+                "source": fund_entry.get("source", "unavailable"),
+                "underlying": underlying_symbol}
+
+    sum_f_up, sum_u_up, n_up = 0.0, 0.0, 0
+    sum_f_dn, sum_u_dn, n_dn = 0.0, 0.0, 0
+    for fr, ur in zip(ret_f, ret_u):
+        if ur > 0:
+            sum_f_up += fr
+            sum_u_up += ur
+            n_up += 1
+        elif ur < 0:
+            sum_f_dn += fr
+            sum_u_dn += ur
+            n_dn += 1
+
+    up_cap = (sum_f_up / sum_u_up * 100.0) if sum_u_up > 1e-9 else None
+    dn_cap = (sum_f_dn / sum_u_dn * 100.0) if sum_u_dn < -1e-9 else None
+    return {
+        "up_capture_pct":   round(up_cap, 1) if up_cap is not None else None,
+        "down_capture_pct": round(dn_cap, 1) if dn_cap is not None else None,
+        "n_up_days":   n_up,
+        "n_down_days": n_dn,
+        "source":     fund_entry.get("source", "unavailable"),
+        "underlying": underlying_symbol,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Realized volatility + BTC correlation (Q2 — live ETF analytics)
 # ═══════════════════════════════════════════════════════════════════════════
 #

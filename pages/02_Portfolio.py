@@ -282,15 +282,37 @@ with card("Allocation"):
         )
     st.plotly_chart(fig, width="stretch")
 
-    display_cols = ["ticker", "name", "issuer", "category", "weight_pct", "usd_value"]
+    # Add per-ETF risk columns (partner feedback #6: "add standard
+    # deviation calculation for each ETF in the portfolio"). Also
+    # surface correlation-with-BTC so the FA sees WHY the covariance
+    # matrix matters — two high-vol ETFs with high cross-correlation
+    # contribute more portfolio risk than the raw weighted-σ average.
+    display_cols = [
+        "ticker", "name", "issuer", "category",
+        "weight_pct", "usd_value",
+        "volatility_pct", "correlation_with_btc",
+    ]
     _alloc_view = alloc_df[display_cols].reset_index(drop=True)
     _alloc_event = st.dataframe(
         _alloc_view,
         width="stretch",
         hide_index=True,
         column_config={
-            "weight_pct": st.column_config.NumberColumn("Weight %", format="%.2f"),
-            "usd_value":  st.column_config.NumberColumn("USD", format="$%,.0f"),
+            "weight_pct":           st.column_config.NumberColumn("Weight %", format="%.2f"),
+            "usd_value":            st.column_config.NumberColumn("USD", format="$%,.0f"),
+            "volatility_pct":       st.column_config.NumberColumn(
+                "σ (ann.)",
+                format="%.1f%%",
+                help="Annualized realized volatility — standard deviation "
+                     "of daily log returns × √252. Computed from 90 trading "
+                     "days of live price history.",
+            ),
+            "correlation_with_btc": st.column_config.NumberColumn(
+                "Corr w/BTC",
+                format="%.2f",
+                help="90-day Pearson correlation of daily log returns vs. "
+                     "IBIT (BTC proxy). 1.0 = moves in lockstep with BTC.",
+            ),
         },
         on_select="rerun",
         selection_mode="single-row",
@@ -321,6 +343,84 @@ with card("Allocation"):
                 st.session_state["_last_alloc_nav_ticker"] = _chosen_ticker
                 st.session_state["selected_etf_ticker"] = _chosen_ticker
                 st.switch_page("pages/03_ETF_Detail.py")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Risk-optimized allocation (MVO) — partner feedback #7:
+# "how can we constantly try to reduce risk but maintain the same return?"
+# ═══════════════════════════════════════════════════════════════════════════
+
+with card("Risk-optimized allocation"):
+    st.caption(level_text(
+        beginner=(
+            "Same expected return, less risk. This runs a mean-variance "
+            "optimization to find the weights that minimize portfolio "
+            "volatility while holding expected return at or above the "
+            "current level. Click to see what the math recommends."
+        ),
+        intermediate=(
+            "Markowitz mean-variance optimization: minimize w·Σ·w "
+            "subject to w·r ≥ current return, weights sum to 1, "
+            "single-position cap 30%. Current category selection is "
+            "preserved — only the weights shift."
+        ),
+        advanced=(
+            "SLSQP solver on the 28-entry pairwise covariance Σ + "
+            "same expected-return vector used by compute_portfolio_metrics. "
+            "Floors at 0, ceilings at MAX_SINGLE_POSITION_PCT=30%. "
+            "Diff vs. current weights surfaced as a side-by-side table."
+        ),
+    ))
+    if st.button("Optimize — minimize risk at current return",
+                 type="primary", width="content"):
+        from core.portfolio_engine import optimize_min_variance
+        with st.spinner("Solving mean-variance optimization…"):
+            opt = optimize_min_variance(holdings)
+        if opt["status"] == "optimal":
+            import pandas as _pd
+            diff_rows = []
+            for h in holdings:
+                tkr = h["ticker"]
+                old_w = h["weight_pct"]
+                new_w = opt["optimized_weights"].get(tkr, 0.0)
+                diff_rows.append({
+                    "Ticker": tkr,
+                    "Current weight":   old_w,
+                    "Optimized weight": new_w,
+                    "Δ":                round(new_w - old_w, 2),
+                })
+            diff_df = _pd.DataFrame(diff_rows)
+            st.dataframe(
+                diff_df,
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "Current weight":   st.column_config.NumberColumn(format="%.2f%%"),
+                    "Optimized weight": st.column_config.NumberColumn(format="%.2f%%"),
+                    "Δ":                st.column_config.NumberColumn(format="%+.2f%%"),
+                },
+            )
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                kpi_tile("Vol reduction", f"{opt['vol_reduction_pct']:.2f}%")
+            with c2:
+                kpi_tile("Original σ",  f"{opt['original_vol_pct']:.1f}%")
+            with c3:
+                kpi_tile("Optimized σ", f"{opt['optimized_vol_pct']:.1f}%")
+            st.caption(
+                f"Expected return held at {opt['expected_return_pct']:.2f}% "
+                f"(target ≥ {opt['target_return_pct']:.2f}%). "
+                f"This is a suggestion, not a re-allocation — review against "
+                f"your client's IPS before executing."
+            )
+        elif opt["status"] == "unchanged":
+            st.info(opt.get("reason", "No optimization possible on this basket."))
+        else:
+            st.warning(
+                f"Solver could not find a feasible improvement — "
+                f"{opt.get('reason', 'unknown')}. Current allocation is "
+                f"likely already near the efficient frontier for this tier."
+            )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
