@@ -138,40 +138,60 @@ PORTFOLIO_TIERS: dict[str, dict] = {
         "tier_number": 1,
         "ceiling_pct": 5,
         "rebalance": "quarterly",
-        "typical_client": "retiree or explicitly risk-averse",
-        "focus": "lowest-expense BTC spot ETFs (IBIT, FBTC, BITB)",
+        "risk_tolerance": "Low",
+        "time_horizon": "Short (< 3 years)",
+        "volatility_tolerance": "Low",
+        "loss_tolerance": "Cannot afford material losses",
+        "typical_client": "Retirees, near-retirement, capital-preservation-first clients",
+        "focus": "Largest-AUM, lowest-expense BTC spot ETFs + vol-dampened income overlay",
         "max_drawdown_pct": 15,
     },
     "Conservative": {
         "tier_number": 2,
         "ceiling_pct": 10,
         "rebalance": "quarterly",
-        "typical_client": "near-retirement, diversification allocation",
-        "focus": "BTC-heavy mix with ETH allocation starting",
+        "risk_tolerance": "Below average",
+        "time_horizon": "3-7 years",
+        "volatility_tolerance": "Low to moderate",
+        "loss_tolerance": "Small losses tolerable, large losses not",
+        "typical_client": "Near-retirement, risk-averse mid-career, conservative accumulators",
+        "focus": "BTC-dominant core + small ETH sleeve + income overlay for volatility dampening",
         "max_drawdown_pct": 25,
     },
     "Moderate": {
         "tier_number": 3,
         "ceiling_pct": 20,
         "rebalance": "bi-monthly",
-        "typical_client": "mid-career, moderate risk tolerance",
-        "focus": "balanced BTC/ETH across multiple issuers",
+        "risk_tolerance": "Average",
+        "time_horizon": "7-15 years",
+        "volatility_tolerance": "Moderate",
+        "loss_tolerance": "Accepts 20-30% drawdowns for long-run upside",
+        "typical_client": "Mid-career accumulators with balanced risk profiles",
+        "focus": "Balanced BTC/ETH core + covered-call income sleeve",
         "max_drawdown_pct": 40,
     },
     "Aggressive": {
         "tier_number": 4,
         "ceiling_pct": 35,
         "rebalance": "monthly",
-        "typical_client": "younger, higher risk tolerance, longer horizon",
-        "focus": "BTC + ETH + emerging thematic ETFs",
+        "risk_tolerance": "Above average",
+        "time_horizon": "15-25 years",
+        "volatility_tolerance": "High",
+        "loss_tolerance": "Accepts 40%+ drawdowns for long-run growth",
+        "typical_client": "Younger high-income accumulators, long horizons, diversification-seekers",
+        "focus": "BTC + ETH + altcoin spot + income wrappers",
         "max_drawdown_pct": 55,
     },
     "Ultra Aggressive": {
         "tier_number": 5,
         "ceiling_pct": 50,
         "rebalance": "bi-weekly",
-        "typical_client": "high-conviction crypto allocator",
-        "focus": "max diversification across all approved crypto ETFs",
+        "risk_tolerance": "High",
+        "time_horizon": "25+ years",
+        "volatility_tolerance": "Very high",
+        "loss_tolerance": "Can afford material drawdowns; high-conviction allocation",
+        "typical_client": "Long-horizon high-conviction crypto allocators, family-office high-risk sleeves",
+        "focus": "Full-spectrum exposure: BTC + ETH + altcoin + thematic equity + small leveraged + income",
         "max_drawdown_pct": 70,
     },
 }
@@ -211,12 +231,22 @@ ETF_UNIVERSE_SEED: list[dict[str, str]] = [
 ]
 
 # ── Benchmark for backtest comparisons (CLAUDE.md §22 item 5) ─────────────────
-# Blended 60/40 equity/bond index + BTC spot sleeve.
+# The "advisor with a 20% crypto sleeve" baseline. Carves a 20% crypto
+# allocation OUT of an 80% traditional 60/40. Component math:
+#   SPY  = 60% × 80% = 48% of portfolio (equities)
+#   AGG  = 40% × 80% = 32% of portfolio (bonds)
+#   IBIT = 20% × 100% = 20% of portfolio (BTC spot)
+#   --------------------------------------
+#   Total: 48 + 32 + 20 = 100% — DOES NOT sum above capital.
+# Prior label ("60/40 + 20% BTC") was misleading — could be read as
+# 60 + 40 + 20 = 120%. Relabeled for clarity per FA feedback.
 BENCHMARK_DEFAULT: dict[str, float] = {
-    "SPY": 0.48,    # 60% of 80% = equity
-    "AGG": 0.32,    # 40% of 80% = bonds
-    "IBIT": 0.20,   # 20% BTC spot sleeve
+    "SPY":  0.48,   # equities — 60% of the 80% traditional sleeve
+    "AGG":  0.32,   # bonds — 40% of the 80% traditional sleeve
+    "IBIT": 0.20,   # BTC spot — the 20% crypto sleeve that
+                    # replaces traditional exposure
 }
+BENCHMARK_LABEL: str = "80% traditional 60/40 (equity/bonds) + 20% BTC spot sleeve"
 
 # ── Rate limits ──────────────────────────────────────────────────────────────
 EDGAR_REQS_PER_SEC: int = 10              # SEC hard cap

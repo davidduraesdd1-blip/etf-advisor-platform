@@ -61,8 +61,12 @@ if not DEMO_MODE:
     )
     st.stop()
 
-# Top-of-page data-source audit panel (Option 3).
-data_sources_panel(key="ds_panel_portfolio")
+# Data-source panel intentionally omitted from decision-making pages
+# per FA feedback — advisors prioritize accurate numbers over data
+# provenance at the point of client recommendation. Full panel is on
+# the Settings page for operator audit. Tile-level transparency
+# (data_source_badge on each KPI) still surfaces any active fallback
+# exactly where it affects the number the FA is reading.
 
 default_id = st.session_state.get("active_client_id", DEMO_CLIENTS[0]["id"])
 options = {f"{c['name']} — {c['label']}": c["id"] for c in DEMO_CLIENTS}

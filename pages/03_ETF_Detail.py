@@ -45,8 +45,10 @@ section_header(
     ),
 )
 
-# Top-of-page data-source audit panel (Option 3).
-data_sources_panel(key="ds_panel_etf_detail")
+# Data-source panel intentionally omitted on research pages per FA
+# feedback. Tile-level `data_source_badge` calls still surface any
+# active fallback exactly where it affects the number. Full stack
+# audit available on Settings.
 
 @st.cache_data(ttl=600)
 def _universe_with_live_analytics_cached() -> list[dict]:

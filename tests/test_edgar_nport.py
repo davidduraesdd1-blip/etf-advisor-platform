@@ -142,11 +142,20 @@ class TestSpotTrustCompositionPath:
         assert "Coinbase" in comp["custodian"]
         assert comp["issuer_holdings_url"].startswith("https://")
 
-    def test_feth_mentions_staking_enabled(self):
+    def test_feth_honestly_labels_no_staking(self):
+        """
+        Audit 2026-04-22: FETH does NOT stake per primary-source
+        research (Fidelity self-custodies but hasn't enabled staking).
+        Previous test asserted staking WAS enabled — wrong.
+        """
         comp = self._call_real("FETH")
         assert comp["supported"] is True
         assert comp["holdings"][0]["name"] == "Ethereum"
-        assert "staking" in comp["note"].lower()
+        # Note should NOT claim staking is distributed (it isn't).
+        # The honest note explains the status.
+        assert "does not stake" in comp["note"].lower() \
+            or "staking" not in comp["note"].lower() \
+            or "forgoes" in comp["note"].lower()
 
     def test_gbtc_high_fee_trust_still_in_registry(self):
         comp = self._call_real("GBTC")

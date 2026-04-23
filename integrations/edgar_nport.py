@@ -100,17 +100,41 @@ _TRUST_COMPOSITIONS: dict[str, dict] = {
              "custodian": "Coinbase Custody Trust Company, LLC",
              "issuer_holdings_url": "https://www.grayscale.com/funds/grayscale-bitcoin-trust"},
 
+    # Staking-flag accuracy note (audit 2026-04-22, research-verified):
+    # SEC approved ETH ETF staking Feb 2026, but not every issuer has
+    # turned it on. Per factsheet research:
+    #   - FETH: DOES NOT stake — Fidelity self-custodies via Fidelity
+    #           Digital Assets but has not enabled staking as of Q1
+    #           2026 (forgoes ~300bps/yr native ETH yield).
+    #   - ETHA: filings permit staking; confirmation not yet surfaced
+    #           on BlackRock's product page — flip to False until
+    #           directly verified (live-first directive).
+    #   - ETH (Grayscale Mini), QETH, EZET: same — flagged False
+    #           pending primary-source confirmation.
+    # The nightly cron should eventually verify per-issuer and flip True
+    # when confirmed. Until then: conservative / honest default.
     "ETHA": {"underlying": "Ethereum", "coin_pct": 99.0, "cash_pct": 1.0,
              "custodian": "Coinbase Custody Trust Company, LLC",
-             "staking_enabled": True,
+             "staking_enabled": False,
+             "staking_note": "SEC approved ETH ETF staking Feb 2026. "
+                             "BlackRock has not publicly confirmed staking "
+                             "is live on ETHA. Flag will flip to True when "
+                             "confirmed from primary source.",
              "issuer_holdings_url": "https://www.ishares.com/us/products/337614/ishares-ethereum-trust"},
     "FETH": {"underlying": "Ethereum", "coin_pct": 99.0, "cash_pct": 1.0,
              "custodian": "Fidelity Digital Asset Services, LLC",
-             "staking_enabled": True,
+             "staking_enabled": False,
+             "staking_note": "FETH does NOT stake. Fidelity self-custodies "
+                             "via Fidelity Digital Assets but has not "
+                             "enabled staking as of Q1 2026. Forgoes "
+                             "~300bps/yr native ETH yield vs. staking-"
+                             "enabled alternatives.",
              "issuer_holdings_url": "https://institutional.fidelity.com/app/funds-and-products/etp/summary/feth.html"},
     "ETH":  {"underlying": "Ethereum", "coin_pct": 99.0, "cash_pct": 1.0,
              "custodian": "Coinbase Custody Trust Company, LLC",
-             "staking_enabled": True,
+             "staking_enabled": False,
+             "staking_note": "Grayscale Ethereum Mini Trust — staking "
+                             "status not confirmed from primary source.",
              "issuer_holdings_url": "https://www.grayscale.com/funds/grayscale-ethereum-mini-trust"},
     "ETHE": {"underlying": "Ethereum", "coin_pct": 99.0, "cash_pct": 1.0,
              "custodian": "Coinbase Custody Trust Company, LLC",
@@ -123,11 +147,15 @@ _TRUST_COMPOSITIONS: dict[str, dict] = {
              "issuer_holdings_url": "https://www.21shares.com/us/en/products/ceth"},
     "QETH": {"underlying": "Ethereum", "coin_pct": 99.0, "cash_pct": 1.0,
              "custodian": "Coinbase Custody Trust Company, LLC",
-             "staking_enabled": True,
+             "staking_enabled": False,
+             "staking_note": "Invesco Galaxy ETH ETF — staking status not "
+                             "confirmed from primary source.",
              "issuer_holdings_url": "https://www.invesco.com/us/financial-products/etfs/product-detail?audienceType=Investor&ticker=QETH"},
     "EZET": {"underlying": "Ethereum", "coin_pct": 99.0, "cash_pct": 1.0,
              "custodian": "Coinbase Custody Trust Company, LLC",
-             "staking_enabled": True,
+             "staking_enabled": False,
+             "staking_note": "Franklin ETH ETF — staking status not "
+                             "confirmed from primary source.",
              "issuer_holdings_url": "https://www.franklintempleton.com/investments/options/exchange-traded-funds/products/39640/SINGLCLASS/franklin-ethereum-etf/EZET"},
     "BTCW": {"underlying": "Bitcoin", "coin_pct": 99.5, "cash_pct": 0.5,
              "custodian": "Coinbase Custody Trust Company, LLC",
@@ -393,10 +421,15 @@ def get_etf_composition(ticker: str) -> dict:
                 "pct_value": spec["cash_pct"],
             },
         ]
-        staking_note = (
-            " Staking yield is distributed to shareholders (SEC-approved Feb 2026)."
-            if spec.get("staking_enabled") else ""
-        )
+        if spec.get("staking_enabled"):
+            staking_note = (
+                " Staking yield is distributed to shareholders "
+                "(SEC-approved Feb 2026, verified live)."
+            )
+        elif spec.get("staking_note"):
+            staking_note = f" {spec['staking_note']}"
+        else:
+            staking_note = ""
         register_fetch_attempt(
             category, "issuer_static", success=True,
             note=f"{spec['underlying']} spot trust (curated composition)",

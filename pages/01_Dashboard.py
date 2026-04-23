@@ -52,11 +52,10 @@ try:
 except Exception:
     pass   # Seed failure is not demo-blocking
 
-# Top-of-page data-source audit panel (Option 3 transparency).
-# Collapsed by default — the FA expands when they want the stack
-# view. Renders an amber summary when anything is in fallback so
-# fallback state is impossible to miss even when collapsed.
-data_sources_panel(key="ds_panel_dashboard")
+# Data-source panel intentionally omitted on Dashboard per FA feedback
+# 2026-04-22: "no FA actually cares where the data is coming from so
+# long as it's correct." Panel available on Settings for operator
+# audit. Function stays in ui/components.py for reuse.
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Live per-client metrics — Q5. Each client's numbers are derived from
