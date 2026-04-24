@@ -317,3 +317,248 @@ def safe_page_link(page: str, label: str, icon: str | None = None) -> None:
         st.caption(f"{icon or '→'} {label} — `{page}`")
     except Exception:
         st.caption(f"→ {label}")
+
+
+# ── DV-2 compliance helper (CLAUDE.md §22 item 5) ───────────────────────
+#
+# Every performance display must include: 1Y / 3Y / 5Y / since-inception
+# returns, benchmark comparison, max drawdown, "Hypothetical results"
+# disclaimer, and methodology link. This helper renders the first four.
+# Disclaimer and methodology link remain the caller's responsibility.
+#
+# Added 2026-04-23 for DV-2. See shared-docs/deployment-checklists/
+# etf-advisor-platform.md item C1 and pending_work.md DV-2 for context.
+
+def _ps_simple_return_pct(closes: list[float], n_days: int) -> float | None:
+    if len(closes) <= n_days:
+        return None
+    start = closes[-n_days - 1] if n_days > 0 else closes[0]
+    end = closes[-1]
+    if start <= 0:
+        return None
+    return ((end / start) - 1.0) * 100.0
+
+
+def _ps_cagr_pct(closes: list[float], n_calendar_days: int) -> float | None:
+    """Annualized return from first to last close. n_calendar_days used to
+    derive the elapsed time; if ambiguous, falls back to len(closes) * 365/252."""
+    if len(closes) < 30:
+        return None
+    start = closes[0]
+    end = closes[-1]
+    if start <= 0 or end <= 0:
+        return None
+    years = n_calendar_days / 365.25 if n_calendar_days >= 30 else (len(closes) * 365.25 / 252) / 365.25
+    if years < (30 / 365.25):
+        return None
+    try:
+        ratio = end / start
+        if ratio <= 0:
+            return None
+        return ((ratio ** (1.0 / years)) - 1.0) * 100.0
+    except (ValueError, ZeroDivisionError, OverflowError):
+        return None
+
+
+def _ps_max_drawdown_pct(closes: list[float]) -> float | None:
+    """Peak-to-trough drawdown over the series. Returns a non-positive %, or None."""
+    if not closes:
+        return None
+    peak = closes[0]
+    max_dd = 0.0
+    for c in closes:
+        if c > peak:
+            peak = c
+        if peak > 0:
+            dd = (c / peak) - 1.0
+            if dd < max_dd:
+                max_dd = dd
+    return max_dd * 100.0
+
+
+def _ps_fmt_pct(val: float | None, fallback_years_needed: int | None = None) -> str:
+    if val is None:
+        if fallback_years_needed:
+            return f"N/A (<{fallback_years_needed}Y hist)"
+        return "—"
+    return f"{val:+.2f}%"
+
+
+def _ps_fmt_dd(val: float | None) -> str:
+    if val is None:
+        return "—"
+    return f"{val:+.2f}%"
+
+
+def _ps_row(ticker: str, source: str, price_rows: list[dict]) -> dict:
+    """Build one display row from a (source, price_rows) pair. Robust to None / empty."""
+    import pandas as pd
+
+    if not price_rows:
+        return {
+            "ticker":            ticker,
+            "source":            source or "unavailable",
+            "inception":         "—",
+            "1Y %":              _ps_fmt_pct(None, fallback_years_needed=1),
+            "3Y %":              _ps_fmt_pct(None, fallback_years_needed=3),
+            "5Y %":              _ps_fmt_pct(None, fallback_years_needed=5),
+            "since-inception %": "—",
+            "max drawdown %":    "—",
+        }
+
+    df = pd.DataFrame(price_rows)
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.sort_values("date").reset_index(drop=True)
+    closes = [float(c) for c in df["close"].astype(float).tolist() if c and c > 0]
+    if not closes:
+        return _ps_row(ticker, source, [])
+
+    inception_date = df["date"].iloc[0].strftime("%Y-%m-%d")
+    n_calendar_days = int((df["date"].iloc[-1] - df["date"].iloc[0]).days)
+
+    return {
+        "ticker":            ticker,
+        "source":            source or "unavailable",
+        "inception":         inception_date,
+        "1Y %":              _ps_fmt_pct(_ps_simple_return_pct(closes, 252), fallback_years_needed=1),
+        "3Y %":              _ps_fmt_pct(_ps_simple_return_pct(closes, 252 * 3), fallback_years_needed=3),
+        "5Y %":              _ps_fmt_pct(_ps_simple_return_pct(closes, 252 * 5), fallback_years_needed=5),
+        "since-inception %": _ps_fmt_pct(_ps_cagr_pct(closes, n_calendar_days)),
+        "max drawdown %":    _ps_fmt_dd(_ps_max_drawdown_pct(closes)),
+    }
+
+
+def _ps_blended_benchmark_row(
+    benchmark_weights: dict[str, float],
+    benchmark_price_data: dict[str, dict],
+    label: str,
+) -> dict:
+    """
+    Synthetic blended benchmark row. Component returns weighted by the
+    provided weights dict. Uses static weights (no daily rebalancing) —
+    close enough for advisor-facing display per §22 item 5; exact
+    rebalancing model documented on the Methodology page.
+    """
+    import pandas as pd
+
+    # Compute each component's series + returns. Skip missing components;
+    # normalize remaining weights so the row still renders something useful.
+    component_series: dict[str, tuple[list[float], int]] = {}
+    usable_weights: dict[str, float] = {}
+    for ticker, weight in benchmark_weights.items():
+        entry = benchmark_price_data.get(ticker, {}) or {}
+        rows = entry.get("prices", []) or []
+        if not rows:
+            continue
+        df = pd.DataFrame(rows)
+        df["date"] = pd.to_datetime(df["date"])
+        df = df.sort_values("date").reset_index(drop=True)
+        closes = [float(c) for c in df["close"].astype(float).tolist() if c and c > 0]
+        if not closes:
+            continue
+        n_days = int((df["date"].iloc[-1] - df["date"].iloc[0]).days)
+        component_series[ticker] = (closes, n_days)
+        usable_weights[ticker] = weight
+
+    if not component_series:
+        return {
+            "ticker":            f"Benchmark ({label})",
+            "source":            "unavailable",
+            "inception":         "—",
+            "1Y %":              "—",
+            "3Y %":              "—",
+            "5Y %":              "—",
+            "since-inception %": "—",
+            "max drawdown %":    "—",
+        }
+
+    total_w = sum(usable_weights.values())
+    norm_w = {t: w / total_w for t, w in usable_weights.items()}
+
+    def _weighted(method_horizon: int | None, is_cagr: bool = False, is_dd: bool = False) -> float | None:
+        acc = 0.0
+        total = 0.0
+        for ticker, (closes, n_days) in component_series.items():
+            if is_dd:
+                val = _ps_max_drawdown_pct(closes)
+            elif is_cagr:
+                val = _ps_cagr_pct(closes, n_days)
+            else:
+                val = _ps_simple_return_pct(closes, method_horizon or 0)
+            if val is None:
+                continue
+            acc += norm_w[ticker] * val
+            total += norm_w[ticker]
+        return (acc / total) if total > 0 else None
+
+    return {
+        "ticker":            f"Benchmark ({label})",
+        "source":            "blended",
+        "inception":         "—",
+        "1Y %":              _ps_fmt_pct(_weighted(252), fallback_years_needed=1),
+        "3Y %":              _ps_fmt_pct(_weighted(252 * 3), fallback_years_needed=3),
+        "5Y %":              _ps_fmt_pct(_weighted(252 * 5), fallback_years_needed=5),
+        "since-inception %": _ps_fmt_pct(_weighted(None, is_cagr=True)),
+        "max drawdown %":    _ps_fmt_dd(_weighted(None, is_dd=True)),
+    }
+
+
+def performance_summary_table(
+    tickers: list[str],
+    price_data: dict[str, dict],
+    benchmark_weights: dict[str, float] | None = None,
+    benchmark_label: str | None = None,
+    benchmark_price_data: dict[str, dict] | None = None,
+):
+    """
+    Compliance-complete performance summary per CLAUDE.md §22 item 5.
+
+    Returns a pandas DataFrame with columns:
+      ticker · source · inception · 1Y % · 3Y % · 5Y % · since-inception % · max drawdown %
+
+    Cells are pre-formatted strings. Returns too short show
+    "N/A (<N>Y hist)" instead of blank/None so FAs can see *why* a cell
+    is empty (fund too new) vs. a data-fetch failure.
+
+    If benchmark_weights + benchmark_price_data are both provided, appends
+    one blended benchmark row at the bottom labeled
+    "Benchmark (<benchmark_label>)". Benchmark uses static weights (no
+    daily rebalancing); documented limitation per Methodology page.
+
+    Parameters
+    ----------
+    tickers : list[str]
+        ETF tickers to include, in display order.
+    price_data : dict[str, dict]
+        Output of integrations.data_feeds.get_etf_prices(tickers, period="5y").
+    benchmark_weights : dict[str, float] | None
+        e.g. config.BENCHMARK_DEFAULT. Component ticker → weight (sums to 1.0).
+    benchmark_label : str | None
+        Human-readable label, e.g. config.BENCHMARK_LABEL.
+    benchmark_price_data : dict[str, dict] | None
+        Price-data bundle for the benchmark components (fetched separately
+        via get_etf_prices(list(benchmark_weights.keys()), period="5y")).
+
+    Returns
+    -------
+    pandas.DataFrame
+    """
+    import pandas as pd
+
+    rows: list[dict] = []
+    for ticker in tickers:
+        entry = price_data.get(ticker, {}) or {}
+        rows.append(_ps_row(
+            ticker=ticker,
+            source=entry.get("source", "unavailable"),
+            price_rows=entry.get("prices", []) or [],
+        ))
+
+    if benchmark_weights and benchmark_price_data and benchmark_label:
+        rows.append(_ps_blended_benchmark_row(
+            benchmark_weights=benchmark_weights,
+            benchmark_price_data=benchmark_price_data,
+            label=benchmark_label,
+        ))
+
+    return pd.DataFrame(rows)

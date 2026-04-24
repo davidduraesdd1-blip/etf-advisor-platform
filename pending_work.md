@@ -35,7 +35,7 @@ Two real bugs found. Both are ⚠ non-blockers for the deploy itself
       `AppTest` runner; assert `user_level` value preserved.
     - Audit against §4 per §24 on commit.
 
-- [ ] **DV-2. Item C1 — Performance displays missing time horizons.**
+- [x] **DV-2. Item C1 — Performance displays missing time horizons.** (FIXED 2026-04-23, see MEMORY.md)
   CLAUDE.md §22 item 5 + §8: "Backtest performance displays ALWAYS
   include multiple time horizons (1Y, 3Y, 5Y, since-inception)."
   User walked and found not all four time horizons appear on every

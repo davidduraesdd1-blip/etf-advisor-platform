@@ -14,6 +14,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from config import (
+    BENCHMARK_DEFAULT,
+    BENCHMARK_LABEL,
     BRAND_NAME,
     DEMO_MODE,
     PORTFOLIO_TIERS,
@@ -26,6 +28,7 @@ from integrations.data_feeds import get_etf_prices, get_last_close
 from ui.components import (
     card,
     data_source_badge,
+    performance_summary_table,
     disclosure,
     kpi_tile,
     safe_page_link,
@@ -461,47 +464,37 @@ with card("Performance"):
         price_data = get_etf_prices(tickers, period="5y", interval="1d")
         data_source_badge(
             "etf_price",
-            consumer_label="1Y / 3Y / 5Y historical returns table",
+            consumer_label="1Y / 3Y / 5Y / since-inception historical returns table",
         )
 
-        rows = []
-        for h in holdings:
-            p = price_data.get(h["ticker"], {}).get("prices", [])
-            if not p:
-                rows.append({
-                    "ticker":      h["ticker"],
-                    "source":      price_data.get(h["ticker"], {}).get("source", "unavailable"),
-                    "1Y return %": None,
-                    "3Y return %": None,
-                    "5Y return %": None,
-                })
-                continue
-            df = pd.DataFrame(p)
-            df["date"] = pd.to_datetime(df["date"])
-            df = df.sort_values("date").reset_index(drop=True)
-            close = df["close"].astype(float)
+        # DV-2: fetch benchmark components so the helper can append a
+        # blended-benchmark row per CLAUDE.md §22 item 5.
+        bench_tickers = list(BENCHMARK_DEFAULT.keys())
+        benchmark_price_data = get_etf_prices(bench_tickers, period="5y", interval="1d")
 
-            def _ret(n_days: int) -> float | None:
-                if len(close) <= n_days:
-                    return None
-                start = close.iloc[-n_days]
-                end = close.iloc[-1]
-                if start <= 0:
-                    return None
-                return round(((end / start) - 1) * 100, 2)
+        hist_df = performance_summary_table(
+            tickers=tickers,
+            price_data=price_data,
+            benchmark_weights=BENCHMARK_DEFAULT,
+            benchmark_label=BENCHMARK_LABEL,
+            benchmark_price_data=benchmark_price_data,
+        )
 
-            rows.append({
-                "ticker":      h["ticker"],
-                "source":      price_data.get(h["ticker"], {}).get("source", "n/a"),
-                "1Y return %": _ret(252),
-                "3Y return %": _ret(252 * 3),
-                "5Y return %": _ret(252 * 5),
-            })
+        # Trigger the no-data fallback only if EVERY cell in EVERY horizon
+        # is a placeholder (em-dash or "N/A"). Real returns render as
+        # signed percent strings, e.g. "+30.25%".
+        has_any_return = any(
+            str(cell).endswith("%")
+            for col in ("1Y %", "3Y %", "5Y %", "since-inception %")
+            for cell in hist_df[col]
+        )
 
-        hist_df = pd.DataFrame(rows)
-        any_data = hist_df[["1Y return %", "3Y return %", "5Y return %"]].notna().any().any()
-        if any_data:
+        if has_any_return:
             st.dataframe(hist_df, width="stretch", hide_index=True)
+            st.caption(
+                "Benchmark: static-weight blend (no daily rebalancing). "
+                "Methodology page documents the simplification."
+            )
         else:
             st.info(
                 level_text(

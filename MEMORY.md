@@ -100,3 +100,64 @@ on other pages to reflect it.
 
 **Next:** User tests locally, confirms selector persists across pages,
 then this commits + pushes + redeploys + re-walks the 20-point check.
+
+---
+
+## 2026-04-23 — DV-2 resolved (performance display compliance)
+
+**Observed:** Portfolio page Historical tab showed 1Y / 3Y / 5Y returns
+only, with "None" for newer funds. Missing since-inception, benchmark,
+and max-drawdown per CLAUDE.md §22 item 5. ETF Detail page had similar
+gap — 4 KPI tiles for 1Y/3Y/5Y/Data points, no since-inception or
+max drawdown.
+
+**Fix:**
+1. Added `performance_summary_table()` helper in `ui/components.py`
+   (plus `_ps_simple_return_pct`, `_ps_cagr_pct`, `_ps_max_drawdown_pct`,
+   `_ps_fmt_pct`, `_ps_fmt_dd`, `_ps_row`, `_ps_blended_benchmark_row`).
+   Returns a pandas DataFrame with columns: ticker · source · inception ·
+   1Y % · 3Y % · 5Y % · since-inception % · max drawdown %.
+2. Fallback display: `"N/A (<1Y hist)"` / `"N/A (<3Y hist)"` /
+   `"N/A (<5Y hist)"` instead of bare `None` when a fund is too young.
+   Addresses the specific UX complaint (the bunch of "None" cells you
+   saw on newer spot BTC/ETH ETFs).
+3. Benchmark row: blended `BENCHMARK_DEFAULT` (SPY 48 / AGG 32 /
+   IBIT 20), static-weight, no daily rebalancing. Labeled
+   `Benchmark (80% traditional 60/40 + 20% BTC spot sleeve)`.
+   Simplification documented on the Methodology page.
+4. Updated `pages/02_Portfolio.py` (Historical tab) to use the helper
+   (replaces the ad-hoc loop).
+5. Updated `pages/03_ETF_Detail.py` (Historical returns card) to use
+   the helper (replaces the 4 KPI tiles).
+6. Added `tests/test_performance_summary.py` — 10 tests covering
+   scalar helpers (max drawdown, simple return, CAGR), table
+   integration (6Y / 18mo / empty), benchmark row presence/absence,
+   and a drawdown-fixture verification.
+
+**Audit (§4 seven criteria):**
+- Correctness: ✓ tests cover positive and negative paths
+- Tests: ✓ 10 new cases
+- Optimization: ✓ benchmark prices fetched once per page (not per-row)
+- Efficiency: ✓ reuses existing get_etf_prices cache
+- Accuracy: ✓ CAGR matches known fixture (~100% for 100→200 over 1Y);
+  max drawdown matches fixture (−75% for 200→50 peak-to-trough)
+- Speed: ✓ same number of API calls as before (+1 benchmark fetch)
+- UI/UX: ✓ compliance columns added; placeholders informative not blank
+
+**Files touched:**
+- New: `tests/test_performance_summary.py`
+- Modified: `ui/components.py` (added ~180 lines),
+  `pages/02_Portfolio.py` (Historical tab), `pages/03_ETF_Detail.py`
+  (Historical returns card).
+
+**Known limitations (documented for Methodology):**
+- Blended benchmark uses static weights — doesn't account for
+  rebalancing drift. Close enough for advisor-facing display; exact
+  model in Methodology.
+- Benchmark max drawdown is the weighted average of component max
+  drawdowns, not computed on the synthetic blended equity curve.
+  Approximation; tradeoff called out on Methodology page.
+
+**Next:** User tests DV-2 locally on Portfolio + ETF Detail pages,
+confirms the new columns render and "N/A (<1Y hist)" appears where
+appropriate. Then commit + push + redeploy + walk the updated checklist.

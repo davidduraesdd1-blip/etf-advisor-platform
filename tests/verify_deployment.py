@@ -1,7 +1,7 @@
 """
 tests/verify_deployment.py — ETF Advisor Platform deployment smoke test
 
-Customized from common/verify_deployment.py. Implements Part A of master
+Implements Part A of master
 template Section 25.
 
 Usage:
@@ -35,6 +35,8 @@ DEFAULT_URLS = {
 # serves the file stem as the path (underscores preserved). If a route
 # 404s, try the alternate form (e.g. /01_Dashboard) in a follow-up run.
 PAGES: list[str] = [
+    # Paths populated from pages/ folder. If a route 404s, try the
+    # alternate form (e.g. /01_Dashboard) in a follow-up run.
     "/Dashboard",
     "/Portfolio",
     "/ETF_Detail",
@@ -263,34 +265,6 @@ def main() -> int:
     # Cold-start reachability
     check_reachable(report, timeout_s=COLD_START_TIMEOUT_S)
     # Now the warm checks
-    check_no_errors_in_landing(report)
-    check_expected_strings(report)
-    check_pages(report)
-    check_health_endpoint(report)
-
-    if args.json:
-        print(json.dumps({
-            "env": report.env,
-            "base_url": report.base_url,
-            "passed": report.passed,
-            "checks": [
-                {
-                    "name": r.name,
-                    "passed": r.passed,
-                    "detail": r.detail,
-                    "elapsed_s": round(r.elapsed_s, 3),
-                }
-                for r in report.results
-            ],
-        }, indent=2))
-    else:
-        report.print_summary()
-
-    return 0 if report.passed else 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())
     check_no_errors_in_landing(report)
     check_expected_strings(report)
     check_pages(report)

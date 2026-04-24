@@ -13,7 +13,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from config import BRAND_NAME, SUPERGROK_BASE_URL, SUPERGROK_COIN_MAP
+from config import BENCHMARK_DEFAULT, BENCHMARK_LABEL, BRAND_NAME, SUPERGROK_BASE_URL, SUPERGROK_COIN_MAP
 from core.etf_universe import load_universe_with_live_analytics
 from core.portfolio_engine import build_portfolio, run_monte_carlo
 from core.signal_adapter import composite_signal
@@ -22,6 +22,7 @@ from integrations.edgar_nport import SUPPORTED_TICKERS as NPORT_TICKERS, get_etf
 from ui.components import (
     card,
     data_source_badge,
+    performance_summary_table,
     disclosure,
     kpi_tile,
     safe_page_link,
@@ -385,20 +386,21 @@ with card("Historical returns"):
         )
         st.plotly_chart(fig, width="stretch")
 
-        def _ret(n_days: int) -> str:
-            if len(df) <= n_days:
-                return "—"
-            start = df["close"].iloc[-n_days]
-            end = df["close"].iloc[-1]
-            if start <= 0:
-                return "—"
-            return f"{((end / start) - 1) * 100:.1f}%"
-
-        c1, c2, c3, c4 = st.columns(4)
-        with c1: kpi_tile("1Y", _ret(252))
-        with c2: kpi_tile("3Y", _ret(252 * 3))
-        with c3: kpi_tile("5Y", _ret(252 * 5))
-        with c4: kpi_tile("Data points", f"{len(df):,}")
+        # DV-2: compliance-complete performance summary (single ticker)
+        bench_tickers = list(BENCHMARK_DEFAULT.keys())
+        benchmark_price_data = get_etf_prices(bench_tickers, period="5y", interval="1d")
+        perf_df = performance_summary_table(
+            tickers=[etf["ticker"]],
+            price_data=prices,
+            benchmark_weights=BENCHMARK_DEFAULT,
+            benchmark_label=BENCHMARK_LABEL,
+            benchmark_price_data=benchmark_price_data,
+        )
+        st.dataframe(perf_df, width="stretch", hide_index=True)
+        st.caption(
+            "Benchmark: static-weight blend (no daily rebalancing). "
+            "Methodology page documents the simplification."
+        )
 
 
 # Composition — live from SEC EDGAR N-PORT when available (IBIT/ETHA/FBTC/FETH).
