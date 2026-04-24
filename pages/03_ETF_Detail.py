@@ -38,14 +38,28 @@ st.set_page_config(page_title=f"ETF Detail — {BRAND_NAME}", layout="wide")
 apply_theme()
 render_sidebar()
 
-section_header(
-    "ETF Detail",
-    level_text(
-        beginner="Research a single fund. Signal, fees, composition, and recent performance.",
-        intermediate="Per-ETF research: signal + KPIs + composition + historical.",
-        advanced="Per-ETF research with Phase-1 composite signal (coin-level wiring Day 4+).",
-    ),
-)
+try:
+    from ui import render_top_bar as _ds_top_bar, page_header as _ds_page_header
+    _ds_top_bar(breadcrumb=("Research", "ETF Detail"),
+                user_level=st.session_state.get("user_level", "beginner"))
+    _ds_page_header(
+        title="ETF detail",
+        subtitle=level_text(
+            beginner="Research a single fund. Signal, fees, composition, and recent performance.",
+            intermediate="Per-ETF research: signal + KPIs + composition + historical.",
+            advanced="Per-ETF research with Phase-1 composite signal (coin-level wiring Day 4+).",
+        ),
+        data_sources=[("Live analytics", "live"), ("Composite signal", "live")],
+    )
+except Exception:
+    section_header(
+        "ETF Detail",
+        level_text(
+            beginner="Research a single fund. Signal, fees, composition, and recent performance.",
+            intermediate="Per-ETF research: signal + KPIs + composition + historical.",
+            advanced="Per-ETF research with Phase-1 composite signal (coin-level wiring Day 4+).",
+        ),
+    )
 
 # Data-source panel intentionally omitted on research pages per FA
 # feedback. Tile-level `data_source_badge` calls still surface any

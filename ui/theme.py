@@ -182,4 +182,18 @@ def apply_theme() -> None:
     """Inject theme CSS. Safe to call on every page."""
     if "theme" not in st.session_state:
         st.session_state["theme"] = "dark"
+    # ── 2026-05 redesign: inject the advisor-family design-system theme
+    #     FIRST so the new CSS variables are the base; the legacy
+    #     _css_for_theme below then layers on top for widgets not yet
+    #     ported. Guarded — any import failure falls back to pre-redesign
+    #     behavior (legacy theme only).
+    try:
+        from ui.design_system import inject_theme as _ds_inject_theme
+        from ui.overrides import inject_streamlit_overrides as _ds_inject_overrides
+        from ui.ds_components import render_sidebar_brand as _ds_brand
+        _ds_inject_theme("etf-advisor-platform", theme=current_theme())
+        _ds_inject_overrides()
+        _ds_brand(brand_name="Advisor", brand_sub="family office", brand_glyph="A")
+    except Exception:
+        pass
     st.markdown(_css_for_theme(current_theme()), unsafe_allow_html=True)

@@ -34,14 +34,27 @@ st.set_page_config(page_title=f"Settings — {BRAND_NAME}", layout="wide")
 apply_theme()
 render_sidebar()
 
-section_header(
-    "Settings",
-    level_text(
-        beginner="Control how the app fetches data, routes orders, and monitors your portfolios.",
-        intermediate="Broker routing, monitoring cadence, auto-execute permissions, scanner health.",
-        advanced="Runtime flags + data-source state + circuit-breaker controls + per-client overrides.",
-    ),
-)
+try:
+    from ui import render_top_bar as _ds_top_bar, page_header as _ds_page_header
+    _ds_top_bar(breadcrumb=("Account", "Settings"),
+                user_level=st.session_state.get("user_level", "beginner"))
+    _ds_page_header(
+        title="Settings",
+        subtitle=level_text(
+            beginner="Control how the app fetches data, routes orders, and monitors your portfolios.",
+            intermediate="Broker routing, monitoring cadence, auto-execute permissions, scanner health.",
+            advanced="Runtime flags + data-source state + circuit-breaker controls + per-client overrides.",
+        ),
+    )
+except Exception:
+    section_header(
+        "Settings",
+        level_text(
+            beginner="Control how the app fetches data, routes orders, and monitors your portfolios.",
+            intermediate="Broker routing, monitoring cadence, auto-execute permissions, scanner health.",
+            advanced="Runtime flags + data-source state + circuit-breaker controls + per-client overrides.",
+        ),
+    )
 
 # Top-of-page data-source audit panel (Option 3 transparency).
 # Settings opens it expanded since this is the operator-diagnostic page.

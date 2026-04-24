@@ -49,14 +49,28 @@ render_sidebar()
 # Client selection
 # ═══════════════════════════════════════════════════════════════════════════
 
-section_header(
-    "Portfolio",
-    level_text(
-        beginner="Pick a client, pick a risk tier, and see the crypto ETF basket we recommend.",
-        intermediate="5-tier risk-profiled basket construction with forward-looking risk metrics.",
-        advanced="Phase-2 pairwise-correlation basket, issuer-tier adjusted, with forward MC projection.",
-    ),
-)
+try:
+    from ui import render_top_bar as _ds_top_bar, page_header as _ds_page_header
+    _ds_top_bar(breadcrumb=("Advisor", "Portfolio"),
+                user_level=st.session_state.get("user_level", "beginner"))
+    _ds_page_header(
+        title="Portfolio",
+        subtitle=level_text(
+            beginner="Pick a client, pick a risk tier, and see the crypto ETF basket we recommend.",
+            intermediate="5-tier risk-profiled basket construction with forward-looking risk metrics.",
+            advanced="Phase-2 pairwise-correlation basket, issuer-tier adjusted, with forward MC projection.",
+        ),
+        data_sources=[("ETF pricing", "live"), ("Risk engine", "live")],
+    )
+except Exception:
+    section_header(
+        "Portfolio",
+        level_text(
+            beginner="Pick a client, pick a risk tier, and see the crypto ETF basket we recommend.",
+            intermediate="5-tier risk-profiled basket construction with forward-looking risk metrics.",
+            advanced="Phase-2 pairwise-correlation basket, issuer-tier adjusted, with forward MC projection.",
+        ),
+    )
 
 if not DEMO_MODE:
     st.warning(

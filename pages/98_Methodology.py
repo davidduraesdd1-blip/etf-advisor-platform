@@ -20,14 +20,27 @@ st.set_page_config(page_title=f"Methodology — {BRAND_NAME}", layout="wide")
 apply_theme()
 render_sidebar()
 
-section_header(
-    "Methodology",
-    level_text(
-        beginner="How the platform constructs portfolios, measures risk, and sources data.",
-        intermediate="Construction, risk metrics, signal math, and data sources.",
-        advanced="Full methodology reference — linked from performance disclosures.",
-    ),
-)
+try:
+    from ui import render_top_bar as _ds_top_bar, page_header as _ds_page_header
+    _ds_top_bar(breadcrumb=("Research", "Methodology"),
+                user_level=st.session_state.get("user_level", "beginner"))
+    _ds_page_header(
+        title="Methodology",
+        subtitle=level_text(
+            beginner="How the platform constructs portfolios, measures risk, and sources data.",
+            intermediate="Construction, risk metrics, signal math, and data sources.",
+            advanced="Full methodology reference — linked from performance disclosures.",
+        ),
+    )
+except Exception:
+    section_header(
+        "Methodology",
+        level_text(
+            beginner="How the platform constructs portfolios, measures risk, and sources data.",
+            intermediate="Construction, risk metrics, signal math, and data sources.",
+            advanced="Full methodology reference — linked from performance disclosures.",
+        ),
+    )
 
 
 # ─── 1. Portfolio construction ───────────────────────────────────────────────

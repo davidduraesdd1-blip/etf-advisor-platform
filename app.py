@@ -35,11 +35,22 @@ st.set_page_config(
 
 
 def _render_home() -> None:
-    st.title(f"{BRAND_NAME}")
-    st.caption(
-        "Risk-profiled crypto ETF portfolios, institutional-grade research, "
-        "two-click basket execution."
-    )
+    # ── 2026-05 redesign: advisor-family top bar + page header ──
+    try:
+        from ui import render_top_bar as _ds_top_bar, page_header as _ds_page_header
+        _ds_top_bar(breadcrumb=("Advisor", "Home"),
+                    user_level=st.session_state.get("user_level", "beginner"))
+        _ds_page_header(
+            title=BRAND_NAME,
+            subtitle="Risk-profiled crypto ETF portfolios, institutional-grade research, two-click basket execution.",
+            data_sources=[("Custody feed", "live"), ("ETF pricing", "live")],
+        )
+    except Exception:
+        st.title(f"{BRAND_NAME}")
+        st.caption(
+            "Risk-profiled crypto ETF portfolios, institutional-grade research, "
+            "two-click basket execution."
+        )
 
     with card("Welcome"):
         level = st.session_state.get("user_level", DEFAULT_USER_LEVEL)
