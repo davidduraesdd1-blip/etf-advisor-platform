@@ -32,15 +32,13 @@ def render_sidebar_brand(
     except Exception:
         accent = {"accent": "#0fa68a", "accent_ink": "#0c0d12"}
     st.sidebar.markdown(
-        f"""
-        <div class="ds-rail-brand">
-          <div class="ds-brand-dot" style="background:{accent['accent']};color:{accent['accent_ink']};">{brand_glyph}</div>
-          <div>
-            <div style="font-family:var(--font-display);font-size:17px;font-weight:500;color:var(--text-primary);letter-spacing:-0.015em;">{brand_name}</div>
-            <div style="font-size:11px;color:var(--text-muted);letter-spacing:0.04em;">{brand_sub}</div>
-          </div>
-        </div>
-        """,
+        f'<div class="ds-rail-brand">'
+        f'<div class="ds-brand-dot" style="background:{accent["accent"]};color:{accent["accent_ink"]};">{brand_glyph}</div>'
+        f'<div>'
+        f'<div style="font-family:var(--font-display);font-size:17px;font-weight:500;color:var(--text-primary);letter-spacing:-0.015em;">{brand_name}</div>'
+        f'<div style="font-size:11px;color:var(--text-muted);letter-spacing:0.04em;">{brand_sub}</div>'
+        f'</div>'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
@@ -68,15 +66,11 @@ def render_top_bar(
     refresh_html = '<button class="ds-chip-btn" data-action="refresh">↻ Refresh</button>' if show_refresh else ""
     theme_html   = '<button class="ds-chip-btn" data-action="theme">☾ Theme</button>' if show_theme else ""
     st.markdown(
-        f"""
-        <div class="ds-topbar">
-          <div class="ds-crumbs">{crumb_html}</div>
-          <div class="ds-topbar-spacer"></div>
-          {level_html}
-          {refresh_html}
-          {theme_html}
-        </div>
-        """,
+        f'<div class="ds-topbar">'
+        f'<div class="ds-crumbs">{crumb_html}</div>'
+        f'<div class="ds-topbar-spacer"></div>'
+        f'{level_html}{refresh_html}{theme_html}'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
@@ -103,15 +97,13 @@ def page_header(
         pills_html = ""
     sub_html = f'<div class="ds-page-sub">{subtitle}</div>' if subtitle else ""
     st.markdown(
-        f"""
-        <div class="ds-page-hd">
-          <div>
-            <h1 class="ds-page-title">{title}</h1>
-            {sub_html}
-          </div>
-          {pills_html}
-        </div>
-        """,
+        f'<div class="ds-page-hd">'
+        f'<div>'
+        f'<h1 class="ds-page-title">{title}</h1>'
+        f'{sub_html}'
+        f'</div>'
+        f'{pills_html}'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
