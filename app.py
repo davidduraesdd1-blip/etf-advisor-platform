@@ -20,7 +20,8 @@ from config import (
     EXTENDED_MODULES_ENABLED,
     USER_LEVELS,
 )
-from ui.theme import apply_theme, current_theme, toggle_theme
+from ui.theme import apply_theme
+from ui.sidebar import render_sidebar
 from ui.components import card, disclosure, safe_page_link
 
 
@@ -31,46 +32,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-
-def _render_sidebar() -> None:
-    with st.sidebar:
-        # Brand header
-        if BRAND_LOGO_PATH:
-            st.image(BRAND_LOGO_PATH, width="stretch")
-        st.markdown(f"## {BRAND_NAME}")
-        st.caption("Crypto ETF portfolio platform for advisors")
-
-        st.divider()
-
-        # User-level selector (CLAUDE.md §7)
-        if "user_level" not in st.session_state:
-            st.session_state["user_level"] = DEFAULT_USER_LEVEL
-        st.session_state["user_level"] = st.radio(
-            "Experience level",
-            options=USER_LEVELS,
-            index=USER_LEVELS.index(st.session_state["user_level"]),
-            help="Scales glossary depth, chart complexity, and signal explanations.",
-        )
-
-        # Theme toggle (CLAUDE.md §8)
-        theme_label = "☼ Light mode" if current_theme() == "dark" else "☾ Dark mode"
-        st.button(theme_label, on_click=toggle_theme, width="stretch")
-
-        # Refresh all data (CLAUDE.md §12)
-        if st.button("⟳ Refresh all data", width="stretch"):
-            st.cache_data.clear()
-            st.toast("Caches cleared — data will refresh on next read.")
-
-        st.divider()
-
-        # Mode indicators
-        if DEMO_MODE:
-            st.caption("◐ Demo mode — fictional clients only")
-        if EXTENDED_MODULES_ENABLED:
-            st.caption("◐ Extended modules enabled (ETF + RWA + DeFi)")
-        else:
-            st.caption("◐ ETF-only (extended modules disabled)")
 
 
 def _render_home() -> None:
@@ -125,7 +86,7 @@ def _render_home() -> None:
 
 def main() -> None:
     apply_theme()
-    _render_sidebar()
+    render_sidebar()
     _render_home()
 
 

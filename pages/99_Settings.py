@@ -26,11 +26,13 @@ from core.etf_universe import SCANNER_STALE_HOURS, get_scanner_health
 from integrations.data_feeds import circuit_breaker_state, reset_circuit_breaker
 from ui.components import card, data_sources_panel, section_header
 from ui.level_helpers import level_text
+from ui.sidebar import render_sidebar
 from ui.theme import apply_theme
 
 
 st.set_page_config(page_title=f"Settings — {BRAND_NAME}", layout="wide")
 apply_theme()
+render_sidebar()
 
 section_header(
     "Settings",

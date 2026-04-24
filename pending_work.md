@@ -1,5 +1,64 @@
 # Pending Work — ETF Advisor Platform
 
+---
+
+## Deployment Verification Findings — 2026-04-23
+
+Baseline pass of CLAUDE.md §25 (Deployment Verification Protocol).
+User walked the 20-point checklist manually against live deploy.
+Two real bugs found. Both are ⚠ non-blockers for the deploy itself
+(nothing crashes), but both should ship before the Friday demo.
+
+*Earlier code-grep conclusions about C7 (drawdown calm messaging) and*
+*X2 (extended-modules preview banner) were WRONG — user confirmed both*
+*are implemented. Grep missed them because of wording variants or*
+*runtime-loaded strings.*
+
+- [x] **DV-1. Item 8 — Level selector does not persist across pages.** (FIXED 2026-04-23, see MEMORY.md)
+  CLAUDE.md §7 requires: "Level persists in session state."
+  Universal 20-point checklist item 8: "Level selector persists across
+  page navigation." User walked and found this broken.
+  Expected: pick Advanced on Dashboard → navigate to Portfolio → still
+  Advanced in sidebar. Observed: resets to default between pages.
+  Likely cause: `st.session_state["user_level"]` is set inside the
+  sidebar function but not read before initialization on each page
+  load. Streamlit's multipage convention re-runs the page script on
+  navigation, but session_state should survive.
+  Deliverables:
+    - Trace `user_level` init logic in `app.py` and every page under
+      `pages/`. Confirm each page reads from `st.session_state` BEFORE
+      writing a default.
+    - If the sidebar component is called per-page (expected), verify
+      it's idempotent re: session_state writes — only set default if
+      the key is missing.
+    - Unit test: simulate page-to-page navigation with Streamlit's
+      `AppTest` runner; assert `user_level` value preserved.
+    - Audit against §4 per §24 on commit.
+
+- [ ] **DV-2. Item C1 — Performance displays missing time horizons.**
+  CLAUDE.md §22 item 5 + §8: "Backtest performance displays ALWAYS
+  include multiple time horizons (1Y, 3Y, 5Y, since-inception)."
+  User walked and found not all four time horizons appear on every
+  performance display.
+  Deliverables:
+    - Inventory every performance display in the app — likely
+      `pages/02_Portfolio.py`, `pages/03_ETF_Detail.py`,
+      `98_Methodology.py`, and any backtest result views.
+    - Confirm which time horizons each shows today; identify which
+      are missing per display.
+    - Build a single `performance_summary()` helper in
+      `ui/components.py` that takes a return series and renders all
+      four horizons (1Y, 3Y, 5Y, since-inception) + benchmark + max
+      drawdown + hypothetical disclaimer in one block.
+    - Replace every ad-hoc performance-display block with calls to
+      the helper. No display can render returns without going through it.
+    - Unit test: helper produces all four horizons from a sample
+      5+-year return series; raises if series too short to compute
+      one (don't silently omit — annotate "insufficient history").
+    - Audit against §4 per §24 on commit.
+
+---
+
 ## Day 1 — Tuesday 2026-04-21 ✅ COMPLETE
 
 - [x] Infrastructure files (.gitignore, .gitleaks.toml, .pre-commit-config.yaml, Dockerfile, docker-compose.yml, requirements.txt, packages.txt, runtime.txt, .env.example, .python-version)

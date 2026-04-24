@@ -1,35 +1,28 @@
 # Claude Code — Master Agreement
 # ETF ADVISOR PLATFORM
-# Last updated: 2026-04-20
-# Inherits from: user's master CLAUDE.md template (all unmodified sections verbatim)
+# Last updated: 2026-04-23
+# Inherits from: ../master-template/CLAUDE_master_template.md
+
+> This file overrides or extends the master template where noted.
+> This project is the most detailed of the four apps — it has a
+> Friday-deadline demo and several demo-specific constraints in
+> Section 22.
 
 ---
 
 ## SECTION 1 — PERMISSION & AUTONOMY
 
-Claude has 100% full permission to complete all coding, research, engineering,
-testing, optimization, auditing, committing, and pushing tasks as quickly and
-efficiently as possible. This includes all file edits, writes, reads, git
-commits, git pushes, bash commands, and tool use.
-
-No permission prompts. No mid-task check-ins. Ever.
-
-One pause point only: before implementing any upgrade or new feature, present
-a numbered proposal list and wait for approval. Once approved, execute the
-entire list autonomously with no further check-ins until done.
-
-Claude may ask clarifying questions on direction-level decisions only — never
-guess on those. The user may ask clarifying questions at any time and Claude
-must answer clearly before continuing.
+[VERBATIM FROM MASTER TEMPLATE.]
 
 ---
 
 ## SECTION 2 — PROJECT SCOPE
 
+```
   Name:          ETF Advisor Platform
-  Path:          [SET ON LOCAL CLONE — typically C:\Users\[user]\Projects\etf-advisor-platform]
+  Path:          C:\Users\david\OneDrive\Desktop\Cowork\etf-advisor-platform
   Repo:          github.com/davidduraesdd1-blip/etf-advisor-platform (PRIVATE)
-  Deploy:        Streamlit Cloud (private app until post-demo review)
+  Deploy:        https://etf-advisor.streamlit.app/  (private app until post-demo review)
   User role:     builder / designer / reviewer (primary), partner joining mid-week
   Collaborators: 2 (user + partner). Partner codebase integrates separately.
 
@@ -43,39 +36,20 @@ must answer clearly before continuing.
   enabled via EXTENDED_MODULES_ENABLED feature flag in config.py. Off by default.
 
   Foundation codebases (READ ONLY — import patterns, do not modify):
-    - github.com/davidduraesdd1-blip/crypto-signal-app
-      → Signal engine; coin-level indicators, Buy/Hold/Sell logic,
-        composite_signal.py, cycle_indicators.py, top_bottom_detector.py
-    - github.com/davidduraesdd1-blip/rwa-infinity-model
-      → Portfolio construction engine; 5-tier risk structure; Monte Carlo;
-        Modern Portfolio Theory; VaR/CVaR; portfolio.py is the gold reference
-    - github.com/davidduraesdd1-blip/flare-defi-model
-      → Cleanest directory structure (pages/, ui/, agents/, scanners/, models/);
-        use as the architectural template for this project
+    - crypto-signal-app  → Signal engine; composite_signal.py, cycle_indicators.py
+    - rwa-infinity-model → Portfolio construction engine; portfolio.py gold reference
+    - flare-defi-model   → Cleanest directory structure; architectural template
 
   Integration with parent FA platform: proprietary, not named here, integrates
   at the advisor workflow layer post-demo. Design UI to feel like a module of
   a larger platform, not a standalone product.
+```
 
 ---
 
 ## SECTION 3 — COMMIT & PUSH RULES
 
-Every completed unit of work must be committed and pushed to GitHub
-immediately. No exceptions. No half-committed states.
-
-Rules:
-- Never amend published commits. Always create new commits forward.
-- Commit messages include a full written report of every change, bug fix,
-  and optimization. The "why" beats the "what."
-- End every commit with:
-    Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-- Never skip hooks (--no-verify) unless explicitly asked.
-- Never force-push to main.
-- Stage files by name, never `git add -A` or `git add .` (can accidentally
-  include .env or secrets).
-- If a pre-commit hook fails, fix the issue and create a NEW commit — never
-  amend the failed one.
+[VERBATIM FROM MASTER TEMPLATE.]
 
 ---
 
@@ -83,45 +57,11 @@ Rules:
 
 [VERBATIM FROM MASTER TEMPLATE — no project-specific overrides.]
 
-Every audit pass covers:
-- Every source file: bugs, logic errors, edge cases, crashes, security holes,
-  performance bottlenecks, UX text errors, wrong calculations, missing error
-  handling, dead code, redundant API calls, memory leaks, blocking operations,
-  cache misses, slow queries — from typo to logic failure.
-- Every feature: every button, scan, data feed, chart, API call, fallback,
-  error path, page, tab, modal, dropdown.
-- Every calculation verified against known correct values.
-- Every user level: Beginner, Intermediate, Advanced.
-- Every theme: dark mode and light mode.
-- All refresh intervals verified operating within API rate limits.
-
-Fix issues immediately as found, before moving to the next file.
-Record every issue: file, line, severity, description, fix applied.
-
-Audit frequency — tiered:
-  Any file touched            → Audit that file + all direct dependencies
-  Any sprint item completed   → Full audit of affected area
-  Before any new sprint       → Full pre-sprint audit
-  Monthly                     → Full deep audit
-  Any time user requests      → Whatever scope user specifies
-
-Written report required after every audit, included in the commit message.
-
 ---
 
 ## SECTION 5 — RESEARCH STANDARDS
 
 [VERBATIM FROM MASTER TEMPLATE.]
-
-Research is mandatory before any upgrade/new feature proposal, any new
-dependency, or any time the user explicitly requests research.
-
-Minimum 30 distinct sources per proposal. Cover official docs, third-party
-blogs, Stack Overflow, competitor products, social media, regulatory bodies,
-academic preprints where applicable.
-
-Output must state: what competitors do that we don't, market gaps,
-version numbers and release dates.
 
 ---
 
@@ -130,21 +70,17 @@ version numbers and release dates.
 BRAND_NAME and BRAND_LOGO_PATH config constants exist in config.py.
 When unset: render a clean professional placeholder header.
 
-For demo: BRAND_NAME = "ETF Advisor Platform" (placeholder — real brand
-decided post-demo with partner).
+For demo: `BRAND_NAME = "ETF Advisor Platform"` (placeholder — real
+brand decided post-demo with partner).
 
-A full rebrand must be no more than 2 line changes. All copy, headers, and
-logo references pull from config constants. No hardcoded brand strings
-anywhere in the app code.
+A full rebrand must be no more than 2 line changes.
 
 ---
 
 ## SECTION 7 — USER LEVEL SYSTEM
 
-Three tiers: Beginner / Intermediate / Advanced, applied identically across
-every screen. Beginner is the default for first-time visits.
+[MASTER TEMPLATE with project-specific tier definitions:]
 
-THIS PROJECT'S SPECIFICS:
   Beginner advisor:   new FAs, FAs new to crypto, compliance reviewers
                       → Plain English. No crypto jargon. "This portfolio
                         invests in Bitcoin funds" not "allocation to spot BTC ETFs."
@@ -162,28 +98,11 @@ THIS PROJECT'S SPECIFICS:
                       → Tooltips collapsed by default
                       → Indicator panels show raw values (RSI=73, not just "overbought")
 
-Level selector always visible in sidebar. Level persists in session state.
-Glossary depth, chart complexity, signal explanations, and error messages
-all scale with level.
-
 ---
 
 ## SECTION 8 — DESIGN STANDARDS
 
-[MASTER TEMPLATE with project-specific calibrations noted.]
-
-Colors (from master template — unchanged):
-  Primary:    #00d4aa  (teal)
-  Success:    #22c55e  (green)
-  Danger:     #ef4444  (red)
-  Warning:    #f59e0b  (amber)
-  Dark bg:    #0d0e14
-  Dark card:  #111827
-  Light bg:   #f1f5f9
-  Light card: #ffffff
-
-Typography, clamp() floors, theme toggling, accessibility, error messages,
-UI consistency, formatting specifics: ALL per master template.
+[MASTER TEMPLATE with project-specific calibrations:]
 
 PROJECT-SPECIFIC TONE NOTES:
 - This is a financial advisor tool. Tone is calmer and more institutional
@@ -199,13 +118,11 @@ PROJECT-SPECIFIC TONE NOTES:
   or "Send to [Broker]". Compliance language matters here.
 - Bad-day scenarios (portfolio in drawdown): calm messaging. Prompt to
   "review risk tolerance and time horizon" not "sell now." No red flashing
-  alarms. This is per user's direct guidance from the planning conversation.
+  alarms.
 
 ---
 
 ## SECTION 9 — MATH MODEL ARCHITECTURE
-
-[MASTER TEMPLATE layered pattern, with this project's layer assignments:]
 
 LAYER 1 — TECHNICAL: coin-level indicators from crypto-signal-app adapted
   to ETF-level signals. Volume, momentum, trend. Weighted across ETF
@@ -226,14 +143,11 @@ PORTFOLIO LAYER — the adapted portfolio.py from rwa-infinity-model. Takes
   a risk tier, selects from the ETF universe, returns holdings with weights
   and full risk metrics (Sharpe, Sortino, Calmar, VaR, CVaR, Monte Carlo).
 
-OUTPUT RULE (master template): however many layers feed in, the output is
-ONE clear signal per ETF: BUY / HOLD / SELL with shape encoding.
+OUTPUT RULE: ONE clear signal per ETF: BUY / HOLD / SELL with shape encoding.
 
 ---
 
 ## SECTION 10 — DATA SOURCES & FALLBACK CHAINS
-
-[MASTER TEMPLATE rules apply. Project-specific source chains below:]
 
 ETF reference data (list, holdings, AUM, expense ratio, inception):
   Primary:   SEC EDGAR N-PORT filings (free, authoritative, slow)
@@ -248,22 +162,19 @@ ETF price data (OHLCV, intraday):
   Upgrade path: Polygon.io Stocks Starter ($29/mo), IEX Cloud, Finnhub
 
 ETF daily scanner (new ETFs coming to market):
-  Primary:   SEC EDGAR RSS feed for N-1A (new fund registration) and 497
-             (prospectus effective) filings tagged "cryptocurrency"
-  Secondary: CoinDesk / The Block crypto-ETF news feeds (RSS)
-  Tertiary:  Manual periodic review
+  Primary:   SEC EDGAR RSS feed for N-1A and 497 filings tagged "cryptocurrency"
+  Secondary: cryptorank.io /news/tag/spot-bitcoin-etf-flows and adjacent tags
+  Tertiary:  CoinDesk / The Block crypto-ETF news feeds (RSS)
+
+ETF flow data (daily net inflows / outflows per ETF — Layer 3 sentiment input):
+  Primary:   cryptorank.io ETF-flow endpoints (cumulative + daily per-issuer breakdown)
+  Secondary: SoSoValue.xyz ETF dashboard (scraping or public API when available)
+  Tertiary:  Farside Investors CSV exports (daily BTC + ETH ETF flows)
+  Upgrade path: Bloomberg Terminal feed (enterprise only)
 
 Underlying coin data (for LAYER 4 on-chain):
   Already solved in crypto-signal-app — reuse those data_feeds.py patterns.
   OKX → CoinGecko → Kraken chain per master template Section 10.
-
-CRITICAL per master template:
-- Test every source against Streamlit Cloud (non-residential IP) before
-  committing to it as primary. CoinMetrics, Binance US, Bybit all have
-  datacenter-IP quirks documented in the master template.
-- Cache empty results with 30s TTL; successful results per source's natural
-  cadence.
-- Never silently fall back to plain text when binary expected.
 
 ---
 
@@ -275,15 +186,12 @@ Environments:
   Local:     Windows dev, VS Code + Claude Code extension
   Cloud:     Streamlit Cloud private app (demo and beyond)
 
-Detection: use __file__-relative paths per master template Section 11.
-
 Shared modules with foundation repos: NONE at runtime. We copy code patterns
 and full modules into this repo, but this repo does not import from
 crypto-signal-app, rwa-infinity-model, or flare-defi-model. This is by user
 design: foundation repos stay frozen as reference implementations.
 
-Secrets: Streamlit Cloud Secrets UI only. Never in repo. .env.example shows
-the expected variables; actual .env is gitignored per master template.
+Streamlit Cloud URL: https://etf-advisor.streamlit.app/
 
 ---
 
@@ -291,20 +199,14 @@ the expected variables; actual .env is gitignored per master template.
 
 [MASTER TEMPLATE. Project-specific refresh windows:]
 
-Dashboard client statuses:     1 minute cache (near-real-time feel)
+Dashboard client statuses:     1 minute cache
 ETF prices (intraday):         5 minute cache during market hours,
                                60 minute cache off-hours and weekends
 ETF holdings data:             24 hour cache (changes slowly, rarely intraday)
 Portfolio construction output: 10 minute cache keyed on tier+universe hash
 Monte Carlo results:           10 minute cache per master template pattern
 Daily ETF scanner:             Runs once per trading day at 16:30 ET
-                               (after US close, before next open)
 Monitoring engine signals:     15 minute recompute cycle
-
-All within free API limits. Paid-tier upgrade is a config flip per master
-template Section 12.
-
-"Refresh All Data" button visible in sidebar on every page. Forces cache bypass.
 
 ---
 
@@ -313,137 +215,81 @@ template Section 12.
 CRYPTO ETF UNIVERSE (starting list, ~20 ETFs, expands via daily scanner):
 
 Spot Bitcoin ETFs (US-listed):
-  IBIT  — iShares Bitcoin Trust (BlackRock)
-  FBTC  — Fidelity Wise Origin Bitcoin Fund
-  BITB  — Bitwise Bitcoin ETF
-  ARKB  — ARK 21Shares Bitcoin ETF
-  BTCO  — Invesco Galaxy Bitcoin ETF
-  EZBC  — Franklin Bitcoin ETF
-  BRRR  — Valkyrie Bitcoin Fund
-  HODL  — VanEck Bitcoin Trust
-  BTC   — Grayscale Bitcoin Mini Trust
-  GBTC  — Grayscale Bitcoin Trust (legacy, higher fee)
-  DEFI  — Hashdex Bitcoin Futures ETF (futures-based comparison)
+  IBIT, FBTC, BITB, ARKB, BTCO, EZBC, BRRR, HODL, BTC, GBTC, DEFI
 
 Spot Ethereum ETFs (US-listed):
-  ETHA  — iShares Ethereum Trust (BlackRock)
-  FETH  — Fidelity Ethereum Fund
-  ETHE  — Grayscale Ethereum Trust
-  ETHW  — Bitwise Ethereum ETF
-  CETH  — 21Shares Core Ethereum ETF
-  QETH  — Invesco Galaxy Ethereum ETF
-  EZET  — Franklin Ethereum ETF
-  ETH   — Grayscale Ethereum Mini Trust
+  ETHA, FETH, ETHE, ETHW, CETH, QETH, EZET, ETH
 
-Multi-asset / thematic crypto ETFs (if available in US markets):
-  [Scanner-populated. Solana ETFs pending approval. Basket ETFs emerging.]
+Multi-asset / thematic crypto ETFs: scanner-populated.
 
-RISK TIERS (inherited from rwa-infinity-model, same names, recalibrated allocations for ETFs):
+RISK TIERS (5-tier, recalibrated allocations for ETFs):
+  Tier 1 — Ultra Conservative:   5% crypto ETF exposure ceiling
+  Tier 2 — Conservative:         10% ceiling
+  Tier 3 — Moderate:             20% ceiling
+  Tier 4 — Aggressive:           35% ceiling
+  Tier 5 — Ultra Aggressive:     50%+ ceiling
 
-  Tier 1 — Ultra Conservative: 5% crypto ETF exposure ceiling
-           Primary: BTC spot ETFs with lowest expense ratios (IBIT, FBTC, BITB)
-           Rebalance: quarterly
-           Typical client: retiree, client explicitly risk-averse
-
-  Tier 2 — Conservative: 10% ceiling
-           Primary: BTC-heavy mix with ETH allocation starting
-           Rebalance: quarterly
-           Typical client: near-retirement, diversification allocation
-
-  Tier 3 — Moderate: 20% ceiling
-           Primary: balanced BTC/ETH, exposure to multiple ETFs for diversification
-           Rebalance: bi-monthly
-           Typical client: mid-career, moderate risk tolerance
-
-  Tier 4 — Aggressive: 35% ceiling
-           Primary: BTC + ETH + emerging thematic ETFs as they become available
-           Rebalance: monthly
-           Typical client: younger, higher risk tolerance, longer horizon
-
-  Tier 5 — Ultra Aggressive: 50%+ ceiling
-           Primary: maximum diversification across all approved crypto ETFs,
-                    including higher-expense-ratio issuers for thematic exposure
-           Rebalance: bi-weekly
-           Typical client: high-conviction crypto allocator, short-to-medium-term lens
-
-These ceiling percentages describe the crypto-ETF portion of a client's TOTAL
-portfolio — not the 100% of what this tool constructs. The tool constructs
-the crypto-ETF sleeve. The FA decides total-portfolio sizing separately,
-guided by a "Crypto allocation within total portfolio" input on the Portfolio
-View.
+Ceiling percentages describe the crypto-ETF portion of a client's TOTAL
+portfolio — not the 100% of what this tool constructs.
 
 EXTENDED MODULES (when EXTENDED_MODULES_ENABLED=True):
-  RWA module: 57 assets from rwa-infinity-model's RWA_UNIVERSE, same 5-tier
-              structure, preview banner enabled
-  DeFi module: Flare blockchain DeFi positions from flare-defi-model, same
-               5-tier structure, preview banner enabled
+  RWA module:  57 assets from rwa-infinity-model's RWA_UNIVERSE
+  DeFi module: Flare blockchain DeFi positions from flare-defi-model
 
 ---
 
 ## SECTION 14 — BACKUP & RESTORE PROTOCOL
 
-[MASTER TEMPLATE verbatim.]
-
-Before every major sprint: `git tag backup-pre-[description]-YYYY-MM-DD`
-Push tags immediately. These are restore points.
+[VERBATIM FROM MASTER TEMPLATE.]
 
 ---
 
 ## SECTION 15 — SPRINT TASK LIST
 
-[MASTER TEMPLATE verbatim.]
-
-Sprint tasks live in pending_work.md. CLAUDE.md contains permanent standards only.
-Sprint approval persists across sessions.
+[VERBATIM FROM MASTER TEMPLATE.]
 
 ---
 
 ## SECTION 16 — SESSION CONTINUITY & RESUME PROTOCOL
 
-[MASTER TEMPLATE verbatim. Standing permission granted.]
-
-On every new session: read MEMORY.md, read pending_work.md, git log -10,
-identify resume point, announce briefly, execute.
+[VERBATIM FROM MASTER TEMPLATE.]
 
 ---
 
 ## SECTION 17 — PARALLEL AGENT MONITORING & TAKEOVER
 
-[MASTER TEMPLATE verbatim.]
-
-5-minute monitoring cadence. Takeover on stall. Never wait indefinitely.
+[VERBATIM FROM MASTER TEMPLATE.]
 
 ---
 
 ## SECTION 18 — STREAMLIT-SPECIFIC PATTERNS
 
-[MASTER TEMPLATE verbatim. All 11 hard-learned patterns apply.]
+[VERBATIM FROM MASTER TEMPLATE.]
 
 ---
 
 ## SECTION 19 — CROSS-APP MODULE DISCIPLINE
 
-[MASTER TEMPLATE with this project's application:]
+[MASTER TEMPLATE. Project application:]
 
 This project does NOT share modules with the three foundation repos at runtime
-(per Section 11 of this file). BYTE-IDENTICAL cross-app constraint does not
-apply.
+(per Section 11). BYTE-IDENTICAL cross-app constraint does not apply externally.
 
-It DOES apply internally: if this project later ships multiple apps (admin
-panel, advisor app, compliance view), shared modules between them are
-byte-identical per master template.
+It DOES apply internally: if this project ships multiple apps (admin panel,
+advisor app, compliance view), shared modules between them are byte-identical
+per master template.
 
 ---
 
 ## SECTION 20 — GIT HYGIENE ON SHARED DEV MACHINES
 
-[MASTER TEMPLATE verbatim. Windows + OneDrive caveats apply on local dev.]
+[VERBATIM FROM MASTER TEMPLATE.]
 
 ---
 
 ## SECTION 21 — TONE & STYLE DURING COLLABORATION
 
-[MASTER TEMPLATE verbatim.]
+[VERBATIM FROM MASTER TEMPLATE.]
 
 Key reminder for this project specifically: user is moving fast toward a
 client demo. Push back on premature optimization. Ship the 80% that
@@ -451,7 +297,7 @@ demonstrates the vision; defer the 20% that only matters at scale.
 
 ---
 
-## SECTION 22 — PROJECT-SPECIFIC DEMO CONSTRAINTS (new section)
+## SECTION 22 — PROJECT-SPECIFIC DEMO CONSTRAINTS
 
 For the Friday-soft-deadline demo:
 
@@ -465,13 +311,12 @@ For the Friday-soft-deadline demo:
    for a real sandbox integration, and later `"alpaca"` for live.
 
 3. No real client data in the repo or in demo fixtures. Every client shown
-   is fictional, explicitly labeled as a demo persona. This is a compliance
-   requirement.
+   is fictional, explicitly labeled as a demo persona. Compliance requirement.
 
 4. Extended modules (RWA/DeFi) preview: visible only when
    EXTENDED_MODULES_ENABLED=True in config.py. Banner on both modules reads
    "Extended coverage — preview release. Execution not yet enabled for this
-   module." Per user's direction in the planning conversation.
+   module."
 
 5. Every backtest or performance display must include: multiple time
    horizons, benchmark comparison (default: 60/40 blended index + BTC), max
@@ -479,3 +324,38 @@ For the Friday-soft-deadline demo:
 
 6. Methodology page (`pages/98_methodology.py`) exists by Friday with
    placeholder copy. Replaced with full content post-demo.
+
+---
+
+## SECTION 23 — TOKEN EFFICIENCY (PROGRESS-PRESERVING)
+
+[VERBATIM FROM MASTER TEMPLATE.]
+
+---
+
+## SECTION 24 — POST-CHANGE FULL REVIEW PROTOCOL (WHEN)
+
+[VERBATIM FROM MASTER TEMPLATE.]
+
+Project-specific notes:
+- Fast-test suite target: under 30s locally.
+- Hot paths for perf check: the landing page, the portfolio construction
+  page, the basket-execute flow.
+- Pre-push hook runs Part A of Section 25 against the live Streamlit URL.
+
+---
+
+## SECTION 25 — DEPLOYMENT VERIFICATION PROTOCOL
+
+[VERBATIM FROM MASTER TEMPLATE.]
+
+Project-specific:
+- Deploy URL: https://etf-advisor.streamlit.app/
+- Checklist: `shared-docs/deployment-checklists/etf-advisor-platform.md`
+- Fallback-chain test: swap `YAHOO_FINANCE` in `.env` to an invalid URL
+  and confirm Alpha Vantage secondary takes over.
+- Compliance check on EVERY deploy: verify all performance displays
+  still show time horizons, benchmark, max drawdown, hypothetical
+  disclaimer, and methodology link.
+- Demo-mode check: `DEMO_MODE=True` boots without internet, all 3
+  demo personas visible.

@@ -29,11 +29,13 @@ from ui.components import (
     signal_badge,
 )
 from ui.level_helpers import is_advanced, level_text
+from ui.sidebar import render_sidebar
 from ui.theme import apply_theme
 
 
 st.set_page_config(page_title=f"ETF Detail — {BRAND_NAME}", layout="wide")
 apply_theme()
+render_sidebar()
 
 section_header(
     "ETF Detail",

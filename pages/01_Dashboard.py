@@ -22,11 +22,13 @@ from ui.components import (
     section_header,
 )
 from ui.level_helpers import level_text
+from ui.sidebar import render_sidebar
 from ui.theme import apply_theme
 
 
 st.set_page_config(page_title=f"Dashboard — {BRAND_NAME}", layout="wide")
 apply_theme()
+render_sidebar()
 
 section_header(
     "Dashboard",

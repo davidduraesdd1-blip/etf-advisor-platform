@@ -33,11 +33,13 @@ from ui.components import (
     tier_pill_selector,
 )
 from ui.level_helpers import is_advanced, is_beginner, level_text
+from ui.sidebar import render_sidebar
 from ui.theme import apply_theme
 
 
 st.set_page_config(page_title=f"Portfolio — {BRAND_NAME}", layout="wide")
 apply_theme()
+render_sidebar()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
