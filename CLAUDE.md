@@ -20,7 +20,7 @@
 
 ```
   Name:          ETF Advisor Platform
-  Path:          C:\Users\david\OneDrive\Desktop\Cowork\etf-advisor-platform
+  Path:          C:\dev\Cowork\etf-advisor-platform
   Repo:          github.com/davidduraesdd1-blip/etf-advisor-platform (PRIVATE)
   Deploy:        https://etf-advisor.streamlit.app/  (private app until post-demo review)
   User role:     builder / designer / reviewer (primary), partner joining mid-week
