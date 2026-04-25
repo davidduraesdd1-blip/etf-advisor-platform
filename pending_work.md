@@ -143,61 +143,44 @@ Morning block (A-F, blocking before deploy):
 - [x] C: Cornish-Fisher + CVaR + MDD retune for crypto ETFs (S=-0.25, K=2.5, CVaR 1.35/1.42, MDD factor 2.7)
 - [x] D: Execute Basket modal wires get_last_close per ETF; Confirm disabled when all live prices missing
 - [x] E: SEC EDGAR N-PORT parser (IBIT / ETHA / FBTC / FETH). Shared 10 req/sec token bucket in integrations/edgar.py. 7-day disk cache.
-- [x] F: get_etf_reference EDGAR → issuer → ETF.com → seed chain (issuer + ETF.com scrapers are post-demo stubs; seed-file marked as CACHED so FA sees transparency)
+- [x] F: get_etf_reference EDGAR → issuer → ETF.com → seed chain (issuer + ETF.com scrapers are post-demo stubs; seed-file marked as CACHED so FA sees tran
+---
 
-Afternoon block (G-J, polish + demo prep):
-- [x] G: Demo client profiles refined with coherent narratives + situation_today + seeded audit log
-- [x] H: pages/98_Methodology.py populated with 5 real sections (construction, backtest, signal, risk, transparency)
-- [x] I: Audit log panel on Settings page. 200-entry ring buffer, atomic writes, Windows retry.
-- [x] J: Empty / loading / error state polish sweep across all 4 pages. Methodology link on Portfolio + ETF Detail disclosures.
+## Sprint 2026-04-24 — UI/UX full redesign (handoff from Cowork)
 
-Cloud deploy (K):
-- [x] Streamlit Cloud deploy guide in docs/streamlit_cloud_deploy.md
-- [x] .streamlit/secrets.toml.example committed
-- [ ] Actual Cloud app creation + secrets population — DAVID'S ACTION (can't automate from Claude Code)
+**Handoff doc:** `../shared-docs/CLAUDE-CODE-HANDOFF.md`
+**Design system:** `../common/ui_design_system.py` — copy to `ui/design_system.py`
+**Research:** `../shared-docs/design-research/2026-04-23-redesign-research.md`
+**Mockups for this app** (all in `../shared-docs/design-mockups/`):
+  - `advisor-etf-portfolio.html — Portfolio`
+  - `advisor-etf-DASHBOARD.html — Dashboard`
+  - `advisor-etf-DETAIL.html — ETF Detail`
+  - `advisor-etf-METHODOLOGY.html — Methodology`
 
-Audit + tag (L-M):
-- [x] Full suite green after CF retune (property-based tests survived by design)
-- [x] Audit report in commit message
-- [x] Commit + push + tag `backup-demo-ready-2026-04-24`
+**Family:** advisor
+**Accent:** #0fa68a (muted advisor-teal) — SEPARATE advisor family (not sibling)
+**Priority note:** LAST in order. Demo-critical — May 1 meeting. main branch stays demo-stable until user explicitly approves merge.
 
-Tests added Day 4:
-- tests/test_signal_adapter.py — RSI / EMA / MACD / momentum / composite (≈20 tests)
-- tests/test_edgar_nport.py — XML fixture parse + unsupported-ticker path
-- tests/test_audit_log.py — append / ring-buffer / atomic-write / seed
-- tests/test_edgar.py — runtime guard / user-agent / token-bucket block
+### Redesign tasks — work in order, commit after each
 
-## Post-demo — parking lot (Day 5+)
+- [ ] 1. Copy `common/ui_design_system.py` → `ui/design_system.py`. Import in `app.py`. Call `inject_theme("etf-advisor-platform")` at the top of every page (after `set_page_config`, before `apply_theme`).
+- [ ] 2. Replace `ui/sidebar.py` with the new left-rail design per mockup. Include: brand header, user-level selector, theme toggle, refresh button, mode indicators. Shared sidebar must render on every page (DV-1 pattern — reuse `render_sidebar()`).
+- [ ] 3. Port the landing/home page per its mockup. First page to commit + verify end-to-end.
+- [ ] 4. Port each remaining page, one per commit. Match the mockup for that page in layout, spacing, component choice.
+- [ ] 5. Replace every hard-coded hex color in component code with a CSS variable reference or a `tokens`/`ACCENTS` lookup.
+- [ ] 6. Verify both dark and light themes on every page. Verify mobile viewport (≤768px) on every page.
+- [ ] 7. Ensure every data-consuming card has a `data_source_badge()` call per master template §10.
+- [ ] 8. Run the post-change audit per CLAUDE.md §24 after each commit — 7 criteria pass, commit message has short summary, `MEMORY.md` has full findings.
+- [ ] 9. Run `python tests/verify_deployment.py --env prod` after every push to `redesign/ui-2026-05` branch. Walk the 20-point checklist when the branch deploys to a test URL.
+- [ ] 10. When all pages are done + user-approved: open a PR `redesign/ui-2026-05` → `main`. Do NOT merge without explicit user approval.
 
-- [ ] Issuer-site and ETF.com reference scrapers (currently marked post-demo placeholder)
-- [ ] N-PORT parser extension beyond IBIT/ETHA/FBTC/FETH to every seed ticker
-- [ ] Alpaca paper-trading integration (BROKER_PROVIDER="alpaca_paper")
-- [ ] Live proper 3-year calibration fit for Cornish-Fisher S/K (replace 2026-04 crypto-ETF retune placeholders)
-- [ ] Signal adapter Layer 2/3/4 additions (macro, sentiment, on-chain) on top of the Day-4 technical composite
-- [ ] Multi-user auth + persistent client state (Supabase or similar)
-- [ ] Partner codebase merge + integration plan
-- [ ] Real brand identity + logo (update BRAND_NAME + BRAND_LOGO_PATH constants)
-- [ ] RWA + DeFi preview tabs wired to rwa-infinity-model + flare-defi-model patterns
-- [ ] Manual WCAG visual audit (complement to the token-palette contrast tests)
-- [ ] Monte Carlo runtime memory ceiling assertion (currently only defined, not enforced)
-- [ ] EDGAR search endpoint integration test in CI (weekly) to catch format changes
+### Acceptance criteria (all must be ✓ before merge to main)
 
-## Day 4 — Friday 2026-04-24 (polish + demo)
-
-- [ ] 3 demo client profiles with coherent narrative arcs (conservative retiree, mid-career moderate, high-conviction allocator)
-- [ ] Polished empty / loading / error states on every page (CLAUDE.md §8)
-- [ ] Performance disclaimers on every backtest
-- [ ] Audit log surface (minimal "Recent actions" panel)
-- [ ] `pages/98_Methodology.py` with placeholder copy
-- [ ] RWA + DeFi preview tabs when `EXTENDED_MODULES_ENABLED=True`
-- [ ] Streamlit Cloud private-app deploy
-- [ ] Full audit pass per CLAUDE.md §4
-- [ ] Commit + push + tag `backup-demo-ready-2026-04-24`
-
-## Post-demo (parking lot)
-
-- [ ] Real Alpaca broker integration (paper → live)
-- [ ] Multi-user auth + persistent state (Supabase or similar)
-- [ ] Partner codebase merge
-- [ ] Production deploy with monitoring
-- [ ] Real brand identity + logo
+- [ ] Every page renders in the new design language
+- [ ] Dark + light mode pass visually on every page
+- [ ] Mobile viewport (≤768px) degrades gracefully on every page
+- [ ] All existing unit tests pass; new tests added for new UI components
+- [ ] Deploy verifier passes 100% on `redesign/ui-2026-05` deployed to a test URL
+- [ ] Full 20-point browser checklist ✓ on test deploy
+- [ ] `MEMORY.md` has "Redesign complete — 2026-XX-XX" entry with per-page audit
+- [ ] User has reviewed the live test deploy and approved the look
