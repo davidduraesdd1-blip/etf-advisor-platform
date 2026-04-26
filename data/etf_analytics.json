@@ -1,13 +1,13 @@
 {
   "_metadata": {
-    "computed_at_ts": 1777134550.400505,
-    "computed_at_iso": "2026-04-25T16:29:10.400507+00:00",
+    "computed_at_ts": 1777221007.3553767,
+    "computed_at_iso": "2026-04-26T16:30:07.355378+00:00",
     "universe_size": 82,
     "tickers_with_data": 82,
     "tickers_fully_live": 68,
     "tickers_forward_only": 14,
-    "btc_long_run_cagr_pct": 66.92022043005608,
-    "eth_long_run_cagr_pct": 26.28036232716322,
+    "btc_long_run_cagr_pct": 66.89146283437,
+    "eth_long_run_cagr_pct": 26.519829192300225,
     "schema_version": 1
   },
   "etfs": {
@@ -22,7 +22,7 @@
       "correlation_source": "self",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 66.0,
+      "forward_return": 65.97,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) minus expense drag (0.25%)"
     },
@@ -37,7 +37,7 @@
       "correlation_source": "self",
       "corr_n_returns": 90,
       "btc_proxy_used": "FBTC",
-      "forward_return": 66.0,
+      "forward_return": 65.97,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) minus expense drag (0.25%)"
     },
@@ -52,7 +52,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 66.05,
+      "forward_return": 66.02,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) minus expense drag (0.20%)"
     },
@@ -67,7 +67,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 66.04,
+      "forward_return": 66.01,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) minus expense drag (0.21%)"
     },
@@ -82,7 +82,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 66.0,
+      "forward_return": 65.97,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) minus expense drag (0.25%)"
     },
@@ -97,7 +97,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 66.06,
+      "forward_return": 66.03,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) minus expense drag (0.19%)"
     },
@@ -112,7 +112,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 66.0,
+      "forward_return": 65.97,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) minus expense drag (0.25%)"
     },
@@ -127,7 +127,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 66.05,
+      "forward_return": 66.02,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) minus expense drag (0.20%)"
     },
@@ -142,7 +142,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 66.0,
+      "forward_return": 65.97,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) minus expense drag (0.25%)"
     },
@@ -157,7 +157,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 66.1,
+      "forward_return": 66.07,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) minus expense drag (0.15%)"
     },
@@ -172,7 +172,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 64.75,
+      "forward_return": 64.72,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) minus expense drag (1.50%)"
     },
@@ -187,7 +187,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 65.35,
+      "forward_return": 65.32,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) minus expense drag (0.90%)"
     },
@@ -202,9 +202,9 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 25.77,
+      "forward_return": 26.0,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD long-run CAGR (26.3%) minus expense drag (0.25%)"
+      "forward_return_basis": "ETH-USD long-run CAGR (26.5%) minus expense drag (0.25%)"
     },
     "FETH": {
       "expected_return": -20.59,
@@ -217,9 +217,9 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 25.77,
+      "forward_return": 26.0,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD long-run CAGR (26.3%) minus expense drag (0.25%)"
+      "forward_return_basis": "ETH-USD long-run CAGR (26.5%) minus expense drag (0.25%)"
     },
     "ETH": {
       "expected_return": -20.16,
@@ -232,9 +232,9 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 25.87,
+      "forward_return": 26.1,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD long-run CAGR (26.3%) minus expense drag (0.15%)"
+      "forward_return_basis": "ETH-USD long-run CAGR (26.5%) minus expense drag (0.15%)"
     },
     "ETHE": {
       "expected_return": -3.64,
@@ -247,9 +247,9 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 23.52,
+      "forward_return": 23.75,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD long-run CAGR (26.3%) minus expense drag (2.50%)"
+      "forward_return_basis": "ETH-USD long-run CAGR (26.5%) minus expense drag (2.50%)"
     },
     "ETHW": {
       "expected_return": -20.57,
@@ -262,9 +262,9 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 25.82,
+      "forward_return": 26.05,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD long-run CAGR (26.3%) minus expense drag (0.20%)"
+      "forward_return_basis": "ETH-USD long-run CAGR (26.5%) minus expense drag (0.20%)"
     },
     "CETH": {
       "expected_return": -20.37,
@@ -277,9 +277,9 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 25.81,
+      "forward_return": 26.04,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD long-run CAGR (26.3%) minus expense drag (0.21%)"
+      "forward_return_basis": "ETH-USD long-run CAGR (26.5%) minus expense drag (0.21%)"
     },
     "QETH": {
       "expected_return": -20.61,
@@ -292,9 +292,9 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 25.77,
+      "forward_return": 26.0,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD long-run CAGR (26.3%) minus expense drag (0.25%)"
+      "forward_return_basis": "ETH-USD long-run CAGR (26.5%) minus expense drag (0.25%)"
     },
     "EZET": {
       "expected_return": -20.54,
@@ -307,9 +307,9 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 25.83,
+      "forward_return": 26.06,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD long-run CAGR (26.3%) minus expense drag (0.19%)"
+      "forward_return_basis": "ETH-USD long-run CAGR (26.5%) minus expense drag (0.19%)"
     },
     "BSOL": {
       "expected_return": -80.15,
@@ -322,7 +322,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 46.64,
+      "forward_return": 46.62,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
@@ -337,12 +337,12 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 46.59,
+      "forward_return": 46.57,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
     "SSOL": {
-      "forward_return": 46.63,
+      "forward_return": 46.61,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
@@ -357,7 +357,7 @@
       "correlation_source": "live",
       "corr_n_returns": 89,
       "btc_proxy_used": "IBIT",
-      "forward_return": 46.59,
+      "forward_return": 46.57,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
@@ -372,7 +372,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 46.49,
+      "forward_return": 46.47,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
@@ -387,7 +387,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 46.34,
+      "forward_return": 46.32,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
@@ -402,7 +402,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 45.9,
+      "forward_return": 45.88,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
@@ -417,32 +417,32 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 46.49,
+      "forward_return": 46.47,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
     "BXRP": {
-      "forward_return": 46.5,
+      "forward_return": 46.48,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
     "LTCO": {
-      "forward_return": 46.34,
+      "forward_return": 46.32,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
     "GLTC": {
-      "forward_return": 46.49,
+      "forward_return": 46.47,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
     "DOGE": {
-      "forward_return": 45.9,
+      "forward_return": 45.88,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
     "CDOG": {
-      "forward_return": 46.34,
+      "forward_return": 46.32,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
@@ -457,17 +457,17 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 46.34,
+      "forward_return": 46.32,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
     "AVAX": {
-      "forward_return": 46.49,
+      "forward_return": 46.47,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
     "ADAX": {
-      "forward_return": 46.49,
+      "forward_return": 46.47,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.70 (altcoin drawdown/dilution haircut), minus expenses"
     },
@@ -482,7 +482,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 59.28,
+      "forward_return": 59.25,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.90 for contango/roll drag, minus expenses"
     },
@@ -497,7 +497,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 58.99,
+      "forward_return": 58.96,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.90 for contango/roll drag, minus expenses"
     },
@@ -512,9 +512,9 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 22.7,
+      "forward_return": 22.92,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD long-run CAGR (26.3%) \u00d7 0.90 for contango/roll drag, minus expenses"
+      "forward_return_basis": "ETH-USD long-run CAGR (26.5%) \u00d7 0.90 for contango/roll drag, minus expenses"
     },
     "BITX": {
       "expected_return": 7.67,
@@ -527,7 +527,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 71.76,
+      "forward_return": 71.73,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
     },
@@ -542,7 +542,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 72.66,
+      "forward_return": 72.63,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
     },
@@ -557,7 +557,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 72.6,
+      "forward_return": 72.57,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
     },
@@ -572,9 +572,9 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 27.97,
+      "forward_return": 28.23,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD 10yr CAGR (26.3%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
+      "forward_return_basis": "ETH-USD 10yr CAGR (26.5%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
     },
     "ETHT": {
       "expected_return": -71.31,
@@ -587,9 +587,9 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 27.96,
+      "forward_return": 28.22,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD 10yr CAGR (26.3%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
+      "forward_return_basis": "ETH-USD 10yr CAGR (26.5%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
     },
     "SOLT": {
       "expected_return": -79.63,
@@ -602,7 +602,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 71.76,
+      "forward_return": 71.73,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
     },
@@ -617,7 +617,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 71.76,
+      "forward_return": 71.73,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
     },
@@ -632,7 +632,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 72.56,
+      "forward_return": 72.53,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr (as MSTR proxy) CAGR (66.9%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
     },
@@ -647,7 +647,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 72.32,
+      "forward_return": 72.29,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr (as MSTR proxy) CAGR (66.9%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
     },
@@ -662,12 +662,12 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 72.46,
+      "forward_return": 72.43,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr (as COIN proxy) CAGR (66.9%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
     },
     "MARL": {
-      "forward_return": 72.46,
+      "forward_return": 72.43,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr (as MARA proxy) CAGR (66.9%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
     },
@@ -682,7 +682,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 72.46,
+      "forward_return": 72.43,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr (as RIOT proxy) CAGR (66.9%) \u00d7 1.10 (vol-decay-adjusted 2x \u2014 realized cumulative return for 2x crypto products tracks ~1\u00d7 spot in volatile regimes, not 2\u00d7), minus expenses"
     },
@@ -697,7 +697,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 35.82,
+      "forward_return": 35.8,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr (as MSTR proxy) CAGR (66.9%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
@@ -712,7 +712,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 35.82,
+      "forward_return": 35.8,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr (as COIN proxy) CAGR (66.9%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
@@ -727,7 +727,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 35.83,
+      "forward_return": 35.81,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
@@ -742,9 +742,9 @@
       "correlation_source": "live",
       "corr_n_returns": 81,
       "btc_proxy_used": "IBIT",
-      "forward_return": 13.47,
+      "forward_return": 13.61,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD 10yr CAGR (26.3%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
+      "forward_return_basis": "ETH-USD 10yr CAGR (26.5%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
     "YBIT": {
       "expected_return": -50.82,
@@ -757,7 +757,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 35.82,
+      "forward_return": 35.8,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
@@ -772,19 +772,19 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 13.46,
+      "forward_return": 13.6,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD 10yr CAGR (26.3%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
+      "forward_return_basis": "ETH-USD 10yr CAGR (26.5%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
     "IBIY": {
-      "forward_return": 35.86,
+      "forward_return": 35.84,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
     "ETHY": {
-      "forward_return": 13.5,
+      "forward_return": 13.64,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD 10yr CAGR (26.3%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
+      "forward_return_basis": "ETH-USD 10yr CAGR (26.5%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
     "MSFO": {
       "expected_return": -15.83,
@@ -797,7 +797,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 35.86,
+      "forward_return": 35.84,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr (as MSTR proxy) CAGR (66.9%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
@@ -812,7 +812,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 35.86,
+      "forward_return": 35.84,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr (as COIN proxy) CAGR (66.9%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
@@ -827,7 +827,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 35.82,
+      "forward_return": 35.8,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr (as MARA proxy) CAGR (66.9%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
@@ -842,7 +842,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 55.02,
+      "forward_return": 55.11,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "60% BTC + 40% ETH long-run CAGR \u00d7 1.10 (equity-beta premium), minus expenses"
     },
@@ -857,7 +857,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 54.88,
+      "forward_return": 54.97,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "60% BTC + 40% ETH long-run CAGR \u00d7 1.10 (equity-beta premium), minus expenses"
     },
@@ -872,7 +872,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 55.23,
+      "forward_return": 55.32,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "60% BTC + 40% ETH long-run CAGR \u00d7 1.10 (equity-beta premium), minus expenses"
     },
@@ -887,7 +887,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 55.23,
+      "forward_return": 55.32,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "60% BTC + 40% ETH long-run CAGR \u00d7 1.10 (equity-beta premium), minus expenses"
     },
@@ -902,7 +902,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 55.08,
+      "forward_return": 55.17,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "60% BTC + 40% ETH long-run CAGR \u00d7 1.10 (equity-beta premium), minus expenses"
     },
@@ -917,7 +917,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 55.13,
+      "forward_return": 55.22,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "60% BTC + 40% ETH long-run CAGR \u00d7 1.10 (equity-beta premium), minus expenses"
     },
@@ -932,7 +932,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 54.98,
+      "forward_return": 55.07,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "60% BTC + 40% ETH long-run CAGR \u00d7 1.10 (equity-beta premium), minus expenses"
     },
@@ -947,7 +947,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 55.08,
+      "forward_return": 55.17,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "60% BTC + 40% ETH long-run CAGR \u00d7 1.10 (equity-beta premium), minus expenses"
     },
@@ -962,7 +962,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 55.23,
+      "forward_return": 55.32,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "60% BTC + 40% ETH long-run CAGR \u00d7 1.10 (equity-beta premium), minus expenses"
     },
@@ -977,12 +977,12 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 56.32,
+      "forward_return": 56.33,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "75% BTC + 15% ETH + 10% altcoin-proxy long-run CAGR, minus expenses"
     },
     "EFBC": {
-      "forward_return": 57.92,
+      "forward_return": 57.93,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "75% BTC + 15% ETH + 10% altcoin-proxy long-run CAGR, minus expenses"
     },
@@ -997,7 +997,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 26.08,
+      "forward_return": 26.07,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.40 (defined-outcome upside cap + buffer floor), minus expenses. Real payoff is capped by the series outcome period \u2014 this is the annualized average across cap hits and flat periods."
     },
@@ -1012,7 +1012,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 26.08,
+      "forward_return": 26.07,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.40 (defined-outcome upside cap + buffer floor), minus expenses. Real payoff is capped by the series outcome period \u2014 this is the annualized average across cap hits and flat periods."
     },
@@ -1027,17 +1027,17 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 26.08,
+      "forward_return": 26.07,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.40 (defined-outcome upside cap + buffer floor), minus expenses. Real payoff is capped by the series outcome period \u2014 this is the annualized average across cap hits and flat periods."
     },
     "CBOQ": {
-      "forward_return": 26.08,
+      "forward_return": 26.07,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.40 (defined-outcome upside cap + buffer floor), minus expenses. Real payoff is capped by the series outcome period \u2014 this is the annualized average across cap hits and flat periods."
     },
     "CBOS": {
-      "forward_return": 26.08,
+      "forward_return": 26.07,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.40 (defined-outcome upside cap + buffer floor), minus expenses. Real payoff is capped by the series outcome period \u2014 this is the annualized average across cap hits and flat periods."
     },
@@ -1052,7 +1052,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 26.08,
+      "forward_return": 26.07,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr CAGR (66.9%) \u00d7 0.40 (defined-outcome upside cap + buffer floor), minus expenses. Real payoff is capped by the series outcome period \u2014 this is the annualized average across cap hits and flat periods."
     },
@@ -1067,7 +1067,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 35.96,
+      "forward_return": 35.94,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr (as MSTR proxy) CAGR (66.9%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
@@ -1082,7 +1082,7 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 35.83,
+      "forward_return": 35.81,
       "forward_return_source": "live_long_run",
       "forward_return_basis": "BTC-USD 10yr (as MSTR proxy) CAGR (66.9%) \u00d7 0.55 (covered-call upside cap), minus expenses. Distribution yield is included in total return."
     },
@@ -1097,9 +1097,9 @@
       "correlation_source": "live",
       "corr_n_returns": 90,
       "btc_proxy_used": "IBIT",
-      "forward_return": 25.82,
+      "forward_return": 26.05,
       "forward_return_source": "live_long_run",
-      "forward_return_basis": "ETH-USD long-run CAGR (26.3%) minus expense drag (0.20%)"
+      "forward_return_basis": "ETH-USD long-run CAGR (26.5%) minus expense drag (0.20%)"
     }
   }
 }
