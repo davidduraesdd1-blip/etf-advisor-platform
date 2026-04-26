@@ -37,24 +37,64 @@ from config import (
 def _sidebar_layout_css() -> str:
     """Sidebar layout CSS.
 
-    2026-04-26 second hotfix: previous hotfix kept Streamlit's auto-nav
-    as a fallback. The custom st.page_link calls demonstrably work on
-    the live deploy now (per user walkthrough), so showing both surfaces
-    produced a duplicate-nav UX. Hide the auto-nav again; custom nav is
-    the single click surface.
+    2026-04-26 polish: per user feedback,
+      * Group headers (ADVISOR / RESEARCH / ACCOUNT) needed to be
+        visually larger + bolder than the nav items beneath them.
+        Prior styling was 10.5px / weight 500 muted — too easy to skim
+        past. Bumped to 12.5px / weight 700 / text-secondary color
+        with a thin top divider so each group reads as a section header.
+      * Nav items needed more breathing room. Bumped the inter-widget
+        gap from 4px → 10px and added padding to the nav-group margin.
 
-    Per-item try/except around each st.page_link in render_sidebar()
-    stays in place — if a single link can't resolve (e.g., "app.py" as
-    the entrypoint sometimes fails), the rest of the nav still renders.
+    Auto-nav stays hidden; custom nav is the single click surface.
+    Per-item try/except around each st.page_link still in place.
     """
     return (
         "<style>"
-        # Hide Streamlit's auto-discovered nav — custom grouped nav owns
-        # this surface.
+        # Hide Streamlit's auto-discovered nav.
         "[data-testid='stSidebarNav'] { display: none !important; }"
-        # Tighten gap between sidebar widgets so brand + nav-group headers
-        # stack cleanly without rivers of whitespace.
-        "[data-testid='stSidebar'] [data-testid='stVerticalBlock'] { gap: 4px; }"
+
+        # Inter-widget breathing room — was 4px, now 10px so nav items
+        # don't crowd each other.
+        "[data-testid='stSidebar'] [data-testid='stVerticalBlock'] { gap: 10px; }"
+
+        # ── Nav-group section headers (ADVISOR / RESEARCH / ACCOUNT) ──
+        # Larger + bolder than nav items. Top divider visually anchors
+        # each section. Override .ds-nav-group inline styles via specific
+        # selector + !important so the inline values can't dilute it.
+        "[data-testid='stSidebar'] .ds-nav-group {"
+            " font-size: 12.5px !important;"
+            " font-weight: 700 !important;"
+            " color: var(--text-secondary) !important;"
+            " margin: 18px 0 6px !important;"
+            " padding: 10px 12px 4px 12px !important;"
+            " text-transform: uppercase !important;"
+            " letter-spacing: 0.14em !important;"
+            " border-top: 1px solid var(--border) !important;"
+        " }"
+        # First nav-group sits right under the brand block — no top
+        # divider on it (it would float above all content visually).
+        "[data-testid='stSidebar'] [data-testid='stVerticalBlock']"
+            " > [data-testid='stElementContainer']:has(.ds-nav-group):first-of-type"
+            " .ds-nav-group {"
+            " border-top: none !important;"
+            " margin-top: 8px !important;"
+            " padding-top: 0 !important;"
+        " }"
+
+        # ── Nav items (st.page_link rendered links) ──
+        # Smaller + lighter than the group headers above them, so the
+        # hierarchy reads correctly: group label > item.
+        "[data-testid='stSidebar'] [data-testid='stPageLink'] a {"
+            " font-size: 13px !important;"
+            " font-weight: 500 !important;"
+            " padding: 8px 12px !important;"
+            " border-radius: 7px !important;"
+        " }"
+        "[data-testid='stSidebar'] [data-testid='stPageLink'] a:hover {"
+            " background: var(--bg-2) !important;"
+            " color: var(--text-primary) !important;"
+        " }"
         "</style>"
     )
 

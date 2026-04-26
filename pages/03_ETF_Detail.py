@@ -669,14 +669,22 @@ with col_comp:
                         "(nothing populates until you do)."
                     )
 
-                # For issuer-static trusts, surface the issuer's live
-                # holdings page so the FA can audit the per-share coin
-                # count published daily.
+                # External link to fund details. For issuer-static trusts
+                # this is the issuer's own daily-holdings page when the
+                # site cooperates (e.g., iShares, Fidelity). For trusts
+                # whose issuer site 404s / refuses bots / has a dead
+                # domain, the link is a Yahoo Finance fund-profile
+                # fallback — always-valid for any US-listed ETF. Label is
+                # neutral so it reads correctly for either destination.
                 if src == "issuer_static" and comp.get("issuer_holdings_url"):
-                    st.markdown(
-                        f"📊 [Live daily holdings on issuer site]"
-                        f"({comp['issuer_holdings_url']})"
+                    _ext_url = comp["issuer_holdings_url"]
+                    _is_yahoo = "finance.yahoo.com" in _ext_url
+                    _link_label = (
+                        "📊 Fund profile (Yahoo Finance) ↗"
+                        if _is_yahoo
+                        else "📊 Live daily holdings on issuer site ↗"
                     )
+                    st.markdown(f"[{_link_label}]({_ext_url})")
                 if comp.get("note"):
                     st.caption(comp["note"])
         else:

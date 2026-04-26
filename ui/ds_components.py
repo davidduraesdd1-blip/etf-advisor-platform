@@ -136,13 +136,38 @@ def render_top_bar(
                     reset_circuit_breaker()
                 except Exception:
                     pass
-                # Toast survives the rerun and gives visible confirmation
-                # — without this the user can't tell the click fired.
+                # Two-channel feedback so the user can see the click fired:
+                #   1. Toast at the bottom-right (auto-dismiss, ~3s).
+                #   2. session_state["last_refresh_ts"] which the topbar
+                #      itself reads on the NEXT render and shows as a
+                #      "Refreshed Xs ago" caption directly under the
+                #      Refresh button (persists until next refresh).
+                import time
+                st.session_state["last_refresh_ts"] = time.time()
                 try:
                     st.toast("Caches cleared — refetching live data", icon="✓")
                 except Exception:
                     pass
                 st.rerun()
+
+            # "Refreshed Xs ago" caption, only when a recent refresh fired.
+            # Renders directly below the Refresh button so the feedback is
+            # unmissable — the user sees the timestamp tick from "just now"
+            # to "1s ago" / "2s ago" / etc. on subsequent reruns.
+            _last = st.session_state.get("last_refresh_ts")
+            if _last:
+                import time as _t
+                _delta = max(0, int(_t.time() - _last))
+                if _delta < 60:
+                    _ago = "just now" if _delta < 2 else f"{_delta}s ago"
+                else:
+                    _ago = f"{_delta // 60}m ago"
+                st.markdown(
+                    f'<div style="font-size:10.5px;color:var(--text-muted);'
+                    f'text-align:center;margin-top:4px;font-family:var(--font-mono);">'
+                    f'✓ refreshed {_ago}</div>',
+                    unsafe_allow_html=True,
+                )
 
     if show_theme:
         with theme_col:
