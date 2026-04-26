@@ -4,6 +4,108 @@ Session continuity log. Newest entries on top. See master-template §16.
 
 ---
 
+## 2026-04-26 — Demo-ready (advisor/client taxonomy + mockup parity)
+
+**Cascade complete.** Tag `demo-ready-2026-04-26` shipped on
+`main` at `5574537`. Live deploy https://etf-advisor.streamlit.app/
+verified 9/9 by `tests/verify_deployment.py --env prod`.
+
+### What landed in a single-day cascade
+
+Four sequential branches, **15 source-changing commits + 1 merge commit**,
+all fast-forwarded onto `main`:
+
+  1. `redesign/advisor-2026-05` (6 commits) — initial mockup port:
+     CSS audit, Dashboard / Portfolio / ETF Detail / Methodology / Home
+     page bodies rewritten to match `../shared-docs/design-mockups/
+     advisor-etf-*.html`.
+
+  2. `redesign/advisor-2026-05-fixes` (6 commits) — mockup-parity
+     follow-ups after Cowork's first walkthrough: Streamlit primary
+     color → advisor teal `#0fa68a`, methodology HTML rendering bug
+     fixed, sidebar grouped nav (no level radio / theme dup / refresh
+     dup), Portfolio tier pills (5 numbered) + KPI dedup + subtitle,
+     ETF Detail hero + KPIs + signal callout, Dashboard inline-Open
+     links per row.
+
+  3. `chore/pre-merge-cleanup-2026-04-26` (5 commits) — pre-merge
+     cleanup: `DEMO_MODE_NO_FETCH=1` short-circuit + 30s AppTest
+     timeout (208/212 → 212/212), session_state autouse reset in
+     conftest, ETF Detail composition side-by-side via st.columns
+     ([2,1]) + DV-2 perf table to its own full-width card,
+     MEMORY.md + pending_work.md + README updates.
+
+  4. `feat/advisor-client-taxonomy-2026-04-26` (3 commits) —
+     **taxonomy collapse** per Cowork directive: drop the 3-level
+     Beginner / Intermediate / Advanced tree; replace with 2-mode
+     Advisor (default — full data, jargon, raw indicator names, for
+     the FA working alone) / Client (plain English, simpler charts,
+     prominent hypothetical-results disclaimers, for screen-share with
+     a client). Same data both modes, presentation only. Topbar pills
+     swapped 3 → 2 (still decorative pending wiring post-demo).
+     Hand-rolled paren-aware scanner rewrote 24 `level_text()` call
+     sites across 5 pages without breaking multi-line strings,
+     f-strings, or comments. `is_advisor()` / `is_client()` replace
+     `is_advanced()` / `is_beginner()` / `is_intermediate()`.
+
+  + 1 merge commit (`5574537`) bringing main's daily chore commits
+    (scanner + analytics — data-only, 5 commits) into the cascade so
+    the final advisor-2026-05 → main step was a clean fast-forward.
+
+### Test status
+
+  - **212/212 passing** on `main` after cascade.
+  - 4 baseline failures from before the sprint (1 sidebar-persistence
+    test-order leak + 3 page-apptest timeouts) — all fixed by cleanup
+    sprint Commit 1 (`DEMO_MODE_NO_FETCH=1`) + Commit 2 (autouse
+    session_state reset).
+  - Full suite ~85s.
+
+### Compliance status
+
+  - **DV-1** (level/mode persists across pages): ✅ preserved through
+    the 3-level → 2-mode collapse. Test rewritten to assert "Client"
+    persistence (was "Advanced").
+  - **DV-2** (perf table 8-column compliance set): ✅ preserved on
+    Portfolio + ETF Detail. ETF Detail perf table now lives in its
+    own full-width card below the columns row.
+  - **SEC Marketing Rule** disclosures: ✅ Hypothetical-results
+    callout on every performance display; Methodology link from each.
+
+### Prod deploy verifier — 2026-04-26
+
+```
+── deploy verify: prod @ https://etf-advisor.streamlit.app/ ──
+  ✓   1.64s  base URL reachable (<= 60s)
+  ✓   1.59s  landing page — no Python error signatures
+  ✓   1.71s  landing page — expected strings (3)
+  ✓   1.61s  page /Dashboard
+  ✓   1.62s  page /Portfolio
+  ✓   1.59s  page /ETF_Detail
+  ✓   1.59s  page /Methodology
+  ✓   1.55s  page /Settings
+  ✓   1.63s  health endpoint /_stcore/health
+── 9/9 checks passed ──
+```
+
+### Resume point
+
+Demo-ready. May 1 demo flow:
+  Home → Dashboard (Marcus Avery, drift-flagged) → Portfolio (Tier 3,
+  toggle to 4 and back) → Execute Basket → ETF Detail → Methodology.
+  Walked at Advisor mode then flipped to Client mode for the simpler
+  copy verification.
+
+Post-demo backlog (per `pending_work.md`):
+  - Topbar pill wiring (currently decorative)
+  - Light-mode end-to-end walk
+  - Mobile (≤768px) walk
+  - Legacy `:root` block collapse in `theme.py`
+  - Full doc sweep updating `pending_work.md` + `README.md` to reflect
+    the new taxonomy (this MEMORY entry covers it for now).
+
+---
+
 ## 2026-04-26 — Advisor-family redesign + mockup-parity fixes + cleanup
 
 **Context:** Three back-to-back sprints porting the advisor-family
