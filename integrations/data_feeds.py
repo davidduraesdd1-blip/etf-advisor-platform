@@ -709,10 +709,55 @@ def get_forward_return_estimate(
     btc_cagr = btc_info.get("cagr_pct")
     eth_cagr = eth_info.get("cagr_pct")
 
+    # ── 2026-04-26 math audit (Bucket 2) ────────────────────────────────────
+    # Previously every altcoin (SOL / XRP / LTC / DOGE / HBAR / ADA / AVAX)
+    # was modeled identically as BTC × 0.70 — a uniform haircut that buried
+    # significant per-coin variance. SOL has a strong 5yr CAGR; XRP / LTC
+    # have flat-to-mid; DOGE has high but extremely volatile. Treating them
+    # as a homogenous bucket was unfair to the better-track-record alts and
+    # generous to the worse ones.
+    #
+    # New approach: try yfinance for the per-coin spot ticker (`<COIN>-USD`)
+    # first. When data exists, use the actual long-run CAGR with no haircut
+    # — the data already reflects every drawdown the coin has experienced.
+    # When data is unavailable (newer launches, ticker not on yfinance),
+    # fall back to BTC × 0.70 with the basis string explicitly noting the
+    # fallback path. The Methodology page documents both paths.
+    _ALTCOIN_YFINANCE_TICKER: dict[str, str] = {
+        "SOL":   "SOL-USD",
+        "XRP":   "XRP-USD",
+        "LTC":   "LTC-USD",
+        "DOGE":  "DOGE-USD",
+        "ADA":   "ADA-USD",
+        "AVAX":  "AVAX-USD",
+        "HBAR":  "HBAR-USD",
+        "DOT":   "DOT-USD",
+        "LINK":  "LINK-USD",
+    }
+
+    def _altcoin_cagr_or_none(coin_symbol: str) -> tuple[float | None, str]:
+        """Per-altcoin CAGR. Returns (cagr_pct, label_or_reason)."""
+        coin = (coin_symbol or "").upper()
+        yticker = _ALTCOIN_YFINANCE_TICKER.get(coin)
+        if not yticker:
+            return (None, f"{coin} not in yfinance map")
+        info = get_long_run_cagr(yticker, period="10y")
+        cagr = info.get("cagr_pct")
+        if cagr is None:
+            return (None, f"{yticker} long-run history unavailable")
+        return (cagr, f"{yticker} long-run")
+
     def _underlying_cagr() -> tuple[float | None, str]:
         """
         Pick the correct long-run CAGR for the fund's actual underlying.
         Returns (cagr_pct, reference_label). Handles None gracefully.
+
+        2026-04-26: now resolves per-altcoin underlyings (SOL / XRP / LTC /
+        DOGE / ADA / AVAX / HBAR / DOT / LINK) via yfinance instead of
+        always falling back to BTC. Used by leveraged + income_covered_call
+        wrappers that target altcoin underlyings (SOLT, XRPT, etc.) so
+        their forward-return estimate reflects the actual underlying coin
+        rather than BTC-as-proxy.
         """
         u = (underlying or "").upper()
         # ETH-based wrappers (ETHU / ETHT / ETHI / YETH / ETHY)
@@ -726,6 +771,15 @@ def get_forward_return_estimate(
         # category-level multiplier (e.g., leveraged 1.40) still applies.
         if u in ("MSTR", "COIN", "MARA", "RIOT"):
             return (btc_cagr, f"BTC-USD 10yr (as {u} proxy)")
+        # Per-altcoin lookup — use the coin's own long-run CAGR when
+        # yfinance has it. Fairer than the old BTC-fallback.
+        if u in _ALTCOIN_YFINANCE_TICKER:
+            alt_cagr, alt_label = _altcoin_cagr_or_none(u)
+            if alt_cagr is not None:
+                return (alt_cagr, alt_label)
+            # No live history — fall through to BTC anchor with a clear
+            # label so the basis string explains the fallback.
+            return (btc_cagr, f"BTC-USD 10yr (fallback — {alt_label})")
         # Default to BTC as the crypto-asset anchor.
         return (btc_cagr, "BTC-USD 10yr")
 
@@ -785,18 +839,43 @@ def get_forward_return_estimate(
                          f"for contango/roll drag, minus expenses"}
 
     if category == "altcoin_spot":
-        # Altcoins (SOL / XRP / LTC / DOGE / HBAR / ADA / AVAX) have
-        # historically underperformed BTC on long-run CAGR due to
-        # steeper drawdowns + higher issuance dilution. Model at BTC
-        # long-run × 0.70 to reflect that structural underperformance
-        # while still carrying meaningful upside vs. cash.
+        # 2026-04-26 math-audit fix: per-altcoin CAGR from yfinance when
+        # available (SOL-USD / XRP-USD / LTC-USD / DOGE-USD / ADA-USD /
+        # AVAX-USD / HBAR-USD / DOT-USD / LINK-USD). Each coin's actual
+        # long-run track record drives its forward estimate, NO uniform
+        # 0.70 haircut. The data already encodes drawdowns + dilution.
+        # Falls back to BTC × 0.70 only when the per-coin history isn't
+        # available (newer launches, ticker not on yfinance) — basis
+        # string makes the path used explicit so the FA can audit.
+        u = (underlying or "").upper()
+        if u and u in _ALTCOIN_YFINANCE_TICKER:
+            alt_cagr, alt_label = _altcoin_cagr_or_none(u)
+            if alt_cagr is not None:
+                fwd = alt_cagr - er_drag * 100.0
+                return {
+                    "forward_return_pct": fwd, "source": "live_long_run",
+                    "basis": f"{alt_label} CAGR ({alt_cagr:.1f}%) "
+                             f"— per-coin (no uniform haircut), minus expenses",
+                }
+            # Per-coin data unavailable — fall through to BTC × 0.70
+            # but flag the fallback in the basis string.
+            if btc_cagr is None:
+                return {"forward_return_pct": None, "source": "unavailable",
+                        "basis": f"{u} history unavailable AND BTC fallback unavailable"}
+            fwd = btc_cagr * 0.70 - er_drag * 100.0
+            return {
+                "forward_return_pct": fwd, "source": "live_long_run",
+                "basis": f"BTC-USD 10yr CAGR ({btc_cagr:.1f}%) × 0.70 "
+                         f"(fallback — {u} history unavailable), minus expenses",
+            }
+        # No underlying field set on the ETF — uniform BTC × 0.70 fallback.
         if btc_cagr is None:
             return {"forward_return_pct": None, "source": "unavailable",
                     "basis": "BTC-USD long-run history unavailable"}
         fwd = btc_cagr * 0.70 - er_drag * 100.0
         return {"forward_return_pct": fwd, "source": "live_long_run",
                 "basis": f"BTC-USD 10yr CAGR ({btc_cagr:.1f}%) × 0.70 "
-                         f"(altcoin drawdown/dilution haircut), minus expenses"}
+                         f"(altcoin proxy — no underlying field set), minus expenses"}
 
     if category == "leveraged":
         # 2x leveraged products: naive 2x is wrong (vol decay); prior
