@@ -6,6 +6,9 @@
 .streamlit/secrets.toml
 .streamlit/*.toml
 !.streamlit/config.toml.example
+# config.toml is deploy-time theme config (no secrets) — tracked so the
+# advisor-family palette flows to Streamlit Cloud
+!.streamlit/config.toml
 
 # ── Runtime data & caches ────────────────────────────────────────────────────
 data/*.json

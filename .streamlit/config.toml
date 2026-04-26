@@ -1,0 +1,19 @@
+[theme]
+# Advisor-family palette — matches ui/design_system.py ADVISOR_DARK +
+# ACCENTS["etf-advisor-platform"] tokens. Without this block Streamlit
+# falls back to its default red primary, which leaks onto every primary
+# button, selected radio option, and toggle on=state across the app.
+primaryColor          = "#0fa68a"
+backgroundColor       = "#0c0d12"
+secondaryBackgroundColor = "#14161d"
+textColor             = "#e8e9ee"
+font                  = "sans serif"
+
+[server]
+# Keep Streamlit Cloud's defaults — these are deploy hints, not feature flags.
+runOnSave             = false
+
+[client]
+# Hide the bottom-right "Made with Streamlit" footer. The advisor demo
+# is a client-facing presentation; no third-party branding.
+toolbarMode           = "minimal"
