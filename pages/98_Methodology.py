@@ -43,180 +43,247 @@ except Exception:
     )
 
 
-# ─── 1. Portfolio construction ───────────────────────────────────────────────
+# ── 2026-04-25 redesign: port body to advisor-etf-METHODOLOGY.html ──────────
+# 8-section structured doc with sticky TOC on the left + article on the right.
+# Single render — methodology is reference content, not level-gated. Existing
+# level_text variants for the 5 prior sections are preserved in git history;
+# the deeper engineering detail (Wilder RSI tuning, Cornish-Fisher MDD
+# factor, etc.) lives in docs/port_log.md and inline code comments where
+# it's load-bearing.
 
-with card("How portfolios are constructed"):
-    st.markdown(level_text(
-        beginner=(
-            "Every client is assigned one of five risk tiers, from **Ultra "
-            "Conservative** (appropriate for retirees) to **Ultra Aggressive** "
-            "(appropriate for younger clients with long horizons and high "
-            "conviction about crypto as an asset class).\n\n"
-            "For each tier, the platform picks a mix of ETFs inside the crypto "
-            "sleeve. Lower tiers stick to a small number of large, low-fee "
-            "Bitcoin spot ETFs. Higher tiers add Ethereum and, eventually, "
-            "more diversified baskets as those ETFs come to market."
-        ),
-        intermediate=(
-            "Five tiers (Ultra Conservative → Ultra Aggressive) with "
-            "category ceilings on the crypto sleeve: **5% / 10% / 20% / "
-            "35% / 50%+** of total portfolio. Inside each tier, the allocation "
-            "matrix (`core/risk_tiers.py`) distributes the sleeve across "
-            "9 category buckets: btc_spot / eth_spot / altcoin_spot / "
-            "income_covered_call / thematic_equity / leveraged / multi_asset. "
-            "btc_futures and eth_futures are excluded by design (spot strictly "
-            "dominates post-approval)."
-        ),
-        advanced=(
-            "`core/portfolio_engine.py::build_portfolio` implements: \n\n"
-            "1. Look up tier allocation matrix from `TIER_CATEGORY_ALLOCATIONS`.\n"
-            "2. For each category with nonzero weight, select up to "
-            "`MAX_ETFS_PER_CATEGORY=3` ETFs sorted by expense ratio (ties "
-            "broken on issuer diversity).\n"
-            "3. Apply issuer-tier nudge: Tier A (BlackRock, Fidelity) +2pp, "
-            "Tier C (GBTC / ETHE / DEFI / XRPR / BITW) −2pp, neutral otherwise. "
-            "Post-nudge renormalize so each category still sums to its target.\n"
-            "4. Enforce `MAX_SINGLE_POSITION_PCT=30%` diversification cap.\n"
-            "5. Normalize final weights to 100%; last holding absorbs "
-            "rounding remainder.\n"
-            "6. Compute full metric suite via `compute_portfolio_metrics`."
-        ),
-    ))
+# Inline CSS for the TOC + article — the design-system stylesheet doesn't
+# style article-style long-form copy because Methodology is the only page
+# with this layout in the app.
+_methodology_css = """
+<style>
+.eap-meth-shell {
+  display: grid; grid-template-columns: 220px 1fr; gap: 40px;
+  align-items: start;
+}
+.eap-meth-toc {
+  position: sticky; top: 100px; align-self: start; font-size: 13px;
+}
+.eap-meth-toc-title {
+  font-size: 11px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;
+}
+.eap-meth-toc a {
+  display: block; color: var(--text-secondary); text-decoration: none;
+  padding: 6px 10px; border-radius: 6px; font-size: 13px; margin-bottom: 2px;
+}
+.eap-meth-toc a:hover { background: var(--bg-2); color: var(--text-primary); }
+.eap-meth-article h1 {
+  font-family: var(--font-display); font-weight: 500;
+  font-size: 32px; letter-spacing: -0.015em;
+  margin: 0 0 12px; line-height: 1.2; color: var(--text-primary);
+}
+.eap-meth-article .sub {
+  color: var(--text-secondary); font-size: 15px;
+  margin-bottom: 28px; max-width: 68ch;
+}
+.eap-meth-article h2 {
+  font-family: var(--font-display); font-weight: 500;
+  font-size: 22px; letter-spacing: -0.01em;
+  margin: 32px 0 12px; padding-top: 24px;
+  border-top: 1px solid var(--border);
+  color: var(--text-primary);
+  scroll-margin-top: 100px;
+}
+.eap-meth-article h2:first-of-type { border-top: none; padding-top: 0; }
+.eap-meth-article p {
+  font-size: 14px; line-height: 1.7;
+  max-width: 68ch; color: var(--text-secondary); margin: 0 0 14px;
+}
+.eap-meth-article p strong { color: var(--text-primary); }
+.eap-meth-article ul {
+  padding-left: 20px; margin: 0 0 14px;
+  color: var(--text-secondary); font-size: 14px; line-height: 1.7;
+}
+.eap-meth-article ul li { margin-bottom: 6px; }
+.eap-meth-article code {
+  font-family: var(--font-mono); background: var(--bg-2);
+  padding: 2px 6px; border-radius: 4px; font-size: 12.5px;
+  color: var(--text-primary);
+}
+.eap-meth-callout {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 16px 20px; margin: 20px 0; font-size: 13px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg-1));
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+  border-left: 3px solid var(--accent); border-radius: 8px;
+}
+.eap-meth-callout.warn {
+  background: color-mix(in srgb, var(--warning) 5%, var(--bg-1));
+  border-color: color-mix(in srgb, var(--warning) 20%, var(--border));
+  border-left-color: var(--warning);
+}
+.eap-meth-callout .icon {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent);
+  display: grid; place-items: center; font-weight: 600; font-size: 13px;
+  flex-shrink: 0;
+}
+.eap-meth-callout.warn .icon {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
+}
+.eap-meth-card {
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: var(--card-radius); padding: 20px; margin: 18px 0;
+}
+.eap-meth-card-title {
+  font-family: var(--font-display); font-weight: 500;
+  font-size: 15px; margin: 0 0 10px; color: var(--text-primary);
+}
+.eap-meth-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 12.5px; margin: 12px 0;
+}
+.eap-meth-table th {
+  text-align: left; padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10.5px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.07em; font-weight: 500;
+}
+.eap-meth-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+.eap-meth-table tr:last-child td { border-bottom: none; }
+.eap-meth-table tr:nth-child(even) td { background: var(--bg-2); }
+.eap-meth-table td.num { text-align: right; font-family: var(--font-mono); }
+.eap-meth-table td .role {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600;
+}
+.eap-meth-table td .role.primary {
+  background: var(--accent-soft); color: var(--accent);
+}
+.eap-meth-table td .role.secondary {
+  background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info);
+}
+.eap-meth-table td .role.tertiary {
+  background: var(--bg-3); color: var(--text-muted);
+}
+@media (max-width: 1024px) {
+  .eap-meth-shell { grid-template-columns: 1fr; gap: 24px; }
+  .eap-meth-toc { position: static; display: none; }
+}
+</style>
+"""
 
+st.markdown(_methodology_css, unsafe_allow_html=True)
 
-# ─── 2. Backtest methodology ─────────────────────────────────────────────────
+# Render the entire 2-col article in one HTML block — TOC anchors + article
+# sections with id="..." attributes for the sticky links.
+_article_html = """
+<div class="eap-meth-shell">
+  <nav class="eap-meth-toc">
+    <div class="eap-meth-toc-title">On this page</div>
+    <a href="#intro">Intro &amp; compliance</a>
+    <a href="#construction">Portfolio construction</a>
+    <a href="#signals">Signal engine</a>
+    <a href="#benchmark">Benchmark</a>
+    <a href="#data">Data sources</a>
+    <a href="#risk">Risk metrics</a>
+    <a href="#simplifications">Known simplifications</a>
+    <a href="#compliance">Compliance statement</a>
+  </nav>
+  <article class="eap-meth-article">
+    <h1>Methodology</h1>
+    <div class="sub">The math, data, and compliance story behind every portfolio, signal, and performance display. Linked from every performance disclosure per SEC Marketing Rule.</div>
 
-with card("Backtest methodology"):
-    st.markdown(level_text(
-        beginner=(
-            "Historical returns are pulled directly from public market data "
-            "(Yahoo Finance, with Stooq as a backup). Performance shown on "
-            "Portfolio and ETF Detail pages is always labeled **Hypothetical "
-            "results** per SEC Marketing Rule guidance.\n\n"
-            "The benchmark is a blended **60% equity / 40% bond** mix with a "
-            "20% Bitcoin spot sleeve, rebalanced quarterly."
-        ),
-        intermediate=(
-            "Historical OHLCV from yfinance → Stooq fallback chain (cached "
-            "5min during market hours, 60min off-hours). 1Y / 3Y / 5Y / "
-            "since-inception tabs. Benchmark = `BENCHMARK_DEFAULT` in "
-            "`config.py`. Max drawdown computed on daily close series."
-        ),
-        advanced=(
-            "Price chain: yfinance primary → Stooq (~15-min delayed). "
-            "Circuit breaker trips yfinance to Stooq on 3 failures in a "
-            "60-second rolling window; new-ETF empty results do not count "
-            "toward the breaker. All fallback states surface via "
-            "`data_source_badge` on the affected panel. Alpha Vantage was "
-            "removed from the active chain (25 req/day free tier was a "
-            "false fallback); scaffold retained in integrations/data_feeds "
-            "for paid-tier reactivation."
-        ),
-    ))
+    <section id="intro">
+      <h2>Intro &amp; compliance</h2>
+      <p>This platform constructs risk-tiered crypto ETF baskets for financial advisors. Every portfolio view shows backtested performance over multiple time horizons, a blended benchmark, and max drawdown — never a single cherry-picked number. All client profiles shown in demo mode are fictional.</p>
+      <div class="eap-meth-callout warn"><div class="icon">!</div><div><strong>Hypothetical results.</strong> All performance shown is hypothetical backtested or simulated. Past performance does not guarantee future results. Nothing on this platform is investment advice.</div></div>
+    </section>
 
+    <section id="construction">
+      <h2>Portfolio construction</h2>
+      <p>Every client is assigned one of five risk tiers — Ultra Conservative, Conservative, Moderate, Aggressive, Ultra Aggressive — each with a maximum crypto-ETF allocation ceiling applied against the <strong>total portfolio</strong>, not just the crypto sleeve.</p>
+      <ul>
+        <li><strong>Tier 1 — 5% ceiling.</strong> BTC spot ETFs with lowest expense ratio (IBIT, FBTC, BITB). Quarterly rebalance.</li>
+        <li><strong>Tier 2 — 10% ceiling.</strong> BTC-heavy mix with ETH starting to enter. Quarterly rebalance.</li>
+        <li><strong>Tier 3 — 20% ceiling.</strong> Balanced BTC/ETH, diversified across multiple issuers. Bi-monthly rebalance.</li>
+        <li><strong>Tier 4 — 35% ceiling.</strong> BTC + ETH + emerging thematic ETFs as approved. Monthly rebalance.</li>
+        <li><strong>Tier 5 — 50%+ ceiling.</strong> Maximum diversification across the approved universe. Bi-weekly rebalance.</li>
+      </ul>
+      <p>The engine (<code>core/portfolio_engine.py::build_portfolio</code>) selects up to 3 ETFs per category sorted by expense ratio, applies an issuer-tier nudge (BlackRock / Fidelity +2pp; smaller issuers neutral or −2pp), enforces a 30% per-position diversification cap, and renormalizes weights to 100%.</p>
+    </section>
 
-# ─── 3. Signal derivation ────────────────────────────────────────────────────
+    <section id="signals">
+      <h2>Signal engine</h2>
+      <p>Each ETF gets one composite signal: <code>BUY</code>, <code>HOLD</code>, or <code>SELL</code>. Composite aggregates four layers with weights that auto-adjust based on inferred market regime:</p>
+      <ul>
+        <li><strong>Layer 1 — Technical.</strong> Volume, momentum, trend, volatility adapted from coin-level indicators to ETF price action. Today: Wilder RSI(14) + MACD(12,26,9) + 20-period momentum.</li>
+        <li><strong>Layer 2 — Macro.</strong> Rates, DXY, VIX, credit spreads. Crypto ETFs are rate-sensitive.</li>
+        <li><strong>Layer 3 — Sentiment.</strong> Fear &amp; Greed, funding rates, spot-ETF flow data (SoSoValue + cryptorank.io), news sentiment.</li>
+        <li><strong>Layer 4 — On-chain.</strong> MVRV, SOPR, active addresses, exchange flows, TVL — aggregated from the underlying coins each ETF holds, weighted by holdings.</li>
+      </ul>
+      <p>When OHLCV history is &lt; 35 bars (newly-launched ETF), the signal falls back to a Phase-1 return-to-volatility heuristic and is clearly labeled <code>phase1_fallback</code> in the signal display.</p>
+    </section>
 
-with card("Signal derivation"):
-    st.markdown(level_text(
-        beginner=(
-            "Each ETF gets a simple **BUY / HOLD / SELL** signal based on three "
-            "checks on its recent price behavior:\n\n"
-            "- **Is it cheap or expensive?** (RSI — Relative Strength Index)\n"
-            "- **Is the trend turning up or down?** (MACD)\n"
-            "- **How much has it moved recently?** (Momentum)\n\n"
-            "When price history isn't available for a brand-new ETF, the "
-            "signal falls back to the ETF's expected return vs volatility — "
-            "and that fallback is clearly labeled in the signal display."
-        ),
-        intermediate=(
-            "Composite = 0.45·RSI_score + 0.35·MACD_score + 0.20·Momentum_score, "
-            "each component scaled to [−1, +1]. Thresholds: BUY ≥ +0.30, "
-            "SELL ≤ −0.30. Fallback when OHLCV < 35 bars: Phase-1 "
-            "return-to-volatility heuristic, labeled `phase1_fallback`."
-        ),
-        advanced=(
-            "`core/signal_adapter.py`: Wilder's RSI(14), MACD(12,26,9) with "
-            "standard EMA seeding, 20-period simple momentum. RSI-30/70 → "
-            "linear [+1,−1]; MACD histogram clamped at ±2.0 → [−1,+1]; "
-            "momentum ±10% → [−1,+1]. Future Layer-2/3/4 additions (macro, "
-            "sentiment, on-chain) compose on top of this core."
-        ),
-    ))
+    <section id="benchmark">
+      <h2>Benchmark</h2>
+      <p>Our default benchmark is an <strong>80% traditional 60/40 + 20% BTC spot sleeve</strong> blend. The crypto-ETF sleeve <em>replaces</em> 20 percentage points of the traditional allocation, not an add-on:</p>
+      <div class="eap-meth-card">
+        <div class="eap-meth-card-title">Benchmark composition</div>
+        <table class="eap-meth-table">
+          <thead><tr><th>Component</th><th>Weight</th><th>Rationale</th></tr></thead>
+          <tbody>
+            <tr><td>SPY</td><td class="num">48%</td><td>Equities — 60% of the 80% traditional sleeve</td></tr>
+            <tr><td>AGG</td><td class="num">32%</td><td>Bonds — 40% of the 80% traditional sleeve</td></tr>
+            <tr><td>IBIT</td><td class="num">20%</td><td>BTC spot — the crypto sleeve replacing traditional exposure</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Weights sum to 100% — they describe the full portfolio after the crypto carve-out.</p>
+    </section>
 
+    <section id="data">
+      <h2>Data sources &amp; fallback chains</h2>
+      <p>Every data source has a primary, secondary, and tertiary fallback. Circuit breakers stop retries on repeated failure and surface a visible state to the FA. Cache TTLs are tight where needed and loose where data moves slowly.</p>
+      <table class="eap-meth-table">
+        <thead><tr><th>Data</th><th>Role</th><th>Source</th><th>Cadence</th></tr></thead>
+        <tbody>
+          <tr><td>ETF prices (intraday)</td><td><span class="role primary">primary</span></td><td>yfinance</td><td>5 min cache (market hours)</td></tr>
+          <tr><td>ETF prices (fallback)</td><td><span class="role secondary">secondary</span></td><td>Stooq (~15-min delayed)</td><td>daily</td></tr>
+          <tr><td>ETF reference (holdings, AUM)</td><td><span class="role primary">primary</span></td><td>SEC EDGAR N-PORT</td><td>24h cache</td></tr>
+          <tr><td>ETF flow data</td><td><span class="role primary">primary</span></td><td>cryptorank.io flow endpoints</td><td>30 min cache</td></tr>
+          <tr><td>Macro rates</td><td><span class="role primary">primary</span></td><td>FRED (3-month T-bill)</td><td>daily</td></tr>
+          <tr><td>Risk-free fallback</td><td><span class="role tertiary">tertiary</span></td><td>4.25% static (footnoted in UI)</td><td>—</td></tr>
+        </tbody>
+      </table>
+      <p><code>core/data_source_state.py</code> tracks four states per category — <strong>LIVE</strong>, <strong>FALLBACK_LIVE</strong>, <strong>CACHED</strong>, <strong>STATIC</strong>. Every fetch registers; the UI reads state and surfaces it via the <code>data_source_badge</code> primitive on every data-consuming panel. The platform never silently serves stale or fabricated data.</p>
+    </section>
 
-# ─── 4. Risk metrics ─────────────────────────────────────────────────────────
+    <section id="risk">
+      <h2>Risk metrics</h2>
+      <p>Every performance display includes the SEC Marketing Rule compliance set: 1Y / 3Y / 5Y / since-inception returns, benchmark comparison, max drawdown. For newer funds (e.g., spot BTC ETFs launched Jan 2024), unavailable horizons are annotated <code>N/A (&lt;3Y hist)</code> rather than silently omitted.</p>
+      <p>Advanced views additionally expose <strong>Sharpe</strong> (3Y, FRED-live risk-free), <strong>Sortino</strong> (Sortino &amp; van der Meer 1991 with MAR=live_rf), <strong>Calmar</strong>, <strong>VaR 95%</strong> + <strong>VaR 99%</strong> (Cornish-Fisher with crypto-ETF-tuned skew/kurtosis), <strong>CVaR 95%</strong> + <strong>CVaR 99%</strong>, and <strong>Monte Carlo</strong> distributions (10,000 paths, block bootstrap with correlated returns, deterministic seed).</p>
+      <p>Max drawdown via Magdon-Ismail-Atiya approximation; MDD factor 2.7 retuned for crypto-ETF volatility profile (vs RWA 3.0 / equity 2.3-2.5).</p>
+    </section>
 
-with card("Risk metrics"):
-    st.markdown(level_text(
-        beginner=(
-            "Every portfolio shows four standard risk numbers:\n\n"
-            "- **Sharpe ratio** — return per unit of risk (higher is better).\n"
-            "- **Sortino ratio** — same idea but only penalizes *downside* "
-            "moves (more forgiving of upside volatility).\n"
-            "- **Value at Risk (VaR)** — how much you could lose on a bad day "
-            "(we show the 95th percentile).\n"
-            "- **Maximum drawdown** — how far the portfolio might fall from "
-            "a peak in a bad stretch.\n\n"
-            "All four are **model-based estimates** — real outcomes will differ."
-        ),
-        intermediate=(
-            "Sharpe + Sortino use a live FRED 3-month T-bill risk-free rate "
-            "(4.25% static fallback when FRED is unreachable — shown as a "
-            "footnote). Sortino uses the canonical Sortino & van der Meer "
-            "(1991) formulation with MAR=live_rf on both sides. VaR is "
-            "Cornish-Fisher parametric. Max drawdown via Magdon-Ismail-Atiya "
-            "approximation. CVaR multiplier for 95/99% = 1.35 / 1.42 "
-            "(crypto-ETF retuned 2026-04)."
-        ),
-        advanced=(
-            "Cornish-Fisher VaR (Favre & Galeano 2002): S=−0.25, K=2.5 — "
-            "retuned for crypto ETFs from the Phase-2 RWA calibration. "
-            "MDD factor 2.7 (crypto-ETF) vs RWA 3.0 vs equity 2.3-2.5. "
-            "Post-demo: proper 3-year calibration fit using BTC spot history "
-            "+ ETF tracking-error extrapolation. See `docs/port_log.md` for "
-            "the Phase 3 tuning entry."
-        ),
-    ))
+    <section id="simplifications">
+      <h2>Known simplifications</h2>
+      <div class="eap-meth-callout"><div class="icon">i</div><div>We call out every simplification rather than hiding it. Advisors reviewing this page should know exactly where the model stops.</div></div>
+      <ul>
+        <li><strong>Benchmark rebalancing.</strong> Static weights, no daily rebalance. Understates benchmark volatility slightly; close enough for advisor-facing display.</li>
+        <li><strong>Benchmark max drawdown.</strong> Weighted average of component max drawdowns, not computed on synthetic blended equity curve. Approximation noted on every performance view.</li>
+        <li><strong>Transaction costs.</strong> Backtests assume 12 bps slippage; real-world may differ per broker.</li>
+        <li><strong>Tax treatment.</strong> Ignored. The platform is pre-tax; advisors apply client-specific tax policy separately.</li>
+        <li><strong>Securities lending income.</strong> Not modeled. Some ETF issuers earn lending income that flows to holders; our backtest ignores this.</li>
+      </ul>
+    </section>
 
-
-# ─── 5. Data sources + transparency ──────────────────────────────────────────
-
-with card("Data sources and transparency"):
-    st.markdown(level_text(
-        beginner=(
-            "The platform is **live-first**. When you see a number on the "
-            "screen, it came directly from a public data source — not a "
-            "hardcoded value. When a primary source is temporarily "
-            "unavailable, the app **tells you**:\n\n"
-            "- A small amber badge means you're seeing data from a backup source.\n"
-            "- An amber banner means you're seeing cached data with a timestamp.\n"
-            "- A footnote means one number (like the risk-free rate) fell "
-            "back to a static estimate.\n\n"
-            "We never silently serve stale or fabricated data."
-        ),
-        intermediate=(
-            "Primary sources: **yfinance** (ETF prices), **SEC EDGAR** (holdings, "
-            "reference data, new-fund filings), **FRED** (risk-free rate via "
-            "3-month T-bill CSV endpoint). Fallback chains per CLAUDE.md §10. "
-            "Fallback state surfaced via the `data_source_badge` primitive on "
-            "every data-consuming panel."
-        ),
-        advanced=(
-            "`core/data_source_state.py` tracks four states per category: "
-            "**LIVE**, **FALLBACK_LIVE**, **CACHED**, **STATIC**. Every fetch "
-            "calls `register_fetch_attempt`; the UI reads the current state "
-            "and renders accordingly. EDGAR calls go through a shared "
-            "10-req/sec token bucket in `integrations/edgar.py`. yfinance has "
-            "a module-level memo + `@st.cache_data` 24hr TTL; circuit breaker "
-            "trips to Stooq after 3 failures/60s."
-        ),
-    ))
-
-
-disclosure(
-    "Hypothetical results. Past performance does not guarantee future "
-    "results. All client profiles shown in demo mode are fictional. "
-    "Methodology parameters are current as of the build date; retuning "
-    "is documented in docs/port_log.md in the repository."
-)
+    <section id="compliance">
+      <h2>Compliance statement</h2>
+      <p>Every performance display on every page includes: multiple time horizons, benchmark comparison, max drawdown, a <em>Hypothetical results</em> disclaimer, and a link back to this methodology page. This satisfies the SEC Marketing Rule requirements for performance presentations to US financial advisors.</p>
+      <p>All client profiles are fictional demo personas. Real client data is never stored or shown in demo mode.</p>
+      <div class="eap-meth-callout warn"><div class="icon">!</div><div><strong>This platform is a research and workflow tool, not investment advice.</strong> FAs using this platform are responsible for applying their own fiduciary judgment, suitability analysis, and compliance review before any client-facing action.</div></div>
+    </section>
+  </article>
+</div>
+"""
+st.markdown(_article_html, unsafe_allow_html=True)
