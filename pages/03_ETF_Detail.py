@@ -531,39 +531,213 @@ st.caption(level_text(
 ))
 
 
-# Historical returns
-with card("Historical returns"):
-    prices = get_etf_prices([etf["ticker"]], period="5y", interval="1d")
-    data_source_badge(
-        "etf_price",
-        consumer_label=f"Historical price chart for {etf['ticker']}",
-    )
-    rows = prices.get(etf["ticker"], {}).get("prices", [])
-    if not rows:
-        st.info(level_text(
-            beginner="Historical prices aren't available right now — the market-data service is temporarily unreachable.",
-            intermediate="No price data from any live source.",
-            advanced="Live price chain (yfinance → Stooq) returned empty for this ticker.",
-        ))
-    else:
-        df = pd.DataFrame(rows)
-        df["date"] = pd.to_datetime(df["date"])
-        df = df.sort_values("date")
-        fig = go.Figure(data=[go.Scatter(
-            x=df["date"], y=df["close"],
-            mode="lines", line=dict(color="#00d4aa", width=2),
-            name="Close",
-        )])
-        fig.update_layout(
-            margin=dict(l=0, r=0, t=10, b=0),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            height=320,
-            yaxis_title="Close (USD)",
-        )
-        st.plotly_chart(fig, width="stretch")
+# ── 2026-04-26 redesign: chart + composition side-by-side per
+# advisor-etf-DETAIL.html (chart 2/3 width, composition 1/3 width).
+# DV-2 perf summary table moved out into its own full-width card BELOW
+# the columns row — it has 8 columns (Ticker / Source / Inception / 1Y
+# / 3Y / 5Y / Since-inception / Max DD) and needs the full main-column
+# width to render readably without horizontal scroll.
 
-        # DV-2: compliance-complete performance summary (single ticker)
+# Fetch prices ONCE — used by chart + perf summary table.
+prices = get_etf_prices([etf["ticker"]], period="5y", interval="1d")
+rows = prices.get(etf["ticker"], {}).get("prices", [])
+
+col_chart, col_comp = st.columns([2, 1])
+
+with col_chart:
+    with card("Historical returns"):
+        data_source_badge(
+            "etf_price",
+            consumer_label=f"Historical price chart for {etf['ticker']}",
+        )
+        if not rows:
+            st.info(level_text(
+                beginner="Historical prices aren't available right now — the market-data service is temporarily unreachable.",
+                intermediate="No price data from any live source.",
+                advanced="Live price chain (yfinance → Stooq) returned empty for this ticker.",
+            ))
+        else:
+            df = pd.DataFrame(rows)
+            df["date"] = pd.to_datetime(df["date"])
+            df = df.sort_values("date")
+            fig = go.Figure(data=[go.Scatter(
+                x=df["date"], y=df["close"],
+                mode="lines", line=dict(color="#0fa68a", width=2),
+                name="Close",
+            )])
+            fig.update_layout(
+                margin=dict(l=0, r=0, t=10, b=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=420,
+                yaxis_title="Close (USD)",
+            )
+            st.plotly_chart(fig, width="stretch")
+
+with col_comp:
+    # Composition — live from SEC EDGAR N-PORT when available
+    # (IBIT/ETHA/FBTC/FETH). Non-supported tickers fall back to a
+    # category-level summary. Transparency badge shows LIVE /
+    # FALLBACK_LIVE / CACHED state per Day-4 design directive.
+    # Wrapped in a max-height scroll div so a long N-PORT holdings
+    # list doesn't make the column taller than the chart.
+    with card("Composition"):
+        data_source_badge(
+            "etf_composition",
+            consumer_label=f"Composition table for {etf['ticker']}",
+        )
+
+        if chosen in NPORT_TICKERS:
+            comp = get_etf_composition(chosen)
+            src = comp["source"]
+            if src == "edgar_live":
+                st.caption(
+                    f"Live from SEC EDGAR N-PORT filing · "
+                    f"dated {comp['filing_date']} · accession {comp['accession']}"
+                )
+            elif src == "issuer_static":
+                # '33-Act spot commodity trust — no N-PORT filing exists;
+                # composition derived from issuer's prospectus + daily
+                # holdings disclosure. Intentionally honest about the
+                # non-live source while providing a link out to verify.
+                st.caption(
+                    f"Spot commodity trust · issuer-curated composition "
+                    f"(trusts don't file N-PORT). Custodian: {comp.get('custodian', 'N/A')}."
+                )
+            elif src == "cached":
+                st.info(comp["note"])
+            else:
+                st.info(comp["note"])
+
+            if comp["holdings"]:
+                # ── Trust composition path (2 rows, coin + cash) ─────────
+                # Render manually so markdown hyperlinks work. st.dataframe
+                # cells don't render markdown; st.column_config.LinkColumn
+                # expects cell values to be plain URLs, not [text](url)
+                # syntax, which led to the previous "wrapped markdown as
+                # path" routing bug.
+                _has_sg_link = False
+                if src == "issuer_static":
+                    # Column headers
+                    hcol1, hcol2, hcol3 = st.columns([3, 2, 2])
+                    hcol1.markdown("**Name**")
+                    hcol2.markdown("**Asset category**")
+                    hcol3.markdown("**% of fund**")
+                    st.divider()
+
+                    for h in comp["holdings"]:
+                        raw_name = h.get("name", "")
+                        pct = h.get("pct_value") or 0.0
+                        asset_cat = h.get("asset_cat", "")
+                        sg_symbol = SUPERGROK_COIN_MAP.get(raw_name)
+
+                        c1, c2, c3 = st.columns([3, 2, 2])
+                        with c1:
+                            if sg_symbol:
+                                _has_sg_link = True
+                                sg_url = f"{SUPERGROK_BASE_URL}?coin={sg_symbol}"
+                                st.markdown(f"**[{raw_name} →]({sg_url})**")
+                            else:
+                                st.markdown(f"**{raw_name}**")
+                        with c2:
+                            st.markdown(asset_cat or "—")
+                        with c3:
+                            st.markdown(f"{pct:.2f}%")
+                    st.caption(f"Total holdings: {comp['holdings_count']}")
+                else:
+                    # ── N-PORT path (longer holdings list) — dataframe ──
+                    # These are futures / securities holdings, not spot
+                    # coins, so we don't SuperGrok-link them.
+                    import pandas as _pd
+                    df_rows = [
+                        {
+                            "Name":      h.get("name", ""),
+                            "Asset cat": h.get("asset_cat", ""),
+                            "Balance":   h.get("balance"),
+                            "Value USD": h.get("value_usd"),
+                            "% of fund": h.get("pct_value"),
+                        }
+                        for h in comp["holdings"]
+                    ]
+                    df = _pd.DataFrame(df_rows)
+                    st.dataframe(
+                        df,
+                        width="stretch",
+                        hide_index=True,
+                        column_config={
+                            "Value USD": st.column_config.NumberColumn(format="$%,.0f"),
+                            "% of fund": st.column_config.NumberColumn(format="%.2f%%"),
+                        },
+                    )
+                    st.caption(f"Total holdings: {comp['holdings_count']}")
+
+                # SuperGrok onboarding notice — only surface when there's
+                # at least one clickable coin in this basket.
+                if _has_sg_link:
+                    st.info(
+                        "**→ SuperGrok integration:** Click any coin name "
+                        "above to open full technical + on-chain research. "
+                        "**First-time tip:** once SuperGrok loads, click the "
+                        "'Analyze All Coins Now' button to seed the data "
+                        "(nothing populates until you do)."
+                    )
+
+                # For issuer-static trusts, surface the issuer's live
+                # holdings page so the FA can audit the per-share coin
+                # count published daily.
+                if src == "issuer_static" and comp.get("issuer_holdings_url"):
+                    st.markdown(
+                        f"📊 [Live daily holdings on issuer site]"
+                        f"({comp['issuer_holdings_url']})"
+                    )
+                if comp.get("note"):
+                    st.caption(comp["note"])
+        else:
+            category = etf.get("category", "")
+            underlying = etf.get("underlying", "")
+            _category_summaries = {
+                "btc_spot":            "Bitcoin spot exposure, custodied by the issuer.",
+                "eth_spot":            "Ethereum spot exposure, custodied by the issuer. "
+                                       "Staking yield may be distributed (ETHA / FETH / ETH as of Feb 2026).",
+                "btc_futures":         "Bitcoin futures (CME). No spot BTC holdings. "
+                                       "Tracking error + contango drag vs. spot.",
+                "eth_futures":         "Ethereum futures (CME). Tracking error + contango drag vs. spot.",
+                "altcoin_spot":        f"Spot {underlying or 'altcoin'} exposure. Approved via SEC's "
+                                       f"Sep-2025 generic listing standard for commodity trusts.",
+                "leveraged":           f"2× daily leveraged exposure to "
+                                       f"{underlying or 'crypto'} via swaps / futures. "
+                                       f"Volatility decay erodes long-run multi-day returns "
+                                       f"below the headline leverage factor.",
+                "income_covered_call": f"Covered-call strategy on {underlying or 'underlying crypto asset'}. "
+                                       f"Caps upside participation in exchange for option "
+                                       f"premium distributions (typically paid weekly or monthly).",
+                "thematic_equity":     "Basket of crypto-industry equities (miners, exchanges, "
+                                       "blockchain infrastructure). Equity-market beta on top of "
+                                       "crypto-asset exposure.",
+                "multi_asset":         "Multi-asset basket of large-cap cryptocurrencies "
+                                       "(typically BTC/ETH-dominant with long-tail altcoin exposure).",
+            }
+            st.write(f"Summary view: {_category_summaries.get(category, 'thematic / multi-asset exposure.')}")
+            st.caption(
+                "Live EDGAR N-PORT holdings are wired for IBIT / ETHA / FBTC / FETH "
+                "in the demo scope. Full issuer coverage lands post-demo."
+            )
+
+        st.caption(level_text(
+            beginner="This shows what the fund holds under the hood.",
+            intermediate="Holdings come from SEC EDGAR N-PORT filings (quarterly cadence).",
+            advanced="EDGAR N-PORT parser with 7-day disk cache; token-bucket rate-limited; fallback chain marks CACHED state in data_source_state.",
+        ))
+
+
+
+
+# ── 2026-04-26 redesign: DV-2 perf summary table moved out of the
+# columns row into its own full-width card. The table has 8 columns
+# (Ticker / Source / Inception / 1Y / 3Y / 5Y / Since-inception / Max DD)
+# and needs the full main-column width to render readably.
+if rows:
+    with card("Performance & compliance summary"):
         bench_tickers = list(BENCHMARK_DEFAULT.keys())
         benchmark_price_data = get_etf_prices(bench_tickers, period="5y", interval="1d")
         perf_df = performance_summary_table(
@@ -578,159 +752,6 @@ with card("Historical returns"):
             "Benchmark: static-weight blend (no daily rebalancing). "
             "Methodology page documents the simplification."
         )
-
-
-# Composition — live from SEC EDGAR N-PORT when available (IBIT/ETHA/FBTC/FETH).
-# Non-supported tickers fall back to a category-level summary. Transparency
-# badge shows LIVE / FALLBACK_LIVE / CACHED state per Day-4 design directive.
-with card("Composition"):
-    data_source_badge(
-        "etf_composition",
-        consumer_label=f"Composition table for {etf['ticker']}",
-    )
-
-    if chosen in NPORT_TICKERS:
-        comp = get_etf_composition(chosen)
-        src = comp["source"]
-        if src == "edgar_live":
-            st.caption(
-                f"Live from SEC EDGAR N-PORT filing · "
-                f"dated {comp['filing_date']} · accession {comp['accession']}"
-            )
-        elif src == "issuer_static":
-            # '33-Act spot commodity trust — no N-PORT filing exists;
-            # composition derived from issuer's prospectus + daily
-            # holdings disclosure. Intentionally honest about the
-            # non-live source while providing a link out to verify.
-            st.caption(
-                f"Spot commodity trust · issuer-curated composition "
-                f"(trusts don't file N-PORT). Custodian: {comp.get('custodian', 'N/A')}."
-            )
-        elif src == "cached":
-            st.info(comp["note"])
-        else:
-            st.info(comp["note"])
-
-        if comp["holdings"]:
-            # ── Trust composition path (2 rows, coin + cash) ─────────
-            # Render manually so markdown hyperlinks work. st.dataframe
-            # cells don't render markdown; st.column_config.LinkColumn
-            # expects cell values to be plain URLs, not [text](url)
-            # syntax, which led to the previous "wrapped markdown as
-            # path" routing bug.
-            _has_sg_link = False
-            if src == "issuer_static":
-                # Column headers
-                hcol1, hcol2, hcol3 = st.columns([3, 2, 2])
-                hcol1.markdown("**Name**")
-                hcol2.markdown("**Asset category**")
-                hcol3.markdown("**% of fund**")
-                st.divider()
-
-                for h in comp["holdings"]:
-                    raw_name = h.get("name", "")
-                    pct = h.get("pct_value") or 0.0
-                    asset_cat = h.get("asset_cat", "")
-                    sg_symbol = SUPERGROK_COIN_MAP.get(raw_name)
-
-                    c1, c2, c3 = st.columns([3, 2, 2])
-                    with c1:
-                        if sg_symbol:
-                            _has_sg_link = True
-                            sg_url = f"{SUPERGROK_BASE_URL}?coin={sg_symbol}"
-                            st.markdown(f"**[{raw_name} →]({sg_url})**")
-                        else:
-                            st.markdown(f"**{raw_name}**")
-                    with c2:
-                        st.markdown(asset_cat or "—")
-                    with c3:
-                        st.markdown(f"{pct:.2f}%")
-                st.caption(f"Total holdings: {comp['holdings_count']}")
-            else:
-                # ── N-PORT path (longer holdings list) — dataframe ──
-                # These are futures / securities holdings, not spot
-                # coins, so we don't SuperGrok-link them.
-                import pandas as _pd
-                df_rows = [
-                    {
-                        "Name":      h.get("name", ""),
-                        "Asset cat": h.get("asset_cat", ""),
-                        "Balance":   h.get("balance"),
-                        "Value USD": h.get("value_usd"),
-                        "% of fund": h.get("pct_value"),
-                    }
-                    for h in comp["holdings"]
-                ]
-                df = _pd.DataFrame(df_rows)
-                st.dataframe(
-                    df,
-                    width="stretch",
-                    hide_index=True,
-                    column_config={
-                        "Value USD": st.column_config.NumberColumn(format="$%,.0f"),
-                        "% of fund": st.column_config.NumberColumn(format="%.2f%%"),
-                    },
-                )
-                st.caption(f"Total holdings: {comp['holdings_count']}")
-
-            # SuperGrok onboarding notice — only surface when there's
-            # at least one clickable coin in this basket.
-            if _has_sg_link:
-                st.info(
-                    "**→ SuperGrok integration:** Click any coin name "
-                    "above to open full technical + on-chain research. "
-                    "**First-time tip:** once SuperGrok loads, click the "
-                    "'Analyze All Coins Now' button to seed the data "
-                    "(nothing populates until you do)."
-                )
-
-            # For issuer-static trusts, surface the issuer's live
-            # holdings page so the FA can audit the per-share coin
-            # count published daily.
-            if src == "issuer_static" and comp.get("issuer_holdings_url"):
-                st.markdown(
-                    f"📊 [Live daily holdings on issuer site]"
-                    f"({comp['issuer_holdings_url']})"
-                )
-            if comp.get("note"):
-                st.caption(comp["note"])
-    else:
-        category = etf.get("category", "")
-        underlying = etf.get("underlying", "")
-        _category_summaries = {
-            "btc_spot":            "Bitcoin spot exposure, custodied by the issuer.",
-            "eth_spot":            "Ethereum spot exposure, custodied by the issuer. "
-                                   "Staking yield may be distributed (ETHA / FETH / ETH as of Feb 2026).",
-            "btc_futures":         "Bitcoin futures (CME). No spot BTC holdings. "
-                                   "Tracking error + contango drag vs. spot.",
-            "eth_futures":         "Ethereum futures (CME). Tracking error + contango drag vs. spot.",
-            "altcoin_spot":        f"Spot {underlying or 'altcoin'} exposure. Approved via SEC's "
-                                   f"Sep-2025 generic listing standard for commodity trusts.",
-            "leveraged":           f"2× daily leveraged exposure to "
-                                   f"{underlying or 'crypto'} via swaps / futures. "
-                                   f"Volatility decay erodes long-run multi-day returns "
-                                   f"below the headline leverage factor.",
-            "income_covered_call": f"Covered-call strategy on {underlying or 'underlying crypto asset'}. "
-                                   f"Caps upside participation in exchange for option "
-                                   f"premium distributions (typically paid weekly or monthly).",
-            "thematic_equity":     "Basket of crypto-industry equities (miners, exchanges, "
-                                   "blockchain infrastructure). Equity-market beta on top of "
-                                   "crypto-asset exposure.",
-            "multi_asset":         "Multi-asset basket of large-cap cryptocurrencies "
-                                   "(typically BTC/ETH-dominant with long-tail altcoin exposure).",
-        }
-        st.write(f"Summary view: {_category_summaries.get(category, 'thematic / multi-asset exposure.')}")
-        st.caption(
-            "Live EDGAR N-PORT holdings are wired for IBIT / ETHA / FBTC / FETH "
-            "in the demo scope. Full issuer coverage lands post-demo."
-        )
-
-    st.caption(level_text(
-        beginner="This shows what the fund holds under the hood.",
-        intermediate="Holdings come from SEC EDGAR N-PORT filings (quarterly cadence).",
-        advanced="EDGAR N-PORT parser with 7-day disk cache; token-bucket rate-limited; fallback chain marks CACHED state in data_source_state.",
-    ))
-
 
 # Single-ticker Monte Carlo projection
 with card("Forward projection"):
