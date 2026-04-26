@@ -59,8 +59,8 @@ try:
         title="Portfolio",
         subtitle=level_text(
             beginner="Pick a client, pick a risk tier, and see the crypto ETF basket we recommend.",
-            intermediate="5-tier risk-profiled basket construction with forward-looking risk metrics.",
-            advanced="Phase-2 pairwise-correlation basket, issuer-tier adjusted, with forward MC projection.",
+            intermediate="Risk-tiered crypto ETF basket for the selected client. Backtests, benchmark comparison, and execution staging — all compliance-safe for FA presentations.",
+            advanced="Risk-tiered crypto ETF basket for the selected client. Backtests, benchmark comparison, and execution staging — all compliance-safe for FA presentations.",
         ),
         data_sources=[
             ("SEC EDGAR", "live"),
@@ -283,12 +283,16 @@ _sources = [e.get("expected_return_source", "category_default") for e in _basket
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# KPI row — now 5 tiles so the FA sees historical + forward side-by-side
+# Provenance caption — historical vs forward returns + live-source coverage.
+# The 5-tile KPI strip that previously rendered here was REMOVED in the
+# 2026-04-25 mockup-parity sprint (Commit 4) — those metrics are now
+# surfaced in the holdings & performance table below, and the page-top
+# 4-up KPI strip (Sharpe / Max DD / 1Y / Allocation ceiling) replaces the
+# at-a-glance read. Forward-estimate computation is preserved here so the
+# provenance caption + footer "Read methodology →" link still has accurate
+# live-vs-fallback counts to surface.
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Weighted forward-return across the basket (uses each ETF's
-# forward_return if populated; falls back to category default
-# via the same weighting path).
 _fwd_numer = 0.0
 _fwd_denom = 0.0
 _n_fwd_live = 0
@@ -305,25 +309,8 @@ for h in holdings:
     _n_fwd_live += 1
 _portfolio_forward_return = (_fwd_numer / _fwd_denom) if _fwd_denom > 0 else None
 
-k1, k2, k3, k4, k5 = st.columns(5)
-with k1:
-    kpi_tile("Crypto sleeve", f"${crypto_sleeve_usd:,.0f}")
-with k2:
-    kpi_tile("Historical return (annualized)",
-             f"{metrics['weighted_return_pct']:.1f}%")
-with k3:
-    if _portfolio_forward_return is not None:
-        kpi_tile("Forward estimate (model)",
-                 f"{_portfolio_forward_return:.1f}%")
-    else:
-        kpi_tile("Forward estimate (model)", "—")
-with k4:
-    kpi_tile("Portfolio vol", f"{metrics['portfolio_volatility_pct']:.1f}%")
-with k5:
-    kpi_tile("Sharpe", f"{metrics['sharpe_ratio']:.2f}")
-
-# Provenance: the two return tiles have different backward-vs-forward
-# framings; explain what each one is and how much of it is live.
+# Provenance: the two return framings (historical vs forward) need a
+# small note so the FA doesn't read short-window CAGR as steady-state.
 _provenance = level_text(
     beginner=(
         f"**Historical return** = what each fund actually did over its "

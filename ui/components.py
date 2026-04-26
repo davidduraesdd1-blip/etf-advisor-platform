@@ -294,14 +294,40 @@ def data_sources_panel(
 
 def tier_pill_selector(options: list[str], default_index: int = 2,
                         key: str = "tier_pill") -> str:
-    """Horizontal radio styled as pills — used for the 5-tier selector."""
-    return st.radio(
-        "Risk tier",
-        options=options,
-        index=default_index,
-        horizontal=True,
-        key=key,
-    )
+    """Numbered tier-pill button row — matches advisor-etf-portfolio.html
+    .tier-row mockup. Each tier is a real st.button with `type="primary"`
+    on the active selection (picks up the advisor accent color from the
+    Streamlit theme + design-system override). Selection persists in
+    session_state[key] across reruns.
+
+    Replaces the previous st.radio implementation which rendered as
+    Streamlit's native radio (default-red dot, no number prefix, no
+    pill chrome) — Cowork walkthrough flagged the mismatch.
+    """
+    state_key = f"_{key}_value"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = options[default_index]
+    if st.session_state[state_key] not in options:
+        st.session_state[state_key] = options[default_index]
+
+    cols = st.columns(len(options))
+    new_selection: str | None = None
+    for idx, (col, opt) in enumerate(zip(cols, options), start=1):
+        with col:
+            is_active = (opt == st.session_state[state_key])
+            label = f"{idx}  {opt}"
+            if st.button(
+                label,
+                key=f"{key}_btn_{idx}",
+                use_container_width=True,
+                type=("primary" if is_active else "secondary"),
+            ):
+                new_selection = opt
+
+    if new_selection is not None:
+        st.session_state[state_key] = new_selection
+
+    return st.session_state[state_key]
 
 
 def safe_page_link(page: str, label: str, icon: str | None = None) -> None:
