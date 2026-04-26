@@ -119,3 +119,30 @@ def _reset_module_state_between_tests():
     reset_circuit_breaker()
     reset_dss()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_streamlit_session_state():
+    """
+    Drop every key from st.session_state between tests. Without this,
+    a test that writes session_state (e.g. user_level toggle, theme,
+    active_client_id) leaks state into the next test and produces order-
+    dependent failures.
+
+    Concrete case this guards against:
+    test_user_level_persists_through_explicit_change passes in isolation
+    but fails when run after the page-render AppTest cases because they
+    leave the user_level write in place — the persistence test then sees
+    its starting "Beginner" state pre-mutated.
+
+    Streamlit's session_state behaves like a dict; del-on-keys is the
+    documented reset path. The try/except absorbs the case where
+    streamlit isn't loaded yet (pre-collection import phase, etc.).
+    """
+    try:
+        import streamlit as st
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+    except Exception:
+        pass
+    yield
