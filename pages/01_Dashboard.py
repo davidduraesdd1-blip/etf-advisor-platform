@@ -9,7 +9,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from config import BRAND_NAME, DEMO_MODE
+from config import BRAND_NAME, DEMO_MODE, EXTENDED_MODULES_ENABLED
 from core.audit_log import seed_demo_entries
 from core.demo_clients import DEMO_CLIENTS
 from core.etf_universe import load_universe_with_live_analytics
@@ -591,6 +591,109 @@ with _comp_col:
         '</div>',
         unsafe_allow_html=True,
     )
+
+# ── Pending auto-rebalances (gated by per-client auto-execute checkboxes) ──
+# When the FA flips on `auto_exec_<client_id>` in Settings for a client,
+# AND that client has rebalance_needed=True, a "Pending auto-rebalances"
+# panel surfaces here on Dashboard. Mock-broker-only for May 1; real
+# broker wiring (Alpaca paper / Alpaca live) is post-demo. The panel
+# gives the FA a single-page review of which clients are queued for
+# the next auto-rebalance run before it fires.
+_pending_auto: list[dict] = []
+for c in DEMO_CLIENTS:
+    if (
+        st.session_state.get(f"auto_exec_{c['id']}", False)
+        and c["rebalance_needed"]
+    ):
+        _pending_auto.append(c)
+
+if _pending_auto:
+    st.markdown('<div style="height:24px;"></div>', unsafe_allow_html=True)
+    _ar_rows = "".join(
+        '<div style="display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:12px;'
+        'align-items:center;padding:10px 4px;border-bottom:1px solid var(--border);'
+        'font-size:12.5px;">'
+        f'<span style="font-weight:600;color:var(--text-primary);">{c["name"]}</span>'
+        f'<span style="font-family:var(--font-mono);color:var(--text-muted);">{c["assigned_tier"]}</span>'
+        f'<span style="font-family:var(--font-mono);color:var(--warning);">drift {c["drift_pct"]:.1f}σ</span>'
+        f'<span style="text-align:right;font-family:var(--font-mono);color:var(--text-muted);">'
+        'queued for next run</span>'
+        '</div>'
+        for c in _pending_auto
+    )
+    _broker_provider = st.session_state.get("broker_provider_override")
+    _broker_label = (
+        "mock broker (no real orders will fire)"
+        if not _broker_provider or _broker_provider == "mock"
+        else f"{_broker_provider} (post-demo wiring)"
+    )
+    st.markdown(
+        '<div class="ds-card" style="margin-bottom:14px;'
+        'background:color-mix(in srgb,var(--warning) 5%,var(--bg-1));'
+        'border-left:3px solid var(--warning);">'
+        '<div style="font-family:var(--font-display);font-weight:500;font-size:16px;color:var(--text-primary);">'
+        f'Pending auto-rebalances · {len(_pending_auto)} client'
+        f'{"s" if len(_pending_auto) != 1 else ""}'
+        '</div>'
+        '<div style="font-size:12.5px;color:var(--text-muted);margin-top:4px;">'
+        f'Daily scheduler will fire these on the next run via {_broker_label}. '
+        'Disable per-client in Settings → Per-client auto-execute permissions.'
+        '</div>'
+        f'<div style="margin-top:12px;">{_ar_rows}</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+# ── Cross-asset preview (gated by Settings → Extended modules toggle) ─────
+# When the FA flips `extended_modules_override` ON in Settings, this section
+# appears showing how the ETF Advisor sleeve would compose alongside RWA
+# + DeFi exposure (which live as sibling apps `rwa-infinity-model` and
+# `flare-defi-model`). Off by default — shows nothing — so the standard
+# advisor view stays clean for the May 1 demo.
+if st.session_state.get("extended_modules_override", EXTENDED_MODULES_ENABLED):
+    st.markdown('<div style="height:24px;"></div>', unsafe_allow_html=True)
+    _xa_total_traditional = sum(c["total_portfolio_usd"] * (100 - c["crypto_allocation_pct"]) / 100.0
+                                 for c in DEMO_CLIENTS)
+    _xa_total_crypto = sum(c["total_portfolio_usd"] * c["crypto_allocation_pct"] / 100.0
+                            for c in DEMO_CLIENTS)
+    _xa_total = _xa_total_traditional + _xa_total_crypto
+    _xa_rwa_placeholder = _xa_total_traditional * 0.10  # illustrative 10% RWA carve-out
+    _xa_defi_placeholder = _xa_total_crypto * 0.05      # illustrative 5% DeFi sleeve
+
+    def _xa_card(label, value, sub, accent_color="var(--accent)"):
+        return (
+            '<div class="ds-card" style="text-align:left;">'
+            f'<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">{label}</div>'
+            f'<div style="font-size:22px;font-family:var(--font-mono);font-weight:500;line-height:1.15;margin-top:4px;color:{accent_color};">{value}</div>'
+            f'<div style="font-size:12px;color:var(--text-muted);margin-top:4px;font-family:var(--font-mono);">{sub}</div>'
+            '</div>'
+        )
+
+    st.markdown(
+        '<div class="ds-card" style="margin-bottom:14px;background:color-mix(in srgb,var(--info) 5%,var(--bg-1));border-left:3px solid var(--info);">'
+        '<div style="font-family:var(--font-display);font-weight:500;font-size:16px;color:var(--text-primary);">'
+        'Cross-asset preview · ETF + RWA + DeFi'
+        '</div>'
+        '<div style="font-size:12.5px;color:var(--text-muted);margin-top:4px;">'
+        'Preview only. RWA + DeFi sleeves live in sibling apps; numbers below are illustrative carve-outs against the same demo-client AUM.'
+        '</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap);margin-bottom:8px;">'
+        + _xa_card("Crypto-ETF sleeve",       f"${_xa_total_crypto:,.0f}",       "live · this app")
+        + _xa_card("RWA sleeve · preview",    f"${_xa_rwa_placeholder:,.0f}",    "illustrative · rwa-infinity-model", "var(--info)")
+        + _xa_card("DeFi sleeve · preview",   f"${_xa_defi_placeholder:,.0f}",   "illustrative · flare-defi-model",   "var(--info)")
+        + '</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "↗ Open companion apps: `rwa-infinity-model` (real-world assets), "
+        "`flare-defi-model` (DeFi yields). Cross-asset roll-up will land in a "
+        "post-demo integration sprint."
+    )
+    st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
 
 # ── Hypothetical-results callout (compliance disclaimer) ────────────────────
 st.markdown(

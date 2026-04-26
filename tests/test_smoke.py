@@ -194,6 +194,64 @@ def test_app_runs_via_streamlit_apptest() -> None:
         "pages/99_Settings.py",
     ],
 )
+@pytest.mark.parametrize("theme", ["dark", "light"])
+def test_page_runs_in_both_themes(page: str, theme: str) -> None:
+    """
+    Smoke test: every page must render without raising in both dark and
+    light mode.
+
+    2026-04-26: this is the automated half of the deferred light-mode
+    walk. It catches obvious breakage (template-string crashes, divisor-
+    by-zero on light-mode token math, etc.) but is NOT a substitute for
+    a human visual walk. A clean run here just means no exceptions —
+    not that the contrast / typography / spacing look right.
+    """
+    pytest.importorskip("streamlit.testing.v1")
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_file(str(REPO_ROOT / page), default_timeout=30)
+    at.session_state["theme"] = theme
+    at.run()
+    assert not at.exception, f"{page} ({theme} mode) raised: {at.exception}"
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        "pages/01_Dashboard.py",
+        "pages/02_Portfolio.py",
+        "pages/03_ETF_Detail.py",
+        "pages/99_Settings.py",
+    ],
+)
+@pytest.mark.parametrize("user_mode", ["Advisor", "Client"])
+def test_page_runs_in_both_user_modes(page: str, user_mode: str) -> None:
+    """
+    Smoke test: every page must render without raising in both Advisor
+    and Client modes (the 2026-04-26 taxonomy collapse).
+
+    Catches level_text() arg-name regressions, is_advisor() / is_client()
+    typo regressions, and any conditional branch that only one mode
+    exercises.
+    """
+    pytest.importorskip("streamlit.testing.v1")
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_file(str(REPO_ROOT / page), default_timeout=30)
+    at.session_state["user_level"] = user_mode
+    at.run()
+    assert not at.exception, f"{page} ({user_mode} mode) raised: {at.exception}"
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        "pages/01_Dashboard.py",
+        "pages/02_Portfolio.py",
+        "pages/03_ETF_Detail.py",
+        "pages/99_Settings.py",
+    ],
+)
 def test_page_runs_via_streamlit_apptest(page: str) -> None:
     pytest.importorskip("streamlit.testing.v1")
     from streamlit.testing.v1 import AppTest
