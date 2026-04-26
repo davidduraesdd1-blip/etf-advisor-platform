@@ -3,7 +3,7 @@ Theme + global CSS injection.
 
 Call `apply_theme()` once at the top of every page. Reads the user's theme
 choice from session_state ("dark" or "light"; "dark" is the default per
-CLAUDE.md §8 — Beginner default = dark).
+CLAUDE.md §8).
 
 CLAUDE.md governance: Section 8 (design standards).
 

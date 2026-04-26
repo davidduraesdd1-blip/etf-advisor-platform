@@ -43,19 +43,23 @@ def test_user_level_key_canonical(apptest):
 
 def test_user_level_persists_through_explicit_change(apptest):
     """
-    Simulate: landing → user picks Advanced → re-render (page navigation) →
-    Advanced still selected. This mirrors what happens when the user
+    Simulate: landing → user picks Client → re-render (page navigation) →
+    Client still selected. This mirrors what happens when the user
     navigates from / to /Dashboard.
+
+    2026-04-26 taxonomy: was "Advanced" (3-level taxonomy), now "Client"
+    (2-mode taxonomy: Advisor / Client). Same DV-1 contract — the
+    user's chosen mode must survive across page navigation.
     """
     at = _new_test(apptest, "app.py")
     at.run()
 
-    # Force the selection to Advanced via session_state (mirrors what the
-    # radio widget would write when user clicks)
-    at.session_state["user_level"] = "Advanced"
+    # Force the selection to Client via session_state (mirrors what the
+    # mode pills would write when wired)
+    at.session_state["user_level"] = "Client"
     at.run()  # re-render, as if navigation happened
 
-    assert at.session_state["user_level"] == "Advanced", (
+    assert at.session_state["user_level"] == "Client", (
         "user_level should persist across sidebar re-renders"
     )
 

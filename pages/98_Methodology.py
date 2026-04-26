@@ -2,8 +2,9 @@
 Methodology — the math, data, and compliance story behind the platform.
 
 Linked from performance disclosures on the Portfolio and ETF Detail pages.
-Written at a Beginner-level reading tone with an "Advanced" expander on
-each section for the FA who wants the full story.
+Reference content — reads identically in both Advisor and Client modes
+(no level gating). Linked from every performance disclosure per SEC
+Marketing Rule.
 """
 from __future__ import annotations
 
@@ -273,7 +274,7 @@ _article_html = """
     <section id="risk">
       <h2>Risk metrics</h2>
       <p>Every performance display includes the SEC Marketing Rule compliance set: 1Y / 3Y / 5Y / since-inception returns, benchmark comparison, max drawdown. For newer funds (e.g., spot BTC ETFs launched Jan 2024), unavailable horizons are annotated <code>N/A (&lt;3Y hist)</code> rather than silently omitted.</p>
-      <p>Advanced views additionally expose <strong>Sharpe</strong> (3Y, FRED-live risk-free), <strong>Sortino</strong> (Sortino &amp; van der Meer 1991 with MAR=live_rf), <strong>Calmar</strong>, <strong>VaR 95%</strong> + <strong>VaR 99%</strong> (Cornish-Fisher with crypto-ETF-tuned skew/kurtosis), <strong>CVaR 95%</strong> + <strong>CVaR 99%</strong>, and <strong>Monte Carlo</strong> distributions (10,000 paths, block bootstrap with correlated returns, deterministic seed).</p>
+      <p>Advisor mode additionally exposes <strong>Sharpe</strong> (3Y, FRED-live risk-free), <strong>Sortino</strong> (Sortino &amp; van der Meer 1991 with MAR=live_rf), <strong>Calmar</strong>, <strong>VaR 95%</strong> + <strong>VaR 99%</strong> (Cornish-Fisher with crypto-ETF-tuned skew/kurtosis), <strong>CVaR 95%</strong> + <strong>CVaR 99%</strong>, and <strong>Monte Carlo</strong> distributions (10,000 paths, block bootstrap with correlated returns, deterministic seed).</p>
       <p>Max drawdown via Magdon-Ismail-Atiya approximation; MDD factor 2.7 retuned for crypto-ETF volatility profile (vs RWA 3.0 / equity 2.3-2.5).</p>
     </section>
 

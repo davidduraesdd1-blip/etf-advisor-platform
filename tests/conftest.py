@@ -133,7 +133,7 @@ def _reset_streamlit_session_state():
     test_user_level_persists_through_explicit_change passes in isolation
     but fails when run after the page-render AppTest cases because they
     leave the user_level write in place — the persistence test then sees
-    its starting "Beginner" state pre-mutated.
+    its starting "Advisor" state pre-mutated.
 
     Streamlit's session_state behaves like a dict; del-on-keys is the
     documented reset path. The try/except absorbs the case where
