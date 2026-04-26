@@ -126,9 +126,18 @@ CACHE_TTL: dict[str, int] = {
 DAILY_SCANNER_HOUR_ET: int = 16
 DAILY_SCANNER_MINUTE_ET: int = 30
 
-# ── User levels (CLAUDE.md §7) ────────────────────────────────────────────────
-USER_LEVELS: tuple[str, ...] = ("Beginner", "Intermediate", "Advanced")
-DEFAULT_USER_LEVEL: str = "Beginner"
+# ── User modes (2026-04-26 taxonomy collapse) ────────────────────────────────
+# Replaces the old Beginner / Intermediate / Advanced triple with a 2-mode
+# advisor-vs-client split. Same data both modes; different presentation.
+#   Advisor — full data, all metrics, jargon, raw indicator names. Default
+#             for the FA working alone in their office.
+#   Client  — plain English, simpler charts, larger fonts, no raw indicator
+#             names, prominent hypothetical-results disclaimers. Used when
+#             the FA is screen-sharing with a client.
+# Session-state key is still `user_level` for backward compatibility — only
+# the values change.
+USER_LEVELS: tuple[str, ...] = ("Advisor", "Client")
+DEFAULT_USER_LEVEL: str = "Advisor"
 
 # ── Risk tiers (CLAUDE.md §13) ────────────────────────────────────────────────
 # Full allocation matrix is in core.risk_tiers.TIER_CATEGORY_ALLOCATIONS.

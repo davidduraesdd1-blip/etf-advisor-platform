@@ -46,20 +46,34 @@ def render_sidebar_brand(
 def render_top_bar(
     *,
     breadcrumb: Sequence[str] = ("Dashboard",),
-    user_level: Literal["beginner", "intermediate", "advanced"] = "beginner",
+    user_level: Literal["Advisor", "Client"] = "Advisor",
     show_level: bool = True,
     show_refresh: bool = True,
     show_theme: bool = True,
 ) -> None:
+    """Render the topbar: breadcrumb + Advisor/Client mode pills + refresh +
+    theme chips. Pills are decorative-only on this branch — wiring lands
+    post-demo. The active pill is teal (.on); inactive is muted.
+
+    2026-04-26 taxonomy collapse: was 3 pills (Beginner / Intermediate /
+    Advanced), now 2 (Advisor / Client). Same control surface, fewer
+    states, clearer mental model for FAs.
+    """
     if st is None:
         return
     *rest, last = list(breadcrumb) or ["", ""]
     crumb_html = " / ".join(rest) + (" / " if rest else "") + f"<b>{last}</b>"
     level_html = ""
     if show_level:
-        lvls = [("beginner", "Beginner"), ("intermediate", "Intermediate"), ("advanced", "Advanced")]
+        # Accept either capitalized ("Advisor") or lower-case keys for
+        # backward compatibility with any caller still passing the old
+        # "beginner" placeholder; normalize before comparing.
+        active = (user_level or "").strip().capitalize()
+        if active not in ("Advisor", "Client"):
+            active = "Advisor"
+        lvls = [("Advisor", "Advisor"), ("Client", "Client")]
         buttons = "".join(
-            f'<button class="{"on" if user_level == k else ""}" data-level="{k}">{lbl}</button>'
+            f'<button class="{"on" if active == k else ""}" data-level="{k.lower()}">{lbl}</button>'
             for k, lbl in lvls
         )
         level_html = f'<div class="ds-level-group">{buttons}</div>'
