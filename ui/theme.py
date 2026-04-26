@@ -227,10 +227,13 @@ def apply_theme() -> None:
     try:
         from ui.design_system import inject_theme as _ds_inject_theme
         from ui.overrides import inject_streamlit_overrides as _ds_inject_overrides
-        from ui.ds_components import render_sidebar_brand as _ds_brand
         _ds_inject_theme("etf-advisor-platform", theme=current_theme())
         _ds_inject_overrides()
-        _ds_brand(brand_name="Advisor", brand_sub="family office", brand_glyph="A")
+        # 2026-04-26 hotfix: do NOT call render_sidebar_brand here.
+        # ui/sidebar.py::render_sidebar() already renders the brand block
+        # ("◐ ETF Advisor / Crypto ETF portfolio platform"); calling it
+        # here too produced a duplicate "A · Advisor · family office"
+        # block above the real brand. Single source of truth: sidebar.py.
     except Exception:
         pass
     st.markdown(_css_for_theme(current_theme()), unsafe_allow_html=True)

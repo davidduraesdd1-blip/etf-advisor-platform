@@ -34,18 +34,42 @@ from config import (
 )
 
 
-def _hide_streamlit_auto_nav_css() -> str:
-    """Streamlit auto-discovers files in pages/ and renders its own nav at
-    the top of the sidebar. The redesigned rail uses a custom grouped nav
-    (Advisor / Research / Account), so we hide the auto-nav element via
-    CSS. Single block returned as a string; injected once by render_sidebar.
+def _sidebar_layout_css() -> str:
+    """Sidebar layout CSS.
+
+    2026-04-26 hotfix: previously this function ALSO hid Streamlit's
+    auto-generated nav (`[data-testid='stSidebarNav']`) on the assumption
+    that our custom st.page_link calls would replace it. They don't —
+    when the first page_link in the try-block raises (Streamlit Cloud's
+    runtime resolves the path differently than our local Python does),
+    the entire try bails to the caption-only fallback and the user has
+    no working nav.
+
+    Fix: keep Streamlit's auto-nav visible as the always-working fallback.
+    Style it to look like our grouped-nav design (group headers stacked
+    above are decorative; the auto-nav below is the click surface).
     """
     return (
         "<style>"
-        "[data-testid='stSidebarNav'] { display: none !important; }"
-        # The brand block + nav group dividers don't need st.divider() lines
-        # so we tighten the gap between sidebar widgets.
+        # Tighten gap between sidebar widgets so brand + nav-group headers
+        # + auto-nav stack cleanly without rivers of whitespace.
         "[data-testid='stSidebar'] [data-testid='stVerticalBlock'] { gap: 4px; }"
+        # Auto-nav styling — bring it inline with the advisor-family look
+        # (compact rows, accent-soft active pill).
+        "[data-testid='stSidebarNav'] { padding: 0 12px; }"
+        "[data-testid='stSidebarNav'] ul { gap: 2px; }"
+        "[data-testid='stSidebarNav'] a {"
+            " padding: 7px 10px; border-radius: 7px;"
+            " font-size: 13.5px; color: var(--text-secondary);"
+            " text-decoration: none;"
+        " }"
+        "[data-testid='stSidebarNav'] a:hover {"
+            " background: var(--bg-2); color: var(--text-primary);"
+        " }"
+        "[data-testid='stSidebarNav'] a[aria-current='page'] {"
+            " background: var(--accent-soft); color: var(--text-primary);"
+            " box-shadow: inset 2px 0 0 var(--accent);"
+        " }"
         "</style>"
     )
 
@@ -82,9 +106,12 @@ def render_sidebar() -> None:
     if "user_level" not in st.session_state:
         st.session_state["user_level"] = DEFAULT_USER_LEVEL
 
-    # Hide Streamlit's auto-generated nav so our custom grouped nav is the
-    # only nav surface. Injected at module level via st.markdown.
-    st.markdown(_hide_streamlit_auto_nav_css(), unsafe_allow_html=True)
+    # 2026-04-26 hotfix: stop hiding Streamlit's auto-nav. Our custom
+    # st.page_link calls fail on Streamlit Cloud (path resolution differs
+    # from local), and when the first call raises the entire try-block
+    # bails to a caption-only fallback that has no click handlers. The
+    # auto-nav always works.
+    st.markdown(_sidebar_layout_css(), unsafe_allow_html=True)
 
     with st.sidebar:
         # Brand block — render via ds_components helper so the
@@ -104,27 +131,35 @@ def render_sidebar() -> None:
             st.markdown(f"## {BRAND_NAME}")
             st.caption("Crypto ETF portfolio platform for advisors")
 
+        # Per-item st.page_link with individual try/except so a single
+        # failure (e.g. "app.py" not resolvable in some Streamlit
+        # versions) doesn't blank the rest of the nav. If page_link is
+        # entirely unavailable (older Streamlit), the auto-nav above the
+        # brand block still works — these are belt + suspenders.
+        def _safe_page_link(path: str, label: str, icon: str | None = None) -> bool:
+            try:
+                if icon:
+                    st.page_link(path, label=label, icon=icon)
+                else:
+                    st.page_link(path, label=label)
+                return True
+            except Exception:
+                return False
+
         # ── ADVISOR group ──
         st.markdown(_nav_group_header("Advisor"), unsafe_allow_html=True)
-        try:
-            st.page_link("app.py", label="Home", icon="◐")
-            st.page_link("pages/01_Dashboard.py", label="Dashboard")
-            st.page_link("pages/02_Portfolio.py", label="Portfolio")
-            st.page_link("pages/03_ETF_Detail.py", label="ETF Detail")
+        _safe_page_link("app.py", "Home", "◐")
+        _safe_page_link("pages/01_Dashboard.py", "Dashboard")
+        _safe_page_link("pages/02_Portfolio.py", "Portfolio")
+        _safe_page_link("pages/03_ETF_Detail.py", "ETF Detail")
 
-            # ── RESEARCH group ──
-            st.markdown(_nav_group_header("Research"), unsafe_allow_html=True)
-            st.page_link("pages/98_Methodology.py", label="Methodology")
+        # ── RESEARCH group ──
+        st.markdown(_nav_group_header("Research"), unsafe_allow_html=True)
+        _safe_page_link("pages/98_Methodology.py", "Methodology")
 
-            # ── ACCOUNT group ──
-            st.markdown(_nav_group_header("Account"), unsafe_allow_html=True)
-            st.page_link("pages/99_Settings.py", label="Settings")
-        except Exception:
-            # AppTest doesn't register sibling pages — render captions so
-            # the test mode at least sees the labels.
-            for lbl in ("Home", "Dashboard", "Portfolio", "ETF Detail",
-                        "Methodology", "Settings"):
-                st.caption(f"→ {lbl}")
+        # ── ACCOUNT group ──
+        st.markdown(_nav_group_header("Account"), unsafe_allow_html=True)
+        _safe_page_link("pages/99_Settings.py", "Settings")
 
         # Footer — DEMO_MODE / extended-modules indicators are diagnostic
         # only (Cowork's mockup-parity directive removes them from the rail).
