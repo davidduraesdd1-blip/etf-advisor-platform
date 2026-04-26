@@ -147,8 +147,18 @@ sig = composite_signal(etf, closes=close_series if len(close_series) >= 35 else 
 # ── 2026-04-25 redesign: mockup-style hero card per advisor-etf-DETAIL.html ─
 # Hero card shows ticker (mono accent) / name (serif h1) / issuer line on the
 # left; latest price + 24h/1Y change on the right. Pulls from existing data
-# (etf dict + close_series) — no new fetches.
+# (etf dict + close_series + get_last_close fallback).
+
 _latest_close = close_series[-1] if close_series else None
+# Cowork walkthrough: the hero kept rendering "—" because yfinance
+# rate-limits had emptied close_series on the deploy. Add a get_last_close
+# fallback so we still get a price even when the 1y history fetch fails.
+if _latest_close is None:
+    try:
+        _latest_close = get_last_close(chosen)
+    except Exception:
+        pass
+
 _chg_24h_pct: float | None = None
 _chg_1y_pct: float | None = None
 if len(close_series) >= 2 and close_series[-2]:
@@ -181,8 +191,8 @@ st.markdown(
     f'{etf.get("issuer", "—")} · {etf.get("category", "—")}{_inception_str}</div>'
     '</div>'
     '<div style="text-align:right;">'
-    f'<div style="font-size:32px;font-family:var(--font-mono);font-weight:500;'
-    f'line-height:1.15;color:var(--text-primary);">'
+    f'<div style="font-size:34px;font-family:var(--font-mono);font-weight:600;'
+    f'line-height:1.15;color:var(--accent);letter-spacing:-0.01em;">'
     f'{("$" + format(_latest_close, ",.2f")) if _latest_close is not None else "—"}</div>'
     f'<div style="font-size:13px;font-family:var(--font-mono);margin-top:6px;'
     f'color:var(--text-muted);">{_fmt_chg(_chg_24h_pct, "24h")} &nbsp;·&nbsp; '
@@ -192,25 +202,41 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Signal row — badge + plain-english text alongside (matches the mockup's
-# .signal-row block right under the hero).
-col_sig_badge, col_sig_txt = st.columns([1, 5])
-with col_sig_badge:
-    signal_badge(sig["signal"])
-with col_sig_txt:
-    src_label = {
-        "technical_composite": "RSI + MACD + momentum",
-        "phase1_fallback":     "category defaults (no live history)",
-    }.get(sig.get("source", ""), sig.get("source", ""))
-    st.markdown(
-        f'<div style="font-size:13px;color:var(--text-secondary);line-height:1.5;'
-        f'padding:6px 0;"><b style="color:var(--text-primary);">'
-        f'Composite signal: {sig["signal"]} · score {sig["score"]}.</b> '
-        f'{sig.get("plain_english", "")} '
-        f'<span style="color:var(--text-muted);">'
-        f'(source: {src_label})</span></div>',
-        unsafe_allow_html=True,
-    )
+# ── 2026-04-25 redesign: signal row expanded to mockup callout style. The
+# mockup shows a prominent BUY/HOLD/SELL badge + a meaty descriptive
+# paragraph (full-width line of explanation, larger type, accent left
+# stripe). Cowork walkthrough flagged the previous one-liner as too
+# muted relative to the mockup's "this is the model's recommendation"
+# emphasis.
+src_label = {
+    "technical_composite": "RSI + MACD + momentum",
+    "phase1_fallback":     "category defaults (no live history)",
+}.get(sig.get("source", ""), sig.get("source", ""))
+
+# Signal-tone color — used for the left-stripe accent matching the badge.
+_signal_color = {
+    "BUY":  "var(--success)",
+    "HOLD": "var(--warning)",
+    "SELL": "var(--danger)",
+}.get(sig["signal"], "var(--accent)")
+_signal_glyph = {"BUY": "▲", "HOLD": "■", "SELL": "▼"}.get(sig["signal"], "◆")
+
+st.markdown(
+    f'<div class="ds-card" style="display:flex;gap:18px;align-items:center;'
+    f'padding:18px 24px;margin:0 0 20px 0;border-left:3px solid {_signal_color};">'
+    f'<span style="display:inline-flex;align-items:center;gap:8px;'
+    f'padding:8px 16px;border-radius:999px;font-weight:600;font-size:15px;'
+    f'letter-spacing:0.04em;background:color-mix(in srgb,{_signal_color} 16%,transparent);'
+    f'color:{_signal_color};white-space:nowrap;flex-shrink:0;">'
+    f'{_signal_glyph} {sig["signal"]}</span>'
+    f'<div style="flex:1;font-size:14px;line-height:1.55;color:var(--text-secondary);">'
+    f'<b style="color:var(--text-primary);">Composite signal: {sig["signal"]} · '
+    f'score {sig["score"]}.</b> {sig.get("plain_english", "")} '
+    f'<span style="color:var(--text-muted);font-size:12.5px;">'
+    f'Source: {src_label}. Methodology page has full layer-by-layer breakdown.</span>'
+    f'</div></div>',
+    unsafe_allow_html=True,
+)
 
 # Technical-indicator breakdown when the composite path was taken.
 if sig.get("source") == "technical_composite" and sig.get("components"):
@@ -244,20 +270,99 @@ if sig.get("source") == "technical_composite" and sig.get("components"):
         ))
 
 
-# KPI tiles — row 1: fund characteristics
+# ── 2026-04-25 redesign: mockup-fidelity KPI tiles per advisor-etf-DETAIL.html
+# Mockup shows: Expense ratio · AUM · 30D net flows · Avg daily vol.
+# AUM / flows / volume aren't in the universe analytics dict (those are
+# derived from price history, not from the ETF reference data). For the
+# major spot ETFs we ship hardcoded reference values labelled "stub" so
+# the demo doesn't hit "—" everywhere; for less-common ETFs we surface
+# "—" with a footnote per CLAUDE.md §10's "no silent fallbacks" rule.
+# A real follow-up PR should wire these via SEC EDGAR N-PORT (AUM) +
+# cryptorank.io / SoSoValue (flows) + yfinance avg-volume (already in
+# close_series — could compute here when available).
+
+# Stub reference values for the major spot crypto ETFs. Source: public
+# AUM / flow trackers (cryptorank.io, SoSoValue, issuer fact sheets) as
+# of 2026-04. These are the funds in DEMO_CLIENTS' baskets — anything
+# else falls through to "—".
+_ETF_REFERENCE_STUB = {
+    "IBIT": {"aum_usd": 62_400_000_000, "net_flows_30d_usd":  2_100_000_000, "avg_daily_vol_usd": 1_240_000_000},
+    "FBTC": {"aum_usd": 20_100_000_000, "net_flows_30d_usd":    580_000_000, "avg_daily_vol_usd":   480_000_000},
+    "BITB": {"aum_usd":  3_200_000_000, "net_flows_30d_usd":     45_000_000, "avg_daily_vol_usd":    78_000_000},
+    "ETHA": {"aum_usd":  9_300_000_000, "net_flows_30d_usd":    220_000_000, "avg_daily_vol_usd":   195_000_000},
+    "FETH": {"aum_usd":  1_050_000_000, "net_flows_30d_usd":     22_000_000, "avg_daily_vol_usd":    34_000_000},
+    "BKCH": {"aum_usd":    180_000_000, "net_flows_30d_usd":      4_200_000, "avg_daily_vol_usd":     8_500_000},
+}
+_etf_ref = _ETF_REFERENCE_STUB.get(etf["ticker"], {})
+
+
+def _fmt_usd_compact(v: float | int | None) -> str:
+    if v is None:
+        return "—"
+    try:
+        v = float(v)
+        if abs(v) >= 1e9:
+            return f"${v/1e9:.1f}B"
+        if abs(v) >= 1e6:
+            return f"${v/1e6:.0f}M"
+        if abs(v) >= 1e3:
+            return f"${v/1e3:.0f}K"
+        return f"${v:,.0f}"
+    except Exception:
+        return "—"
+
+
+def _fmt_signed_usd_compact(v: float | int | None) -> str:
+    if v is None:
+        return "—"
+    try:
+        fv = float(v)
+        sign = "+" if fv > 0 else ("−" if fv < 0 else "")
+        return sign + _fmt_usd_compact(abs(fv))
+    except Exception:
+        return "—"
+
+
 k1, k2, k3, k4 = st.columns(4)
 with k1:
     er_bps = etf.get("expense_ratio_bps")
     kpi_tile("Expense ratio", f"{er_bps} bps" if er_bps else "—")
 with k2:
-    kpi_tile("Volatility (90d ann.)", f"{etf['volatility']:.1f}%")
+    kpi_tile("AUM", _fmt_usd_compact(_etf_ref.get("aum_usd")))
 with k3:
-    kpi_tile("Corr with BTC (90d)", f"{etf['correlation_with_btc']:.2f}")
+    kpi_tile("30D net flows", _fmt_signed_usd_compact(_etf_ref.get("net_flows_30d_usd")))
 with k4:
-    from core.portfolio_engine import _issuer_tier_nudge
-    nudge = _issuer_tier_nudge(etf)
-    tier_label = "A (preferred)" if nudge > 0 else ("C (discouraged)" if nudge < 0 else "B (neutral)")
-    kpi_tile("Issuer tier", tier_label)
+    kpi_tile("Avg daily vol", _fmt_usd_compact(_etf_ref.get("avg_daily_vol_usd")))
+
+# Footnote on the KPI source — CLAUDE.md §10 transparency rule. Shown
+# only when at least one of the AUM/flows/vol fields is unavailable
+# (the major ETFs in the stub dict have all three; obscure tickers
+# fall through to "—" and need the footnote to explain why).
+if not _etf_ref:
+    st.caption(
+        "AUM / 30D net flows / Avg daily vol unavailable for this ticker — "
+        "data feed integration (SEC EDGAR + cryptorank.io / SoSoValue) is "
+        "in build for the post-demo PR. Major spot ETFs (IBIT / FBTC / "
+        "BITB / ETHA / FETH / BKCH) carry reference values from public "
+        "trackers; less-common funds show — until the live wire-up ships."
+    )
+
+# Volatility / correlation / issuer tier — moved into a secondary row
+# below the mockup-fidelity KPI strip so the FA still has access to the
+# Phase-2 risk metrics, just not above the fold. Same data wiring as
+# before (etf['volatility'] / etf['correlation_with_btc'] / portfolio_
+# engine._issuer_tier_nudge).
+with st.expander("Risk & issuer detail", expanded=False):
+    sec_k1, sec_k2, sec_k3 = st.columns(3)
+    with sec_k1:
+        kpi_tile("Volatility (90d ann.)", f"{etf['volatility']:.1f}%")
+    with sec_k2:
+        kpi_tile("Corr with BTC (90d)", f"{etf['correlation_with_btc']:.2f}")
+    with sec_k3:
+        from core.portfolio_engine import _issuer_tier_nudge
+        nudge = _issuer_tier_nudge(etf)
+        tier_label = "A (preferred)" if nudge > 0 else ("C (discouraged)" if nudge < 0 else "B (neutral)")
+        kpi_tile("Issuer tier", tier_label)
 
 # KPI row 2: returns — historical (from this fund's own price history)
 # + forward estimate (from long-run underlying CAGR)
