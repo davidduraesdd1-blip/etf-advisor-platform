@@ -53,6 +53,8 @@ try:
     from ui import render_top_bar as _ds_top_bar, page_header as _ds_page_header
     _ds_top_bar(breadcrumb=("Advisor", "Portfolio"),
                 user_level=st.session_state.get("user_level", "beginner"))
+    # Data-source pill row — mirrors the mockup's 4 pills (EDGAR / yfinance /
+    # News / Broker mock). Tones: live=success-tick, cached=warning-tick.
     _ds_page_header(
         title="Portfolio",
         subtitle=level_text(
@@ -60,7 +62,12 @@ try:
             intermediate="5-tier risk-profiled basket construction with forward-looking risk metrics.",
             advanced="Phase-2 pairwise-correlation basket, issuer-tier adjusted, with forward MC projection.",
         ),
-        data_sources=[("ETF pricing", "live"), ("Risk engine", "live")],
+        data_sources=[
+            ("SEC EDGAR", "live"),
+            ("yfinance", "live"),
+            ("News", "cached"),
+            ("Broker · mock", "live"),
+        ],
     )
 except Exception:
     section_header(
@@ -130,6 +137,79 @@ st.caption(level_text(
 ))
 
 
+# ── 2026-04-25 redesign: render the mockup-style top KPI strip right after
+# the tier selector. Pulls 4 numbers that match the advisor-etf-portfolio.html
+# layout: Sharpe (3Y) · Max DD (5Y) · Return (1Y) · Crypto allocation ceiling.
+# Render is deferred until after `metrics` exists; we just stub the function
+# here and call it once `portfolio` has been built below.
+
+def _render_mockup_kpi_strip(metrics_dict: dict, ceiling_pct: float, tier_label: str) -> None:
+    """Mockup-fidelity 4-up KPI strip (used near top of Portfolio page)."""
+    sharpe = metrics_dict.get("sharpe_ratio")
+    max_dd = metrics_dict.get("max_drawdown_pct")
+    one_y = metrics_dict.get("return_1y_pct") or metrics_dict.get("weighted_return_pct")
+    bench_one_y = metrics_dict.get("benchmark_return_1y_pct")
+    bench_sharpe = metrics_dict.get("benchmark_sharpe")
+
+    def _fmt_pct(v, signed=True, decimals=1):
+        if v is None:
+            return "—"
+        try:
+            fv = float(v)
+            sign = "+ " if (signed and fv > 0) else ("− " if (signed and fv < 0) else "")
+            return f"{sign}{abs(fv):.{decimals}f}%"
+        except Exception:
+            return "—"
+
+    def _fmt_num(v, decimals=2):
+        if v is None:
+            return "—"
+        try:
+            return f"{float(v):.{decimals}f}"
+        except Exception:
+            return "—"
+
+    sharpe_sub = f"vs benchmark {_fmt_num(bench_sharpe)}" if bench_sharpe is not None else "3-year rolling"
+    one_y_sub = (f"vs benchmark {_fmt_pct(bench_one_y)}"
+                 if bench_one_y is not None else "1-year basket return")
+    one_y_color = ("var(--success)" if (one_y is not None and float(one_y) > 0)
+                   else ("var(--danger)" if (one_y is not None and float(one_y) < 0) else ""))
+
+    def _kpi(lbl: str, val: str, sub: str, *, val_color: str = "", sub_class: str = "") -> str:
+        color_attr = f" style=\"color:{val_color};\"" if val_color else ""
+        sub_color = ""
+        if sub_class == "up":
+            sub_color = "color:var(--success);"
+        elif sub_class == "down":
+            sub_color = "color:var(--danger);"
+        return (
+            "<div>"
+            f'<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">{lbl}</div>'
+            f'<div style="font-size:26px;font-family:var(--font-mono);font-weight:500;line-height:1.15;margin-top:4px;color:var(--text-primary);"{color_attr}>{val}</div>'
+            f'<div style="font-size:12px;margin-top:4px;font-family:var(--font-mono);color:var(--text-muted);{sub_color}">{sub}</div>'
+            "</div>"
+        )
+
+    st.markdown(
+        '<div class="ds-card" style="margin-bottom:24px;">'
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap);">'
+        + _kpi("Sharpe (3Y)", _fmt_num(sharpe), sharpe_sub,
+               sub_class=("up" if (sharpe is not None and bench_sharpe is not None
+                                   and float(sharpe) > float(bench_sharpe)) else ""))
+        + _kpi("Max drawdown (5Y)", _fmt_pct(max_dd), "BTC basket trough",
+               val_color="var(--danger)" if max_dd is not None else "",
+               sub_class="down" if max_dd is not None else "")
+        + _kpi("Return (1Y)", _fmt_pct(one_y), one_y_sub,
+               val_color=one_y_color,
+               sub_class=("up" if (one_y is not None and bench_one_y is not None
+                                   and float(one_y) > float(bench_one_y)) else ""))
+        + _kpi("Crypto allocation ceiling", f"{ceiling_pct:.0f}%",
+               f"{tier_label} · of total portfolio")
+        + '</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
 @st.cache_data(ttl=600)
 def _universe_with_live_analytics_cached() -> list[dict]:
     """
@@ -176,6 +256,19 @@ if _compliance_filter:
     )
 holdings = portfolio["holdings"]
 metrics = portfolio["metrics"]
+
+# Mockup-fidelity 4-up KPI strip (Sharpe / Max DD / 1Y / Allocation ceiling).
+# Renders BEFORE the existing 5-tile KPI row so the FA's first read is the
+# advisor-etf-portfolio.html top-card, then they can dive into the existing
+# detail tiles for sleeve/forward/vol detail.
+try:
+    _render_mockup_kpi_strip(
+        metrics_dict=metrics,
+        ceiling_pct=float(tier_meta.get("ceiling_pct", client["crypto_allocation_pct"])),
+        tier_label=f"Tier {tier_meta['tier_number']}",
+    )
+except Exception as _e_kpi:
+    pass  # Strip is decorative; legacy tiles below still render the same data
 
 # Count per-metric live vs category-default for the transparency caption.
 _holding_tickers = {h["ticker"] for h in holdings}
@@ -748,20 +841,109 @@ def _confirm_body() -> None:
             st.session_state["confirm_execute"] = False
 
 
-col_cta, col_info = st.columns([1, 2])
-with col_cta:
+# ── 2026-04-25 redesign: mockup-style exec-row + compliance callout ─────────
+# Layout matches advisor-etf-portfolio.html lines 587-622:
+#   exec-row (2 cols): "Ready to execute basket" card  |  rebalance/last-reviewed card
+#   callout: "Hypothetical results..." with methodology link
+
+_n_holdings = len(holdings)
+_basket_notional = sum(h.get("dollar_amount", 0) or h.get("notional_usd", 0)
+                       for h in holdings) or crypto_sleeve_usd
+
+# Format last rebalance + next rebalance (next = last + cadence)
+def _fmt_date(iso_str: str) -> str:
+    try:
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        return dt.strftime("%b %d, %Y")
+    except Exception:
+        return "—"
+
+_last_reviewed_str = _fmt_date(client.get("last_rebalance_iso", ""))
+# Estimate next rebalance from cadence
+_cadence_days = {"weekly": 7, "bi-weekly": 14, "bi-monthly": 60,
+                 "monthly": 30, "quarterly": 90, "semi-annual": 180,
+                 "annually": 365, "annual": 365}.get(
+    str(tier_meta.get("rebalance", "")).lower(), 60
+)
+try:
+    _last_dt = datetime.fromisoformat(client["last_rebalance_iso"].replace("Z", "+00:00"))
+    from datetime import timedelta as _td
+    _next_str = (_last_dt + _td(days=_cadence_days)).strftime("%b %d, %Y")
+except Exception:
+    _next_str = "—"
+
+_exec_l, _exec_r = st.columns(2)
+
+with _exec_l:
+    st.markdown(
+        '<div class="ds-card" style="padding:28px;">'
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;">'
+        '<div style="max-width:40ch;">'
+        '<h3 style="font-family:var(--font-display);font-size:20px;font-weight:500;'
+        'margin:0 0 6px;letter-spacing:-0.01em;color:var(--text-primary);">'
+        'Ready to execute basket</h3>'
+        f'<p style="margin:0;color:var(--text-secondary);font-size:13px;">'
+        f'You are about to submit a {tier_name} basket for {client["name"]}. '
+        f'{_n_holdings} holdings · ${_basket_notional:,.0f} notional. '
+        'Mock broker — no real order is placed.</p>'
+        '</div></div></div>',
+        unsafe_allow_html=True,
+    )
+    # Real Streamlit button — sits visually under the exec card. The `primary`
+    # type pulls the accent color so it reads as the page CTA.
     st.button(
         "Execute basket →",
         on_click=_open_confirm,
         type="primary",
         width="stretch",
+        key="exec_basket_cta",
     )
-with col_info:
     st.caption(level_text(
         beginner="Demo mode — no real orders will be placed.",
         intermediate="Broker = mock. Post-demo flips to Alpaca paper, then Alpaca live.",
         advanced="BROKER_PROVIDER='mock' per config.py. Day-4+ routes to alpaca_paper.",
     ))
+
+with _exec_r:
+    st.markdown(
+        '<div class="ds-card" style="padding:20px;">'
+        '<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;'
+        'letter-spacing:0.08em;">Rebalance cadence</div>'
+        f'<div style="font-size:18px;font-family:var(--font-mono);font-weight:500;'
+        f'line-height:1.15;margin-top:4px;color:var(--text-primary);">'
+        f'{tier_meta.get("rebalance", "—").title()}</div>'
+        f'<div style="font-size:12px;color:var(--text-muted);margin-top:4px;'
+        f'font-family:var(--font-mono);">next rebalance: {_next_str}</div>'
+        '<hr style="border:none;border-top:1px solid var(--border);margin:14px 0;">'
+        '<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;'
+        'letter-spacing:0.08em;">Last reviewed</div>'
+        f'<div style="font-size:18px;font-family:var(--font-mono);font-weight:500;'
+        f'line-height:1.15;margin-top:4px;color:var(--text-primary);">{_last_reviewed_str}</div>'
+        f'<div style="font-size:12px;color:var(--text-muted);margin-top:4px;'
+        f'font-family:var(--font-mono);">drift {client["drift_pct"]:.1f}σ · '
+        f'{"rebal needed" if client["rebalance_needed"] else "on target"}</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+# ── Hypothetical-results callout (compliance disclaimer) ────────────────────
+st.markdown(
+    '<div style="display:flex;gap:14px;align-items:flex-start;'
+    'padding:16px 20px;margin-top:20px;'
+    'background:color-mix(in srgb,var(--accent) 5%,var(--bg-1));'
+    'border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));'
+    'border-left:3px solid var(--accent);border-radius:8px;font-size:13px;">'
+    '<div style="width:22px;height:22px;border-radius:50%;'
+    'background:var(--accent-soft);color:var(--accent);'
+    'display:grid;place-items:center;font-weight:600;font-size:13px;flex-shrink:0;">i</div>'
+    '<div><div style="font-weight:500;color:var(--text-primary);margin-bottom:2px;">'
+    'Hypothetical results. Past performance does not guarantee future results.</div>'
+    'All client profiles shown in demo mode are fictional. Every performance display '
+    'includes multiple time horizons, benchmark comparison, and max drawdown per '
+    'SEC Marketing Rule compliance. See the Methodology page for the full set of '
+    'assumptions, data sources, and simplifications.</div></div>',
+    unsafe_allow_html=True,
+)
 
 if st.session_state.get("confirm_execute"):
     _render_confirm_modal()
