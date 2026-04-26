@@ -172,7 +172,21 @@ _methodology_css = """
 </style>
 """
 
-st.markdown(_methodology_css, unsafe_allow_html=True)
+# ── 2026-04-25 fix: Streamlit's markdown parser converts any line with 4+
+# leading spaces into a `<pre><code>` block BEFORE unsafe_allow_html=True
+# kicks in. Our pretty-formatted HTML strings below have plenty of
+# 4-space-indented lines (nested <section>/<article> children). Without
+# normalizing the whitespace, the entire methodology page rendered as
+# raw HTML markup as plain text. The helper strips line-leading whitespace
+# so every line is flush-left — markdown can't mistake it for code.
+
+def _html(raw: str) -> str:
+    """Flush-left an HTML string so st.markdown's code-block rule
+    (4+ leading spaces = <pre><code>) doesn't fire on indented HTML."""
+    return "\n".join(line.lstrip() for line in raw.split("\n"))
+
+
+st.markdown(_html(_methodology_css), unsafe_allow_html=True)
 
 # Render the entire 2-col article in one HTML block — TOC anchors + article
 # sections with id="..." attributes for the sticky links.
@@ -286,4 +300,4 @@ _article_html = """
   </article>
 </div>
 """
-st.markdown(_article_html, unsafe_allow_html=True)
+st.markdown(_html(_article_html), unsafe_allow_html=True)
