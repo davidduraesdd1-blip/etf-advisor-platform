@@ -218,6 +218,34 @@ def load_universe(scanner_additions: list[dict] | None = None) -> list[dict]:
         for new in scanner_additions:
             if new.get("ticker") and new["ticker"] not in existing:
                 base.append(_enrich(new))
+
+    # ── 2026-04-26 Bucket 3: merge FA-approved scanner additions ──
+    # core/etf_review_queue.approve_entry() writes to
+    # data/etf_user_additions.json. Loading them here means an FA can
+    # approve a candidate from Settings + see it flow into Portfolio
+    # basket selection on the next refresh, without editing config.py.
+    try:
+        from core.etf_review_queue import load_user_additions
+        _user_adds = load_user_additions()
+        existing_tickers = {e["ticker"] for e in base}
+        for ua in _user_adds:
+            tkr = (ua.get("ticker") or "").upper()
+            if not tkr or tkr in existing_tickers:
+                continue
+            base.append(_enrich({
+                "ticker":             tkr,
+                "issuer":             ua.get("issuer", ""),
+                "category":           ua.get("category", "btc_spot"),
+                "underlying":         ua.get("underlying", "BTC"),
+                "name":               ua.get("name", tkr),
+                "expense_ratio_bps":  ua.get("expense_ratio_bps") or 50,
+                "inception":          ua.get("inception", ""),
+                "review_source":      "fa_approved",
+            }))
+            existing_tickers.add(tkr)
+    except Exception as exc:
+        logger.debug("FA-approved additions merge failed (non-fatal): %s", exc)
+
     # Default provenance flag — load_universe_with_live_returns overrides
     # it per-ticker when a live CAGR fetch succeeds.
     for e in base:
@@ -522,6 +550,19 @@ def daily_scanner(days_back: int = 7) -> list[dict]:
             else f"All {n_queries} EDGAR queries failed (429 or network)"
         ),
     )
+
+    # ── 2026-04-26 Bucket 3: feed each new filing through the review
+    # queue. add_pending() handles dedup against approved + rejected so
+    # this is idempotent across daily runs — already-decided filings
+    # don't get re-flagged.
+    try:
+        from core.etf_review_queue import add_pending as _rq_add_pending
+        _n_new = _rq_add_pending(results)
+        if _n_new > 0:
+            logger.info("Review queue: %d new filings added to pending", _n_new)
+    except Exception as exc:
+        logger.warning("Review-queue enqueue failed (non-fatal): %s", exc)
+
     return results
 
 

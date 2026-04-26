@@ -205,6 +205,147 @@ with card("EDGAR scanner health"):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 2026-04-26 Bucket 3: New ETFs pending review (Advisor mode only)
+# ═══════════════════════════════════════════════════════════════════════════
+# When daily_scanner finds a new EDGAR filing, etf_review_queue enriches
+# it (suggested category / underlying / ticker) and adds to the pending
+# list. This panel lets the FA approve or reject each candidate. Approved
+# entries flow into the universe via data/etf_user_additions.json on the
+# next universe refresh — no config.py edit needed.
+
+from ui.level_helpers import is_advisor
+
+if is_advisor():
+    with card("New ETFs pending review"):
+        try:
+            from core.etf_review_queue import (
+                load_queue, approve_entry, reject_entry,
+            )
+            _q = load_queue()
+            _pending = _q.get("pending", [])
+            _approved_count = len(_q.get("approved", []))
+            _rejected_count = len(_q.get("rejected", []))
+
+            st.caption(
+                f"Pending {len(_pending)} · approved {_approved_count} · "
+                f"rejected {_rejected_count}. Run "
+                "**Run scanner now** above to refresh. Each candidate is "
+                "auto-enriched with a suggested category/underlying/ticker "
+                "from the SEC filing — review and approve to flow into the "
+                "live universe (no config.py edit needed)."
+            )
+
+            if not _pending:
+                st.info(
+                    "No filings pending review. The daily EDGAR cron will "
+                    "populate this queue automatically; the manual button "
+                    "above triggers an on-demand scan."
+                )
+            else:
+                _CATS = [
+                    "btc_spot", "eth_spot", "altcoin_spot",
+                    "btc_futures", "eth_futures", "leveraged",
+                    "income_covered_call", "thematic_equity",
+                    "multi_asset", "defined_outcome",
+                ]
+                _UNDS = ["BTC", "ETH", "SOL", "XRP", "LTC", "DOGE",
+                         "ADA", "AVAX", "HBAR", "DOT", "LINK", "MIXED"]
+
+                for _entry in _pending[:10]:  # cap per render
+                    _acc = _entry.get("accession_number", "")
+                    if not _acc:
+                        continue
+                    _exp = st.expander(
+                        f"📄 {_entry.get('filer_name', 'unknown filer')} · "
+                        f"{_entry.get('form_type', '?')} · "
+                        f"{_entry.get('filing_date', '?')}",
+                        expanded=False,
+                    )
+                    with _exp:
+                        st.caption(
+                            f"Accession `{_acc}` · CIK "
+                            f"`{_entry.get('filer_cik', '?')}` · matched "
+                            f"keywords: {', '.join(_entry.get('matched_keywords', []) or ['—'])}"
+                        )
+                        _form_cols = st.columns(3)
+                        with _form_cols[0]:
+                            _ticker = st.text_input(
+                                "Ticker",
+                                value=_entry.get("suggested_ticker") or "",
+                                key=f"rq_ticker_{_acc}",
+                                help="2-5 capital letters; auto-suggested from filing.",
+                            )
+                        with _form_cols[1]:
+                            _cat_idx = (
+                                _CATS.index(_entry.get("suggested_category"))
+                                if _entry.get("suggested_category") in _CATS
+                                else 0
+                            )
+                            _category = st.selectbox(
+                                "Category", _CATS,
+                                index=_cat_idx,
+                                key=f"rq_cat_{_acc}",
+                            )
+                        with _form_cols[2]:
+                            _und_idx = (
+                                _UNDS.index(_entry.get("suggested_underlying"))
+                                if _entry.get("suggested_underlying") in _UNDS
+                                else 0
+                            )
+                            _underlying = st.selectbox(
+                                "Underlying", _UNDS,
+                                index=_und_idx,
+                                key=f"rq_und_{_acc}",
+                            )
+                        _notes = st.text_input(
+                            "Review notes (optional)",
+                            key=f"rq_notes_{_acc}",
+                            help="Free-form. Stored on the queue entry for audit.",
+                        )
+                        _btn_cols = st.columns([1, 1, 4])
+                        with _btn_cols[0]:
+                            if st.button(
+                                "✓ Approve",
+                                key=f"rq_approve_{_acc}",
+                                type="primary",
+                                use_container_width=True,
+                            ):
+                                approve_entry(
+                                    _acc,
+                                    ticker_override=_ticker.strip().upper() or None,
+                                    category_override=_category,
+                                    underlying_override=_underlying,
+                                    notes=_notes,
+                                )
+                                st.toast(
+                                    f"Approved {_ticker or 'filing'} — "
+                                    f"will appear in universe after refresh."
+                                )
+                                st.rerun()
+                        with _btn_cols[1]:
+                            if st.button(
+                                "✗ Reject",
+                                key=f"rq_reject_{_acc}",
+                                use_container_width=True,
+                            ):
+                                reject_entry(_acc, notes=_notes)
+                                st.toast(f"Rejected — won't be re-flagged.")
+                                st.rerun()
+
+                if len(_pending) > 10:
+                    st.caption(
+                        f"Showing first 10 of {len(_pending)} pending. "
+                        "Approve/reject the visible batch first; remaining "
+                        "candidates surface on next render."
+                    )
+        except Exception as _rq_exc:
+            st.warning(
+                f"Review queue unavailable ({type(_rq_exc).__name__}: {_rq_exc}). "
+                "Scanner findings will still log; approval workflow is offline."
+            )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Circuit breaker + data-source state
 # ═══════════════════════════════════════════════════════════════════════════
 
