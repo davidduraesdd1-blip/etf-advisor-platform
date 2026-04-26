@@ -51,42 +51,99 @@ def render_top_bar(
     show_refresh: bool = True,
     show_theme: bool = True,
 ) -> None:
-    """Render the topbar: breadcrumb + Advisor/Client mode pills + refresh +
-    theme chips. Pills are decorative-only on this branch — wiring lands
-    post-demo. The active pill is teal (.on); inactive is muted.
+    """Render the topbar: breadcrumb on the left, real Streamlit widget
+    controls on the right (Advisor/Client pills + Refresh + Theme).
 
-    2026-04-26 taxonomy collapse: was 3 pills (Beginner / Intermediate /
-    Advanced), now 2 (Advisor / Client). Same control surface, fewer
-    states, clearer mental model for FAs.
+    2026-04-26 hotfix: the previous implementation rendered the entire
+    topbar as a single block of HTML with `<button>` elements. Those
+    are decorative — Streamlit can't capture clicks on raw HTML. This
+    rewrite splits the layout into st.columns and replaces the chips
+    with real st.button widgets that update session_state and rerun.
+
+    Wired actions:
+      Advisor / Client pills  → st.session_state["user_level"] = "..."
+      ↻ Refresh               → st.cache_data.clear(); st.rerun()
+      ☾ Theme                 → flip st.session_state["theme"]; st.rerun()
+
+    Active mode pill uses type="primary" so it inherits the advisor
+    teal accent from ui/overrides.py + .streamlit/config.toml.
     """
     if st is None:
         return
+
+    # Normalize level — accept old lowercase placeholders for back-compat.
+    active = (user_level or "").strip().capitalize()
+    if active not in ("Advisor", "Client"):
+        active = "Advisor"
+
+    # Layout: breadcrumb (wide) + 2 mode pills + refresh + theme.
+    # Column widths picked so the chips on the right read as a tight cluster
+    # and the breadcrumb gets all the leftover space.
+    crumb_col, advisor_col, client_col, refresh_col, theme_col = st.columns(
+        [6, 1, 1, 1, 1], gap="small",
+    )
+
     *rest, last = list(breadcrumb) or ["", ""]
     crumb_html = " / ".join(rest) + (" / " if rest else "") + f"<b>{last}</b>"
-    level_html = ""
-    if show_level:
-        # Accept either capitalized ("Advisor") or lower-case keys for
-        # backward compatibility with any caller still passing the old
-        # "beginner" placeholder; normalize before comparing.
-        active = (user_level or "").strip().capitalize()
-        if active not in ("Advisor", "Client"):
-            active = "Advisor"
-        lvls = [("Advisor", "Advisor"), ("Client", "Client")]
-        buttons = "".join(
-            f'<button class="{"on" if active == k else ""}" data-level="{k.lower()}">{lbl}</button>'
-            for k, lbl in lvls
+    with crumb_col:
+        st.markdown(
+            f'<div class="ds-crumbs" style="padding-top:6px;color:var(--text-muted);'
+            f'font-size:13px;">{crumb_html}</div>',
+            unsafe_allow_html=True,
         )
-        level_html = f'<div class="ds-level-group">{buttons}</div>'
-    refresh_html = '<button class="ds-chip-btn" data-action="refresh">↻ Refresh</button>' if show_refresh else ""
-    theme_html   = '<button class="ds-chip-btn" data-action="theme">☾ Theme</button>' if show_theme else ""
-    st.markdown(
-        f'<div class="ds-topbar">'
-        f'<div class="ds-crumbs">{crumb_html}</div>'
-        f'<div class="ds-topbar-spacer"></div>'
-        f'{level_html}{refresh_html}{theme_html}'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+
+    if show_level:
+        with advisor_col:
+            if st.button(
+                "Advisor",
+                key="topbar_mode_advisor",
+                use_container_width=True,
+                type=("primary" if active == "Advisor" else "secondary"),
+            ):
+                st.session_state["user_level"] = "Advisor"
+                st.rerun()
+        with client_col:
+            if st.button(
+                "Client",
+                key="topbar_mode_client",
+                use_container_width=True,
+                type=("primary" if active == "Client" else "secondary"),
+            ):
+                st.session_state["user_level"] = "Client"
+                st.rerun()
+
+    if show_refresh:
+        with refresh_col:
+            if st.button(
+                "↻ Refresh",
+                key="topbar_refresh",
+                use_container_width=True,
+                help="Clear all data caches and reload the page.",
+            ):
+                try:
+                    st.cache_data.clear()
+                except Exception:
+                    pass
+                try:
+                    st.cache_resource.clear()
+                except Exception:
+                    pass
+                st.rerun()
+
+    if show_theme:
+        with theme_col:
+            cur_theme = st.session_state.get("theme", "dark")
+            label = "☼ Light" if cur_theme == "dark" else "☾ Dark"
+            if st.button(
+                label,
+                key="topbar_theme",
+                use_container_width=True,
+                help="Toggle between dark and light mode.",
+            ):
+                st.session_state["theme"] = (
+                    "light" if cur_theme == "dark" else "dark"
+                )
+                st.rerun()
 
 
 def page_header(

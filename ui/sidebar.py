@@ -37,39 +37,24 @@ from config import (
 def _sidebar_layout_css() -> str:
     """Sidebar layout CSS.
 
-    2026-04-26 hotfix: previously this function ALSO hid Streamlit's
-    auto-generated nav (`[data-testid='stSidebarNav']`) on the assumption
-    that our custom st.page_link calls would replace it. They don't —
-    when the first page_link in the try-block raises (Streamlit Cloud's
-    runtime resolves the path differently than our local Python does),
-    the entire try bails to the caption-only fallback and the user has
-    no working nav.
+    2026-04-26 second hotfix: previous hotfix kept Streamlit's auto-nav
+    as a fallback. The custom st.page_link calls demonstrably work on
+    the live deploy now (per user walkthrough), so showing both surfaces
+    produced a duplicate-nav UX. Hide the auto-nav again; custom nav is
+    the single click surface.
 
-    Fix: keep Streamlit's auto-nav visible as the always-working fallback.
-    Style it to look like our grouped-nav design (group headers stacked
-    above are decorative; the auto-nav below is the click surface).
+    Per-item try/except around each st.page_link in render_sidebar()
+    stays in place — if a single link can't resolve (e.g., "app.py" as
+    the entrypoint sometimes fails), the rest of the nav still renders.
     """
     return (
         "<style>"
+        # Hide Streamlit's auto-discovered nav — custom grouped nav owns
+        # this surface.
+        "[data-testid='stSidebarNav'] { display: none !important; }"
         # Tighten gap between sidebar widgets so brand + nav-group headers
-        # + auto-nav stack cleanly without rivers of whitespace.
+        # stack cleanly without rivers of whitespace.
         "[data-testid='stSidebar'] [data-testid='stVerticalBlock'] { gap: 4px; }"
-        # Auto-nav styling — bring it inline with the advisor-family look
-        # (compact rows, accent-soft active pill).
-        "[data-testid='stSidebarNav'] { padding: 0 12px; }"
-        "[data-testid='stSidebarNav'] ul { gap: 2px; }"
-        "[data-testid='stSidebarNav'] a {"
-            " padding: 7px 10px; border-radius: 7px;"
-            " font-size: 13.5px; color: var(--text-secondary);"
-            " text-decoration: none;"
-        " }"
-        "[data-testid='stSidebarNav'] a:hover {"
-            " background: var(--bg-2); color: var(--text-primary);"
-        " }"
-        "[data-testid='stSidebarNav'] a[aria-current='page'] {"
-            " background: var(--accent-soft); color: var(--text-primary);"
-            " box-shadow: inset 2px 0 0 var(--accent);"
-        " }"
         "</style>"
     )
 
