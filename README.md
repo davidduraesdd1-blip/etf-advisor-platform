@@ -10,6 +10,29 @@ two-click basket execution across the crypto ETF universe.
 **Private repo** — demo phase. Not yet production-ready. See `CLAUDE.md`
 for governance and `docs/BUILD_PACKAGE.md` for the build plan.
 
+**Active branch:** `redesign/advisor-2026-05-fixes` — full advisor-family
+redesign + mockup-parity fixes pending Cowork's walkthrough before merge
+to `main`. Demo target: May 1 2026. See `MEMORY.md` for the per-sprint
+commit log and `pending_work.md` for the deferred backlog.
+
+## Design system
+
+The platform uses the **advisor family** of the 2026-05 redesign — a
+warmer charcoal dark palette + paper-white light palette, with a serif
+display font (Source Serif 4) for headings and a muted teal accent
+(`#0fa68a`).
+
+- **Mockups:** `../shared-docs/design-mockups/advisor-etf-*.html` —
+  Dashboard, Portfolio, ETF Detail, Methodology.
+- **Tokens:** `ui/design_system.py` — single source of truth for colors,
+  fonts, layout primitives. Per-app accent in `ACCENTS["etf-advisor-platform"]`.
+- **Streamlit theme:** `.streamlit/config.toml` pins `primaryColor` to
+  the advisor teal so every native widget (radios, toggles, sidebar
+  primary buttons) matches the design.
+- **5 pages ported** to the redesign: Home (`app.py`), Dashboard,
+  Portfolio, ETF Detail, Methodology. Settings is operator-only, kept
+  on legacy primitives by design.
+
 ## Stack
 
 - Python 3.11

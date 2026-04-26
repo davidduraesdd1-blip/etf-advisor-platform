@@ -163,24 +163,56 @@ Morning block (A-F, blocking before deploy):
 
 ### Redesign tasks — work in order, commit after each
 
-- [ ] 1. Copy `common/ui_design_system.py` → `ui/design_system.py`. Import in `app.py`. Call `inject_theme("etf-advisor-platform")` at the top of every page (after `set_page_config`, before `apply_theme`).
-- [ ] 2. Replace `ui/sidebar.py` with the new left-rail design per mockup. Include: brand header, user-level selector, theme toggle, refresh button, mode indicators. Shared sidebar must render on every page (DV-1 pattern — reuse `render_sidebar()`).
-- [ ] 3. Port the landing/home page per its mockup. First page to commit + verify end-to-end.
-- [ ] 4. Port each remaining page, one per commit. Match the mockup for that page in layout, spacing, component choice.
-- [ ] 5. Replace every hard-coded hex color in component code with a CSS variable reference or a `tokens`/`ACCENTS` lookup.
-- [ ] 6. Verify both dark and light themes on every page. Verify mobile viewport (≤768px) on every page.
-- [ ] 7. Ensure every data-consuming card has a `data_source_badge()` call per master template §10.
-- [ ] 8. Run the post-change audit per CLAUDE.md §24 after each commit — 7 criteria pass, commit message has short summary, `MEMORY.md` has full findings.
-- [ ] 9. Run `python tests/verify_deployment.py --env prod` after every push to `redesign/ui-2026-05` branch. Walk the 20-point checklist when the branch deploys to a test URL.
-- [ ] 10. When all pages are done + user-approved: open a PR `redesign/ui-2026-05` → `main`. Do NOT merge without explicit user approval.
+- [x] 1. Copy `common/ui_design_system.py` → `ui/design_system.py`. Import in `app.py`. Call `inject_theme("etf-advisor-platform")` at the top of every page (after `set_page_config`, before `apply_theme`). *(Done in `redesign/ui-2026-05` commit `97efb11`.)*
+- [x] 2. Replace `ui/sidebar.py` with the new left-rail design per mockup. Include: brand header, user-level selector, theme toggle, refresh button, mode indicators. Shared sidebar must render on every page (DV-1 pattern — reuse `render_sidebar()`). *(Done; sidebar redesigned in fixes-Commit-3 — grouped nav (ADVISOR / RESEARCH / ACCOUNT). Level radio + theme button **dropped** from sidebar — they were duplicates of topbar controls.)*
+- [x] 3. Port the landing/home page per its mockup. First page to commit + verify end-to-end. *(Sprint 1 Commit 6, fixes Commit 1 polished primary color.)*
+- [x] 4. Port each remaining page, one per commit. Match the mockup for that page in layout, spacing, component choice. *(Sprint 1 commits 2-5: Dashboard / Portfolio / ETF Detail / Methodology.)*
+- [x] 5. Replace every hard-coded hex color in component code with a CSS variable reference or a `tokens`/`ACCENTS` lookup. *(Done in Sprint 1 + cleanup Commit 3 (chart line color #00d4aa → #0fa68a).)*
+- [ ] 6. Verify both dark and light themes on every page. Verify mobile viewport (≤768px) on every page. *(**DEFERRED** to post-demo. Dark mode walked end-to-end; light mode + mobile not yet verified by human eyes.)*
+- [x] 7. Ensure every data-consuming card has a `data_source_badge()` call per master template §10. *(Verified — Portfolio + ETF Detail composition + chart all have badges.)*
+- [x] 8. Run the post-change audit per CLAUDE.md §24 after each commit — 7 criteria pass, commit message has short summary, `MEMORY.md` has full findings. *(Per-commit audit done; MEMORY.md 2026-04-26 entry covers all three sprints.)*
+- [ ] 9. Run `python tests/verify_deployment.py --env prod` after every push to `redesign/ui-2026-05` branch. Walk the 20-point checklist when the branch deploys to a test URL. *(**Pending** test-deploy URL pointing at `redesign/advisor-2026-05-fixes`.)*
+- [ ] 10. When all pages are done + user-approved: open a PR `redesign/advisor-2026-05` → `main`. Do NOT merge without explicit user approval. *(**Pending** user walkthrough at all 3 user levels for May 1 demo.)*
 
 ### Acceptance criteria (all must be ✓ before merge to main)
 
-- [ ] Every page renders in the new design language
-- [ ] Dark + light mode pass visually on every page
-- [ ] Mobile viewport (≤768px) degrades gracefully on every page
-- [ ] All existing unit tests pass; new tests added for new UI components
-- [ ] Deploy verifier passes 100% on `redesign/ui-2026-05` deployed to a test URL
+- [x] Every page renders in the new design language
+- [ ] Dark + light mode pass visually on every page *(dark ✓; light not yet walked)*
+- [ ] Mobile viewport (≤768px) degrades gracefully on every page *(not yet walked)*
+- [x] All existing unit tests pass; new tests added for new UI components *(212/212 passing as of cleanup sprint Commit 1.)*
+- [ ] Deploy verifier passes 100% on `redesign/advisor-2026-05-fixes` deployed to a test URL *(deploy URL change pending)*
 - [ ] Full 20-point browser checklist ✓ on test deploy
-- [ ] `MEMORY.md` has "Redesign complete — 2026-XX-XX" entry with per-page audit
+- [x] `MEMORY.md` has "Redesign complete — 2026-XX-XX" entry with per-page audit *(2026-04-26 entry added)*
 - [ ] User has reviewed the live test deploy and approved the look
+
+---
+
+## Post-demo backlog (deferred from May 1)
+
+Items intentionally NOT in scope for the May 1 demo. Pick up after.
+
+- [ ] **Topbar level pills + theme button — wire to handlers.** Currently
+      decorative HTML rendered alongside the page header. Same state as
+      crypto-signal shipped in. Should write `st.session_state["user_level"]`
+      and trigger `st.rerun()` on click, mirroring crypto-signal-app's
+      `render_top_bar(on_refresh=..., on_theme=...)` pattern.
+- [ ] **Light-mode end-to-end visual walk.** Toggle theme on every page,
+      verify DS tokens flip correctly, no inline-styled dark colors leak
+      through, contrast meets WCAG AA on every text/background pair.
+- [ ] **Mobile (≤768px) end-to-end walk.** Each of the 5 pages at 390px
+      and 768px viewports. Streamlit's native column-stacking should
+      handle most of it, but verify exec-row, KPI strip, roster table,
+      and signal hero card all degrade gracefully.
+- [ ] **Collapse legacy `:root` block in `ui/theme.py`.** ~200 lines of
+      `--primary` / `--card` / `--text` / `--bg` tokens still referenced
+      by inline-styled HTML in `ui/components.py` and a few scattered
+      page bodies. Migrate every consumer to DS tokens (`--accent` /
+      `--bg-1` / `--text-primary`) then delete the legacy block.
+      Explicit risk: any inline-style sweep needs visual regression
+      testing, hence post-demo.
+- [ ] **Investigate the 4 baseline test failures' root causes.** Cleanup
+      sprint Commit 1 made them pass with `DEMO_MODE_NO_FETCH=1`, which
+      is the right test-harness fix, but the underlying cause (page
+      cold-boot exceeding 10s when yfinance is unreachable) is still
+      worth understanding. Could be a perf optimization opportunity
+      for real users hitting the live deploy on a yfinance-down day.
