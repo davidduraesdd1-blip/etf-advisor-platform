@@ -120,12 +120,26 @@ def render_top_bar(
                 use_container_width=True,
                 help="Clear all data caches and reload the page.",
             ):
+                # Clear both cache layers + reset the data-source state
+                # registry so the next page render sees fresh fetches and
+                # the data-source badges flip back to LIVE on success.
                 try:
                     st.cache_data.clear()
                 except Exception:
                     pass
                 try:
                     st.cache_resource.clear()
+                except Exception:
+                    pass
+                try:
+                    from integrations.data_feeds import reset_circuit_breaker
+                    reset_circuit_breaker()
+                except Exception:
+                    pass
+                # Toast survives the rerun and gives visible confirmation
+                # — without this the user can't tell the click fired.
+                try:
+                    st.toast("Caches cleared — refetching live data", icon="✓")
                 except Exception:
                     pass
                 st.rerun()
