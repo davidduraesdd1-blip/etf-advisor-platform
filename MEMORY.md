@@ -4,6 +4,135 @@ Session continuity log. Newest entries on top. See master-template §16.
 
 ---
 
+## 2026-04-26 — Advisor-family redesign + mockup-parity fixes + cleanup
+
+**Context:** Three back-to-back sprints porting the advisor-family
+design system mockups onto every page of the ETF advisor platform,
+then closing every visible mockup-parity gap, then a pre-merge
+cleanup pass to green the test suite and stabilize for the May 1 demo.
+
+### Sprint 1 — Initial port (`redesign/advisor-2026-05`, 6 commits)
+
+Mockups in `../shared-docs/design-mockups/advisor-etf-*.html`:
+  - `advisor-etf-DASHBOARD.html` — KPI strip + client roster + activity + compliance
+  - `advisor-etf-portfolio.html` — tier pills + holdings & perf + ready-to-execute
+  - `advisor-etf-DETAIL.html`    — hero + perf chart + composition + perf table
+  - `advisor-etf-METHODOLOGY.html` — 8 sections w/ sticky TOC
+
+Commits 1-6:
+  1. CSS audit — annotated all `!important` rules across `ui/theme.py`
+     + `ui/overrides.py` + `ui/design_system.py`; deleted 1 duplicate
+     (theme.py sidebar-bg conflicting with overrides.py).
+  2. Dashboard body → KPI strip · roster table · activity · compliance · callout.
+  3. Portfolio body → 4-up KPI strip · exec-row · rebalance card · callout
+     (preserved DV-2 perf table, allocation chart, MC fan, Execute Basket modal).
+  4. ETF Detail body → hero card · signal row · callout
+     (preserved DV-2 perf table, composition table, MC, signal components).
+  5. Methodology body → 8-section structured doc with sticky TOC, serif h1/h2.
+  6. Home body refresh (.ds-card primitives) + Settings verified.
+
+### Sprint 2 — Mockup-parity follow-ups (`redesign/advisor-2026-05-fixes`, 6 commits)
+
+Cowork walkthrough flagged Streamlit-default red on every primary
+button/radio/toggle, methodology HTML rendering as raw text, sidebar
+duplicates of topbar controls, Portfolio radio (not pills) + double
+KPI strip + technical subtitle, ETF Detail hero showing dashes for
+24h/1Y change + wrong KPIs, Dashboard giant-button stack instead of
+inline-Open links.
+
+Commits 1-6:
+  1. `.streamlit/config.toml` — primaryColor=#0fa68a (advisor teal),
+     backgroundColor=#0c0d12, font=sans serif, client.toolbarMode=minimal.
+     Also bumped `.gitignore` to track config.toml (was excluded).
+  2. Methodology — fixed HTML-rendering bug; all 8 sections render with
+     proper typography.
+  3. Sidebar — grouped nav (ADVISOR / RESEARCH / ACCOUNT), removed
+     experience-level radio + Light-mode button (duplicates of topbar
+     controls), renamed auto-generated "app" entry to "Home".
+  4. Portfolio — replaced Streamlit radio with 5 numbered tier pills,
+     deduped the second 5-KPI strip, rewrote technical subtitle for FA
+     audience.
+  5. ETF Detail — hero shows price + 24h % + 1Y % (was dashes), KPI swap
+     to Expense / AUM / 30D Flows / Avg Vol, signal callout expanded.
+  6. Dashboard — inline "Open →" link per row, drift-flagged client
+     gets warning-amber color (no longer Streamlit red).
+
+### Sprint 3 — Pre-merge cleanup (`chore/pre-merge-cleanup-2026-04-26`, 5 commits)
+
+Audit found 4 baseline test failures predating the redesign work
+(208/212). Cleanup sprint to green CI before final merge.
+
+Commits 1-5:
+  1. `tests/test_smoke.py` — `os.environ["DEMO_MODE_NO_FETCH"] = "1"` at
+     module top + `default_timeout=30` on parametrized AppTest. Added
+     short-circuit in `integrations/data_feeds.py::get_etf_prices` and
+     `get_last_close` so universe loader bypasses the ~80-ticker
+     yfinance loop in tests. **Suite: 208/212 → 212/212.**
+  2. `tests/conftest.py` — autouse fixture that drops every key from
+     `st.session_state` between tests. Defensive guard for the
+     sidebar-persistence test-order leak; prevents future regressions.
+  3. ETF Detail composition side-by-side — chart 2/3 / composition 1/3
+     in `st.columns([2, 1])`; DV-2 perf summary table moved to its
+     own full-width card below the columns row.
+  4. (this entry) — MEMORY.md update.
+  5. (next) — pending_work.md reconciliation + README refresh.
+
+### Compliance status
+
+  - **DV-1** (level selector persists across pages): ✅ preserved through redesign.
+  - **DV-2** (perf table 8-column compliance set): ✅ preserved through redesign.
+  - **SEC Marketing Rule** disclosures: ✅ on every performance display via
+    Hypothetical-results callout.
+
+### Files touched (high-level inventory)
+
+  - `app.py` — Home body refresh
+  - `pages/01_Dashboard.py` — KPI strip · roster · inline Open links · activity · compliance
+  - `pages/02_Portfolio.py` — tier pills · 4-up KPI strip · exec-row · callout
+  - `pages/03_ETF_Detail.py` — hero card · signal row · side-by-side chart+composition · perf table
+  - `pages/98_Methodology.py` — 8-section reference doc with sticky TOC
+  - `pages/99_Settings.py` — DS chrome verified, body unchanged (operator page)
+  - `ui/sidebar.py` — grouped nav (ADVISOR / RESEARCH / ACCOUNT), no level/theme dups
+  - `ui/design_system.py` — token registry · audit annotations
+  - `ui/ds_components.py` — sidebar brand block
+  - `ui/overrides.py` — Streamlit widget overrides (advisor-family palette)
+  - `ui/theme.py` — legacy compat layer (annotated for post-demo collapse)
+  - `.streamlit/config.toml` — Streamlit theme config (advisor teal primary)
+  - `.gitignore` — track config.toml
+  - `tests/test_smoke.py`, `tests/conftest.py` — DEMO_MODE_NO_FETCH + session reset
+
+### Test status — 2026-04-26
+
+  - **212/212 passing** (was 208/212 across all three sprints).
+  - 4 baseline failures fixed: 1 sidebar-persistence test-order leak +
+    3 page-apptest timeouts.
+  - Full suite runs ~85s.
+
+### Branch graph
+
+```
+main (d127275)
+ └─ redesign/ui-2026-05 (656f0ee)
+     │  advisor-family design system + topbar/page_header wiring
+     └─ redesign/advisor-2026-05 (6eb1096)        ← Sprint 1: 6 commits
+         └─ redesign/advisor-2026-05-fixes (e968000) ← Sprint 2: 6 commits
+             └─ chore/pre-merge-cleanup-2026-04-26   ← Sprint 3: 5 commits (this PR)
+```
+
+### Resume point
+
+PR `chore/pre-merge-cleanup-2026-04-26` → `redesign/advisor-2026-05-fixes`
+pending Cowork's walkthrough + sign-off. After that the merge cascade
+runs:
+  `chore/pre-merge-cleanup-2026-04-26` → `redesign/advisor-2026-05-fixes`
+  `redesign/advisor-2026-05-fixes`     → `redesign/advisor-2026-05`
+  `redesign/advisor-2026-05`           → `main`
+
+Final user walkthrough at Beginner / Intermediate / Advanced levels
+required before the May 1 demo.
+
+---
+
 ## 2026-04-23 — Baseline deployment verification (§25 Part A + B)
 
 **Context:** First pass of §25 against live deploy at
