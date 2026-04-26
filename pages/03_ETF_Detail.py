@@ -49,7 +49,14 @@ try:
             intermediate="Per-ETF research: signal + KPIs + composition + historical.",
             advanced="Per-ETF research with Phase-1 composite signal (coin-level wiring Day 4+).",
         ),
-        data_sources=[("Live analytics", "live"), ("Composite signal", "live")],
+        # Data-source pills match advisor-etf-DETAIL.html — yfinance for the
+        # price chart, SEC EDGAR for composition (N-PORT), composite signal
+        # for the BUY/HOLD/SELL badge.
+        data_sources=[
+            ("yfinance", "live"),
+            ("SEC EDGAR · N-PORT", "live"),
+            ("Composite signal", "live"),
+        ],
     )
 except Exception:
     section_header(
@@ -137,22 +144,73 @@ for row in price_bundle.get(chosen, {}).get("prices", []):
 sig = composite_signal(etf, closes=close_series if len(close_series) >= 35 else None)
 
 
-# Header row: ticker info + signal
-col_id, col_sig = st.columns([3, 1])
-with col_id:
-    st.markdown(f"### {etf['ticker']} — {etf['name']}")
-    st.caption(f"{etf['issuer']} · {etf['category']}")
-with col_sig:
+# ── 2026-04-25 redesign: mockup-style hero card per advisor-etf-DETAIL.html ─
+# Hero card shows ticker (mono accent) / name (serif h1) / issuer line on the
+# left; latest price + 24h/1Y change on the right. Pulls from existing data
+# (etf dict + close_series) — no new fetches.
+_latest_close = close_series[-1] if close_series else None
+_chg_24h_pct: float | None = None
+_chg_1y_pct: float | None = None
+if len(close_series) >= 2 and close_series[-2]:
+    _chg_24h_pct = (close_series[-1] / close_series[-2] - 1.0) * 100.0
+if len(close_series) >= 252 and close_series[-252]:
+    _chg_1y_pct = (close_series[-1] / close_series[-252] - 1.0) * 100.0
+elif len(close_series) >= 2 and close_series[0]:
+    _chg_1y_pct = (close_series[-1] / close_series[0] - 1.0) * 100.0
+
+def _fmt_chg(v: float | None, label: str) -> str:
+    if v is None:
+        return f'<span style="color:var(--text-muted);">—</span> · {label}'
+    sign = "+ " if v > 0 else ("− " if v < 0 else "")
+    color = "var(--success)" if v > 0 else ("var(--danger)" if v < 0 else "var(--text-secondary)")
+    return f'<span style="color:{color};">{sign}{abs(v):.2f}%</span> · {label}'
+
+_inception = etf.get("inception_date") or etf.get("inception", "")
+_inception_str = f" · inception {str(_inception)[:10]}" if _inception else ""
+
+st.markdown(
+    '<div class="ds-card" style="display:flex;align-items:center;justify-content:space-between;'
+    'gap:24px;padding:28px;margin-bottom:14px;flex-wrap:wrap;">'
+    '<div>'
+    f'<div style="font-family:var(--font-mono);color:var(--accent);font-weight:600;'
+    f'font-size:13px;letter-spacing:0.04em;">{etf["ticker"]}</div>'
+    f'<h1 style="font-family:var(--font-display);font-size:28px;font-weight:500;'
+    f'margin:4px 0 6px;letter-spacing:-0.015em;color:var(--text-primary);line-height:1.15;">'
+    f'{etf["name"]}</h1>'
+    f'<div style="font-size:13px;color:var(--text-muted);">'
+    f'{etf.get("issuer", "—")} · {etf.get("category", "—")}{_inception_str}</div>'
+    '</div>'
+    '<div style="text-align:right;">'
+    f'<div style="font-size:32px;font-family:var(--font-mono);font-weight:500;'
+    f'line-height:1.15;color:var(--text-primary);">'
+    f'{("$" + format(_latest_close, ",.2f")) if _latest_close is not None else "—"}</div>'
+    f'<div style="font-size:13px;font-family:var(--font-mono);margin-top:6px;'
+    f'color:var(--text-muted);">{_fmt_chg(_chg_24h_pct, "24h")} &nbsp;·&nbsp; '
+    f'{_fmt_chg(_chg_1y_pct, "1Y")}</div>'
+    '</div>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
+# Signal row — badge + plain-english text alongside (matches the mockup's
+# .signal-row block right under the hero).
+col_sig_badge, col_sig_txt = st.columns([1, 5])
+with col_sig_badge:
     signal_badge(sig["signal"])
+with col_sig_txt:
     src_label = {
         "technical_composite": "RSI + MACD + momentum",
         "phase1_fallback":     "category defaults (no live history)",
     }.get(sig.get("source", ""), sig.get("source", ""))
-    st.caption(level_text(
-        beginner=sig["plain_english"],
-        intermediate=f"{sig['signal']} · score {sig['score']} · {src_label}",
-        advanced=f"{sig['signal']} · score {sig['score']} · source={sig.get('source','')}",
-    ))
+    st.markdown(
+        f'<div style="font-size:13px;color:var(--text-secondary);line-height:1.5;'
+        f'padding:6px 0;"><b style="color:var(--text-primary);">'
+        f'Composite signal: {sig["signal"]} · score {sig["score"]}.</b> '
+        f'{sig.get("plain_english", "")} '
+        f'<span style="color:var(--text-muted);">'
+        f'(source: {src_label})</span></div>',
+        unsafe_allow_html=True,
+    )
 
 # Technical-indicator breakdown when the composite path was taken.
 if sig.get("source") == "technical_composite" and sig.get("components"):
@@ -645,9 +703,25 @@ with card("Forward projection"):
                 f"Paths: {mc['n_simulations']:,} · retained: {mc['paths_retained']} · seed: {mc['seed']}"
             )
 
-disclosure(
-    "Hypothetical results. Past performance does not guarantee future "
-    "results. Technical signals are model-based estimates, not forecasts. "
-    "See the Methodology page for assumptions and indicator definitions."
+# ── 2026-04-25 redesign: mockup-style compliance callout (advisor-etf-DETAIL
+# .html footer). Replaces the legacy disclosure() chip with the wider, more
+# visible accent-stripe callout the mockup uses.
+st.markdown(
+    '<div style="display:flex;gap:14px;align-items:flex-start;'
+    'padding:16px 20px;margin-top:24px;'
+    'background:color-mix(in srgb,var(--accent) 5%,var(--bg-1));'
+    'border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));'
+    'border-left:3px solid var(--accent);border-radius:8px;font-size:13px;">'
+    '<div style="width:22px;height:22px;border-radius:50%;'
+    'background:var(--accent-soft);color:var(--accent);'
+    'display:grid;place-items:center;font-weight:600;font-size:13px;flex-shrink:0;">i</div>'
+    '<div><strong style="color:var(--text-primary);">Hypothetical results. '
+    'Past performance does not guarantee future results.</strong> '
+    'Every performance display includes multiple time horizons, benchmark '
+    'comparison, and max drawdown per SEC Marketing Rule compliance. '
+    'Technical signals are model-based estimates, not forecasts. '
+    'See the Methodology page for assumptions and indicator definitions.'
+    '</div></div>',
+    unsafe_allow_html=True,
 )
 safe_page_link("pages/98_Methodology.py", label="Read methodology →", icon="📋")
