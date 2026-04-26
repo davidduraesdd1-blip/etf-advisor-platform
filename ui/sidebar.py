@@ -1,19 +1,24 @@
 """
 ui/sidebar.py — Shared sidebar rendered on every page.
 
-Called by app.py (landing) and every file under pages/. Implements CLAUDE.md
-§§6 (brand), §7 (user-level selector), §8 (theme toggle), §12 (refresh),
-and §22 demo-mode indicators.
+Called by app.py (landing) and every file under pages/.
 
 Keep this the single source of truth for sidebar content. Changes to the
-brand header, level selector, theme toggle, refresh button, or mode
-indicators live here — not in any page file.
+brand header, nav structure, or footer live here — not in any page file.
 
 Resolution history:
 - 2026-04-23 — extracted from app.py to fix DV-1 (level selector
   persistence). Previously the sidebar only rendered on the landing
   page, which meant the selector was invisible on every other page
   and the user experienced "reset on navigation."
+- 2026-04-25 — sidebar restructured per advisor-etf-DASHBOARD.html
+  mockup. Level selector + theme button + refresh button + mode
+  indicators all REMOVED — the topbar (rendered by ui/ds_components
+  .render_top_bar in each page) owns those controls. Sidebar is now
+  brand block + grouped nav (Advisor / Research / Account) + thin
+  footer. user_level session-state key still defaulted to
+  DEFAULT_USER_LEVEL on first call so downstream level_text() calls
+  don't blow up before the topbar is wired to real widgets.
 """
 from __future__ import annotations
 
@@ -27,58 +32,101 @@ from config import (
     EXTENDED_MODULES_ENABLED,
     USER_LEVELS,
 )
-from ui.theme import current_theme, toggle_theme
 
 
-# Widget key for the user-level radio. Explicit key prevents Streamlit's
-# implicit call-site hashing from producing per-page widget instances
-# that would break session_state persistence across navigation.
-_USER_LEVEL_WIDGET_KEY = "user_level_radio"
+def _hide_streamlit_auto_nav_css() -> str:
+    """Streamlit auto-discovers files in pages/ and renders its own nav at
+    the top of the sidebar. The redesigned rail uses a custom grouped nav
+    (Advisor / Research / Account), so we hide the auto-nav element via
+    CSS. Single block returned as a string; injected once by render_sidebar.
+    """
+    return (
+        "<style>"
+        "[data-testid='stSidebarNav'] { display: none !important; }"
+        # The brand block + nav group dividers don't need st.divider() lines
+        # so we tighten the gap between sidebar widgets.
+        "[data-testid='stSidebar'] [data-testid='stVerticalBlock'] { gap: 4px; }"
+        "</style>"
+    )
+
+
+def _nav_group_header(label: str) -> str:
+    """Return the inline-styled nav-group header HTML matching the mockup."""
+    return (
+        f'<div class="ds-nav-group" style="margin:14px 0 4px;padding:0 12px;'
+        f'color:var(--text-muted);font-size:10.5px;font-weight:500;'
+        f'letter-spacing:0.1em;text-transform:uppercase;">{label}</div>'
+    )
 
 
 def render_sidebar() -> None:
-    """Render the full sidebar. Call from every page, after apply_theme()."""
+    """Render the full sidebar. Call from every page, after apply_theme().
+
+    Structure (matches shared-docs/design-mockups/advisor-etf-DASHBOARD.html
+    aside.rail):
+
+        Brand block        (◐ ETF Advisor + family-office subtitle)
+        ── ADVISOR ──
+        · Home              (app.py)
+        · Dashboard         (pages/01_Dashboard.py)
+        · Portfolio         (pages/02_Portfolio.py)
+        · ETF Detail        (pages/03_ETF_Detail.py)
+        ── RESEARCH ──
+        · Methodology       (pages/98_Methodology.py)
+        ── ACCOUNT ──
+        · Settings          (pages/99_Settings.py)
+        Thin footer         (no widgets — topbar owns level / theme / refresh)
+    """
+    # Initialize user_level so level_text() callers don't crash before the
+    # topbar is wired to a real widget. DEFAULT_USER_LEVEL per CLAUDE.md §7.
+    if "user_level" not in st.session_state:
+        st.session_state["user_level"] = DEFAULT_USER_LEVEL
+
+    # Hide Streamlit's auto-generated nav so our custom grouped nav is the
+    # only nav surface. Injected at module level via st.markdown.
+    st.markdown(_hide_streamlit_auto_nav_css(), unsafe_allow_html=True)
+
     with st.sidebar:
-        # Brand header (CLAUDE.md §6)
-        if BRAND_LOGO_PATH:
-            st.image(BRAND_LOGO_PATH, width="stretch")
-        st.markdown(f"## {BRAND_NAME}")
-        st.caption("Crypto ETF portfolio platform for advisors")
+        # Brand block — render via ds_components helper so the
+        # advisor-family glyph + serif wordmark stays consistent.
+        try:
+            from ui.ds_components import render_sidebar_brand
+            render_sidebar_brand(
+                brand_name="ETF Advisor",
+                brand_sub="Crypto ETF portfolio platform",
+                brand_glyph="◐",
+            )
+        except Exception:
+            # Fallback to a plain markdown header if the design system
+            # isn't importable (kept for AppTest compat).
+            if BRAND_LOGO_PATH:
+                st.image(BRAND_LOGO_PATH, width="stretch")
+            st.markdown(f"## {BRAND_NAME}")
+            st.caption("Crypto ETF portfolio platform for advisors")
 
-        st.divider()
+        # ── ADVISOR group ──
+        st.markdown(_nav_group_header("Advisor"), unsafe_allow_html=True)
+        try:
+            st.page_link("app.py", label="Home", icon="◐")
+            st.page_link("pages/01_Dashboard.py", label="Dashboard")
+            st.page_link("pages/02_Portfolio.py", label="Portfolio")
+            st.page_link("pages/03_ETF_Detail.py", label="ETF Detail")
 
-        # User-level selector (CLAUDE.md §7)
-        # Initialize persistent value first, then render the widget
-        # using session_state as the source of truth.
-        if "user_level" not in st.session_state:
-            st.session_state["user_level"] = DEFAULT_USER_LEVEL
-        selected = st.radio(
-            "Experience level",
-            options=USER_LEVELS,
-            index=USER_LEVELS.index(st.session_state["user_level"]),
-            help="Scales glossary depth, chart complexity, and signal explanations.",
-            key=_USER_LEVEL_WIDGET_KEY,
-        )
-        # Mirror the widget's current value back to the canonical key so
-        # any code path reading st.session_state["user_level"] stays in
-        # sync regardless of which page rendered the sidebar.
-        st.session_state["user_level"] = selected
+            # ── RESEARCH group ──
+            st.markdown(_nav_group_header("Research"), unsafe_allow_html=True)
+            st.page_link("pages/98_Methodology.py", label="Methodology")
 
-        # Theme toggle (CLAUDE.md §8)
-        theme_label = "☼ Light mode" if current_theme() == "dark" else "☾ Dark mode"
-        st.button(theme_label, on_click=toggle_theme, width="stretch")
+            # ── ACCOUNT group ──
+            st.markdown(_nav_group_header("Account"), unsafe_allow_html=True)
+            st.page_link("pages/99_Settings.py", label="Settings")
+        except Exception:
+            # AppTest doesn't register sibling pages — render captions so
+            # the test mode at least sees the labels.
+            for lbl in ("Home", "Dashboard", "Portfolio", "ETF Detail",
+                        "Methodology", "Settings"):
+                st.caption(f"→ {lbl}")
 
-        # Refresh all data (CLAUDE.md §12)
-        if st.button("⟳ Refresh all data", width="stretch"):
-            st.cache_data.clear()
-            st.toast("Caches cleared — data will refresh on next read.")
-
-        st.divider()
-
-        # Mode indicators (CLAUDE.md §22)
-        if DEMO_MODE:
-            st.caption("◐ Demo mode — fictional clients only")
-        if EXTENDED_MODULES_ENABLED:
-            st.caption("◐ Extended modules enabled (ETF + RWA + DeFi)")
-        else:
-            st.caption("◐ ETF-only (extended modules disabled)")
+        # Footer — DEMO_MODE / extended-modules indicators are diagnostic
+        # only (Cowork's mockup-parity directive removes them from the rail).
+        # Kept available via Settings → operator panel; not rendered here.
+        # Intentionally no widgets in the footer.
