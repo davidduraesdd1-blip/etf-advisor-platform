@@ -15,10 +15,19 @@ from __future__ import annotations
 import ast
 import importlib
 import importlib.util
+import os
 from pathlib import Path
 from typing import Any
 
 import pytest
+
+# Test-harness short-circuit: tells integrations/data_feeds.get_etf_prices
+# + get_last_close to skip the yfinance → Stooq fallback chain and return
+# the empty/unavailable shape immediately. Without this, page-render
+# AppTest cases hit ~80 yfinance calls per page (universe loader) and
+# blow past the AppTest timeout. Set BEFORE any import that might
+# transitively touch data_feeds at module-load time.
+os.environ["DEMO_MODE_NO_FETCH"] = "1"
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -189,7 +198,12 @@ def test_page_runs_via_streamlit_apptest(page: str) -> None:
     pytest.importorskip("streamlit.testing.v1")
     from streamlit.testing.v1 import AppTest
 
-    at = AppTest.from_file(str(REPO_ROOT / page), default_timeout=10)
+    # default_timeout=30: page renders with DEMO_MODE_NO_FETCH=1 short-circuit
+    # data fetches, but Streamlit AppTest still does full DOM build + widget
+    # tree walk. Empirically 5-12s on a cold worker; 30s gives headroom for
+    # CI variance (Settings.py used to pass at 10s but the others didn't —
+    # bumping uniformly so the suite is consistent).
+    at = AppTest.from_file(str(REPO_ROOT / page), default_timeout=30)
     at.run()
     assert not at.exception, f"{page} raised: {at.exception}"
 

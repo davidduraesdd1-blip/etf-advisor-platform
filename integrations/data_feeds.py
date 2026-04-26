@@ -26,6 +26,7 @@ CLAUDE.md governance: Sections 10, 11, 12.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections import deque
 from typing import Any
@@ -222,7 +223,19 @@ def get_etf_prices(
                  "prices": [{date, open, high, low, close, volume}, ...]} }
     Empty list means no data available (after fallback exhausted).
     Never raises for a single ticker failure — logs and moves on.
+
+    Test-harness short-circuit: when DEMO_MODE_NO_FETCH=1 is set in the
+    environment (set by tests/test_smoke.py at session start), bypass the
+    yfinance → Stooq fallback chain entirely and return the empty/
+    unavailable shape. This keeps Streamlit AppTest renders deterministic
+    and under the AppTest timeout — without this short-circuit the
+    universe loader hits ~80 yfinance calls during page-render tests,
+    which trips the 10s default and times out (real time ~25s + circuit
+    breaker).
     """
+    if os.environ.get("DEMO_MODE_NO_FETCH") == "1":
+        return {t: {"source": "unavailable", "prices": []} for t in tickers}
+
     result: dict[str, dict] = {}
     for ticker in tickers:
         result[ticker] = _fetch_single_ticker(ticker, period, interval)
@@ -291,7 +304,14 @@ def _update_last_close(ticker: str, prices: list[dict]) -> None:
 
 
 def get_last_close(ticker: str) -> float | None:
-    """Return the most recently cached close for a ticker, or None."""
+    """Return the most recently cached close for a ticker, or None.
+
+    Test-harness short-circuit: under DEMO_MODE_NO_FETCH=1, return None
+    immediately so callers (e.g. ETF Detail hero card) render their
+    placeholder dashes without triggering any cached-state side effects.
+    """
+    if os.environ.get("DEMO_MODE_NO_FETCH") == "1":
+        return None
     return _last_close.get(ticker.upper())
 
 
