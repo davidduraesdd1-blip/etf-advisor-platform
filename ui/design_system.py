@@ -16,6 +16,22 @@ Usage inside a Streamlit app:
 Reference mockups:
     shared-docs/design-mockups/sibling-family-<app>-*.html
     shared-docs/design-mockups/advisor-etf-*.html
+
+──────────────────────────────────────────────────────────────────────
+2026-04-25 LEGACY-CSS AUDIT (advisor-2026-05 redesign Commit 1)
+
+ZERO `!important` rules in this file. This is the BASE layer:
+  * :root variable definitions (--accent, --bg-0…3, --text-primary,
+    --border, --font-ui/mono/display, --rail-w, --card-radius, --gap)
+  * thin set of element-level base rules (html/body/*.stApp font + bg,
+    .num/[data-testid="stMetricValue"] tabular nums, h1/h2/h3 serif
+    for advisor family, .ds-card primitive)
+  * 4 component helpers returning HTML strings (kpi_tile, signal_badge,
+    data_source_badge, compliance_callout) — no CSS in those, just
+    inline-style HTML using DS tokens.
+
+Verdict: clean. KEEP as-is.
+──────────────────────────────────────────────────────────────────────
 """
 from __future__ import annotations
 

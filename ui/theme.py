@@ -6,6 +6,43 @@ choice from session_state ("dark" or "light"; "dark" is the default per
 CLAUDE.md §8 — Beginner default = dark).
 
 CLAUDE.md governance: Section 8 (design standards).
+
+──────────────────────────────────────────────────────────────────────
+2026-04-25 LEGACY-CSS AUDIT (advisor-2026-05 redesign Commit 1)
+
+This file is the LEGACY compat layer. The redesign's primary stylesheet
+is split between `ui/design_system.py` (tokens + base) and `ui/overrides.py`
+(Streamlit widget overrides). The two run BEFORE this file inside
+apply_theme(), so anything below paints on top.
+
+Status of rules below:
+  (a) load-bearing — keep:
+      - :root legacy variables (--primary/--card/--text/--bg/--muted/--border/
+        --badge-*) — referenced by every .eap-* class and dozens of inline
+        styles in components.py + ds_components.py + page bodies. Cannot
+        delete without sweeping inline-style usage.
+      - html/body bg+color (lines 66-70) — sets text-rendering baseline
+        for legacy widgets. DS sets the same for `[class*=css]` and `.stApp`
+        but not the html/body element directly, so this still has a job.
+      - Typography floors (lines 77-93) — CLAUDE.md §8 contract.
+      - .eap-card / .eap-signal-* / .eap-disclosure / .eap-dss-* (lines
+        95-176) — used pervasively by legacy components.py / page bodies.
+      - button min-height 44px (lines 126-131) — CLAUDE.md §8 tap-target
+        floor. DS doesn't replicate.
+
+  (b) duplicate / conflicts with DS — DELETED in this commit:
+      - [data-testid="stSidebar"] background-color: var(--card) !important
+        on lines 72-75. ui/overrides.py L30-39 already styles the sidebar
+        with var(--bg-1) (the DS token). The legacy rule was painting on
+        top with the old --card token, defeating the DS sidebar palette.
+        Removed; DS owns sidebar chrome.
+
+  (c) flagged for follow-up post-demo (DO NOT delete now):
+      - The dual variable system (--card/--bg/--text vs --bg-1/--bg-0/
+        --text-primary). Eventually inline styles should migrate to DS
+        tokens and this :root block can collapse to a thin alias layer.
+        Out of scope for May 1 demo.
+──────────────────────────────────────────────────────────────────────
 """
 from __future__ import annotations
 
@@ -69,10 +106,10 @@ def _css_for_theme(theme: str) -> str:
         font-family: {FONTS["ui"]};
       }}
 
-      [data-testid="stSidebar"] {{
-        background-color: var(--card) !important;
-        border-right: 1px solid var(--border);
-      }}
+      /* AUDIT (b): [data-testid="stSidebar"] background rule removed — duplicates
+         and conflicts with ui/overrides.py L30-39 which uses var(--bg-1). DS owns
+         sidebar chrome now. The 1px border-right on the sidebar is also set in
+         overrides.py so we don't need it here either. */
 
       /* Typography floors — never cross these per CLAUDE.md §8 */
       body, p, div, span, label {{

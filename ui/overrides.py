@@ -8,6 +8,22 @@ Advisor family distinctions from the sibling apps:
 - Looser breathing room: rail 256px, gap 20px, card padding 24px.
 - Serif display font for headings (Source Serif 4).
 - Warmer charcoal dark mode, paper-white light mode.
+
+──────────────────────────────────────────────────────────────────────
+2026-04-25 LEGACY-CSS AUDIT (advisor-2026-05 redesign Commit 1)
+
+16 `!important` rules in this file. All scoped to specific
+[data-testid="..."] selectors fighting Streamlit's native widget styling
+(stSidebar, stMetric*, stTextInput, stNumberInput, stSelectbox).
+Streamlit's default widget rules ALSO use !important + high specificity,
+so without these we lose the redesign look on every native widget.
+
+Verdict: all 16 are load-bearing. KEEP.
+
+No duplicates with ui/theme.py after Commit 1's removal of the
+theme.py stSidebar override. No conflicts with ui/design_system.py
+(that file has 0 !important — pure base layer + tokens).
+──────────────────────────────────────────────────────────────────────
 """
 from __future__ import annotations
 
