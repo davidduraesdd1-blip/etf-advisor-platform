@@ -37,22 +37,20 @@ render_sidebar()
 try:
     from ui import render_top_bar as _ds_top_bar, page_header as _ds_page_header
     _ds_top_bar(breadcrumb=("Account", "Settings"),
-                user_level=st.session_state.get("user_level", "beginner"))
+                user_level=st.session_state.get("user_level", "Advisor"))
     _ds_page_header(
         title="Settings",
         subtitle=level_text(
-            beginner="Control how the app fetches data, routes orders, and monitors your portfolios.",
-            intermediate="Broker routing, monitoring cadence, auto-execute permissions, scanner health.",
-            advanced="Runtime flags + data-source state + circuit-breaker controls + per-client overrides.",
-        ),
+                     advisor="Runtime flags + data-source state + circuit-breaker controls + per-client overrides.",
+                     client="Control how the app fetches data, routes orders, and monitors your portfolios.",
+                 ),
     )
 except Exception:
     section_header(
         "Settings",
         level_text(
-            beginner="Control how the app fetches data, routes orders, and monitors your portfolios.",
-            intermediate="Broker routing, monitoring cadence, auto-execute permissions, scanner health.",
-            advanced="Runtime flags + data-source state + circuit-breaker controls + per-client overrides.",
+            advisor="Runtime flags + data-source state + circuit-breaker controls + per-client overrides.",
+            client="Control how the app fetches data, routes orders, and monitors your portfolios.",
         ),
     )
 
@@ -88,10 +86,9 @@ with card("Broker routing"):
 
 with card("Per-client auto-execute permissions"):
     st.caption(level_text(
-        beginner="Turn on auto-execute to let the app rebalance a client's basket on its own within their risk limits.",
-        intermediate="Auto-execute runs the next rebalance without manual confirmation, within tier limits.",
-        advanced="Per-client discretionary flag. Only honored when BROKER_PROVIDER is non-mock.",
-    ))
+                   advisor="Per-client discretionary flag. Only honored when BROKER_PROVIDER is non-mock.",
+                   client="Turn on auto-execute to let the app rebalance a client's basket on its own within their risk limits.",
+               ))
     for c in DEMO_CLIENTS:
         key = f"auto_exec_{c['id']}"
         st.checkbox(
@@ -127,25 +124,20 @@ with card("Extended modules (Framing A / B demo toggle)"):
 # office, qualified-purchaser, or IPS-specified) who can hold them.
 with card("Fiduciary-appropriate instrument filter"):
     st.caption(level_text(
-        beginner=(
+                   advisor=(
+            "core.risk_tiers.COMPLIANCE_RESTRICTED_CATEGORIES + "
+            "COMPLIANCE_RESTRICTED_TICKERS. Threaded through "
+            "build_portfolio(compliance_filter_on=) and "
+            "_select_etfs_for_category(compliance_filter_on=)."
+        ),
+                   client=(
             "When ON (default), the platform hides leveraged crypto ETFs "
             "and single-stock income wrappers (MSTY, CONY, MSFO) from "
             "tier allocations. Most RIA compliance departments prohibit "
             "these with retail clients. Turn OFF only when advising a "
             "client whose IPS explicitly permits aggressive product classes."
         ),
-        intermediate=(
-            "ON blocks categories: leveraged. Blocked tickers: MSTY, CONY, "
-            "MSFO, COII, MARO. Weight redistributes proportionally to "
-            "remaining categories. OFF shows the full universe."
-        ),
-        advanced=(
-            "core.risk_tiers.COMPLIANCE_RESTRICTED_CATEGORIES + "
-            "COMPLIANCE_RESTRICTED_TICKERS. Threaded through "
-            "build_portfolio(compliance_filter_on=) and "
-            "_select_etfs_for_category(compliance_filter_on=)."
-        ),
-    ))
+               ))
     compliance_on = st.toggle(
         "Restrict to fiduciary-appropriate instruments",
         value=st.session_state.get("compliance_filter_on", True),
@@ -245,10 +237,9 @@ with card("Data-source state"):
 
 with card("Recent actions"):
     st.caption(level_text(
-        beginner="Everything the advisor or the app has done on your clients' accounts recently.",
-        intermediate="Session + historical actions. Last 50 shown.",
-        advanced="Ring-buffered at 200 entries, oldest-first trim, atomic writes.",
-    ))
+                   advisor="Ring-buffered at 200 entries, oldest-first trim, atomic writes.",
+                   client="Everything the advisor or the app has done on your clients' accounts recently.",
+               ))
     entries = recent_entries(limit=50)
     if entries:
         import pandas as _pd

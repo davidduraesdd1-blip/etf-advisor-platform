@@ -33,24 +33,22 @@ render_sidebar()
 # ── 2026-05 redesign: advisor-family top bar + page header ──
 try:
     from ui import render_top_bar as _ds_top_bar, page_header as _ds_page_header
-    _ds_level_adv = st.session_state.get("user_level", "beginner")
+    _ds_level_adv = st.session_state.get("user_level", "Advisor")
     _ds_top_bar(breadcrumb=("Advisor", "Dashboard"), user_level=_ds_level_adv)
     _ds_page_header(
         title="Client dashboard",
         subtitle=level_text(
-            beginner="Your client list with rebalance status and quick links.",
-            intermediate="Client roster: tier, drift, rebalance flags.",
-            advanced="Client roster with tier / drift / flags. Filter + sort via column headers.",
-        ),
+                     advisor="Client roster with tier / drift / flags. Filter + sort via column headers.",
+                     client="Your client list with rebalance status and quick links.",
+                 ),
         data_sources=[("Custody feed", "live"), ("Model drift", "cached")],
     )
 except Exception:
     section_header(
         "Dashboard",
         level_text(
-            beginner="Your client list with rebalance status and quick links.",
-            intermediate="Client roster: tier, drift, rebalance flags.",
-            advanced="Client roster with tier / drift / flags. Filter + sort via column headers.",
+            advisor="Client roster with tier / drift / flags. Filter + sort via column headers.",
+            client="Your client list with rebalance status and quick links.",
         ),
     )
 

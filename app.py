@@ -39,7 +39,7 @@ def _render_home() -> None:
     try:
         from ui import render_top_bar as _ds_top_bar, page_header as _ds_page_header
         _ds_top_bar(breadcrumb=("Advisor", "Home"),
-                    user_level=st.session_state.get("user_level", "beginner"))
+                    user_level=st.session_state.get("user_level", "Advisor"))
         _ds_page_header(
             title=BRAND_NAME,
             subtitle="Risk-profiled crypto ETF portfolios, institutional-grade research, two-click basket execution.",
@@ -59,20 +59,19 @@ def _render_home() -> None:
     # + new primitive without redesigning content. Per Cowork's Commit 6
     # directive ("apply design system tokens... don't redesign body content").
 
+    # 2026-04-26 taxonomy: Advisor (default) gets the technical
+    # description; Client gets the plain-English screen-share copy.
+    # Old Beginner copy → Client; old Advanced copy → Advisor;
+    # Intermediate copy dropped (its content was a midpoint —
+    # closer to Advisor; absorbed into Advisor by reference).
     level = st.session_state.get("user_level", DEFAULT_USER_LEVEL)
-    if level == "Beginner":
+    if level == "Client":
         _welcome_body = (
             "This platform helps you build and manage crypto ETF allocations "
             "for your clients with the same rigor you'd apply to any other "
             "asset class. Pick a page from the sidebar to get started."
         )
-    elif level == "Intermediate":
-        _welcome_body = (
-            "Risk-tier portfolio construction across the US-listed crypto "
-            "ETF universe. Signal engine per ETF. Backtests with benchmark, "
-            "max drawdown, Sharpe/Sortino/Calmar. Mock execution for demo."
-        )
-    else:  # Advanced
+    else:  # Advisor (default)
         _welcome_body = (
             "MPT + Monte Carlo + Cornish-Fisher VaR portfolio construction. "
             "Per-ETF composite signals aggregated from underlying coin "

@@ -23,22 +23,20 @@ render_sidebar()
 try:
     from ui import render_top_bar as _ds_top_bar, page_header as _ds_page_header
     _ds_top_bar(breadcrumb=("Research", "Methodology"),
-                user_level=st.session_state.get("user_level", "beginner"))
+                user_level=st.session_state.get("user_level", "Advisor"))
     _ds_page_header(
         title="Methodology",
         subtitle=level_text(
-            beginner="How the platform constructs portfolios, measures risk, and sources data.",
-            intermediate="Construction, risk metrics, signal math, and data sources.",
-            advanced="Full methodology reference — linked from performance disclosures.",
-        ),
+                     advisor="Full methodology reference — linked from performance disclosures.",
+                     client="How the platform constructs portfolios, measures risk, and sources data.",
+                 ),
     )
 except Exception:
     section_header(
         "Methodology",
         level_text(
-            beginner="How the platform constructs portfolios, measures risk, and sources data.",
-            intermediate="Construction, risk metrics, signal math, and data sources.",
-            advanced="Full methodology reference — linked from performance disclosures.",
+            advisor="Full methodology reference — linked from performance disclosures.",
+            client="How the platform constructs portfolios, measures risk, and sources data.",
         ),
     )
 

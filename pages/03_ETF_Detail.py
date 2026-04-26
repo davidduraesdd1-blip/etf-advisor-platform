@@ -29,7 +29,7 @@ from ui.components import (
     section_header,
     signal_badge,
 )
-from ui.level_helpers import is_advanced, level_text
+from ui.level_helpers import is_advisor, level_text
 from ui.sidebar import render_sidebar
 from ui.theme import apply_theme
 
@@ -41,14 +41,13 @@ render_sidebar()
 try:
     from ui import render_top_bar as _ds_top_bar, page_header as _ds_page_header
     _ds_top_bar(breadcrumb=("Research", "ETF Detail"),
-                user_level=st.session_state.get("user_level", "beginner"))
+                user_level=st.session_state.get("user_level", "Advisor"))
     _ds_page_header(
         title="ETF detail",
         subtitle=level_text(
-            beginner="Research a single fund. Signal, fees, composition, and recent performance.",
-            intermediate="Per-ETF research: signal + KPIs + composition + historical.",
-            advanced="Per-ETF research with Phase-1 composite signal (coin-level wiring Day 4+).",
-        ),
+                     advisor="Per-ETF research with Phase-1 composite signal (coin-level wiring Day 4+).",
+                     client="Research a single fund. Signal, fees, composition, and recent performance.",
+                 ),
         # Data-source pills match advisor-etf-DETAIL.html — yfinance for the
         # price chart, SEC EDGAR for composition (N-PORT), composite signal
         # for the BUY/HOLD/SELL badge.
@@ -62,9 +61,8 @@ except Exception:
     section_header(
         "ETF Detail",
         level_text(
-            beginner="Research a single fund. Signal, fees, composition, and recent performance.",
-            intermediate="Per-ETF research: signal + KPIs + composition + historical.",
-            advanced="Per-ETF research with Phase-1 composite signal (coin-level wiring Day 4+).",
+            advisor="Per-ETF research with Phase-1 composite signal (coin-level wiring Day 4+).",
+            client="Research a single fund. Signal, fees, composition, and recent performance.",
         ),
     )
 
@@ -253,21 +251,17 @@ if sig.get("source") == "technical_composite" and sig.get("components"):
             kpi_tile("Momentum (20d)", f"{comps['mom_pct']:.1f}%",
                      delta=f"score {comps['mom_score']:+.2f}")
         st.caption(level_text(
-            beginner=(
+                       advisor=(
+                "RSI(14) Wilder's smoothing · MACD(12,26,9) · "
+                "simple 20-period momentum. Per-indicator scores in [−1,+1]."
+            ),
+                       client=(
                 "Three simple checks: is the price cheap or expensive "
                 "relative to its recent range (RSI), is the trend turning "
                 "up or down (MACD), and how much has it moved in the last "
                 "month (momentum)?"
             ),
-            intermediate=(
-                "Weighted composite: 45% RSI + 35% MACD histogram + 20% "
-                "20-day momentum. Thresholds: BUY ≥ +0.30, SELL ≤ −0.30."
-            ),
-            advanced=(
-                "RSI(14) Wilder's smoothing · MACD(12,26,9) · "
-                "simple 20-period momentum. Per-indicator scores in [−1,+1]."
-            ),
-        ))
+                   ))
 
 
 # ── 2026-04-25 redesign: mockup-fidelity KPI tiles per advisor-etf-DETAIL.html
@@ -506,7 +500,14 @@ def _src_label(src: str) -> str:
 
 
 st.caption(level_text(
-    beginner=(
+               advisor=(
+        f"hist={_ret_src} fwd={_fwd_src} vol={_vol_src} corr={_corr_src} · "
+        f"Forward: {_fwd_basis} · "
+        f"BTC proxy: {etf.get('btc_proxy_used', 'IBIT')} · "
+        f"n_returns vol={etf.get('vol_n_returns', '—')} "
+        f"corr={etf.get('corr_n_returns', '—')}."
+    ),
+               client=(
         f"Source — historical return: {_src_label(_ret_src)} · "
         f"forward estimate: {_src_label(_fwd_src)} · "
         f"volatility: {_src_label(_vol_src)} · "
@@ -515,20 +516,7 @@ st.caption(level_text(
         f"over 10 years, adjusted for this fund's category. "
         f"Forward basis: {_fwd_basis}"
     ),
-    intermediate=(
-        f"Historical src: {_ret_src} · Forward src: {_fwd_src} · "
-        f"Vol src (90d σ·√252): {_vol_src} · "
-        f"BTC-corr src (90d Pearson vs IBIT): {_corr_src}. "
-        f"Forward basis: {_fwd_basis}"
-    ),
-    advanced=(
-        f"hist={_ret_src} fwd={_fwd_src} vol={_vol_src} corr={_corr_src} · "
-        f"Forward: {_fwd_basis} · "
-        f"BTC proxy: {etf.get('btc_proxy_used', 'IBIT')} · "
-        f"n_returns vol={etf.get('vol_n_returns', '—')} "
-        f"corr={etf.get('corr_n_returns', '—')}."
-    ),
-))
+           ))
 
 
 # ── 2026-04-26 redesign: chart + composition side-by-side per
@@ -552,10 +540,9 @@ with col_chart:
         )
         if not rows:
             st.info(level_text(
-                beginner="Historical prices aren't available right now — the market-data service is temporarily unreachable.",
-                intermediate="No price data from any live source.",
-                advanced="Live price chain (yfinance → Stooq) returned empty for this ticker.",
-            ))
+                        advisor="Live price chain (yfinance → Stooq) returned empty for this ticker.",
+                        client="Historical prices aren't available right now — the market-data service is temporarily unreachable.",
+                    ))
         else:
             df = pd.DataFrame(rows)
             df["date"] = pd.to_datetime(df["date"])
@@ -724,10 +711,9 @@ with col_comp:
             )
 
         st.caption(level_text(
-            beginner="This shows what the fund holds under the hood.",
-            intermediate="Holdings come from SEC EDGAR N-PORT filings (quarterly cadence).",
-            advanced="EDGAR N-PORT parser with 7-day disk cache; token-bucket rate-limited; fallback chain marks CACHED state in data_source_state.",
-        ))
+                       advisor="EDGAR N-PORT parser with 7-day disk cache; token-bucket rate-limited; fallback chain marks CACHED state in data_source_state.",
+                       client="This shows what the fund holds under the hood.",
+                   ))
 
 
 
@@ -824,7 +810,9 @@ with card("Forward projection"):
             showlegend=False,
         )
         st.plotly_chart(fig, width="stretch")
-        if is_advanced():
+        # Advisor mode only — MC engine diagnostics (paths / seed) hidden
+        # in Client mode.
+        if is_advisor():
             st.caption(
                 f"Paths: {mc['n_simulations']:,} · retained: {mc['paths_retained']} · seed: {mc['seed']}"
             )

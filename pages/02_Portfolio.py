@@ -35,7 +35,7 @@ from ui.components import (
     section_header,
     tier_pill_selector,
 )
-from ui.level_helpers import is_advanced, is_beginner, level_text
+from ui.level_helpers import is_advisor, is_client, level_text
 from ui.sidebar import render_sidebar
 from ui.theme import apply_theme
 
@@ -52,16 +52,15 @@ render_sidebar()
 try:
     from ui import render_top_bar as _ds_top_bar, page_header as _ds_page_header
     _ds_top_bar(breadcrumb=("Advisor", "Portfolio"),
-                user_level=st.session_state.get("user_level", "beginner"))
+                user_level=st.session_state.get("user_level", "Advisor"))
     # Data-source pill row — mirrors the mockup's 4 pills (EDGAR / yfinance /
     # News / Broker mock). Tones: live=success-tick, cached=warning-tick.
     _ds_page_header(
         title="Portfolio",
         subtitle=level_text(
-            beginner="Pick a client, pick a risk tier, and see the crypto ETF basket we recommend.",
-            intermediate="Risk-tiered crypto ETF basket for the selected client. Backtests, benchmark comparison, and execution staging — all compliance-safe for FA presentations.",
-            advanced="Risk-tiered crypto ETF basket for the selected client. Backtests, benchmark comparison, and execution staging — all compliance-safe for FA presentations.",
-        ),
+                     advisor="Risk-tiered crypto ETF basket for the selected client. Backtests, benchmark comparison, and execution staging — all compliance-safe for FA presentations.",
+                     client="Pick a client, pick a risk tier, and see the crypto ETF basket we recommend.",
+                 ),
         data_sources=[
             ("SEC EDGAR", "live"),
             ("yfinance", "live"),
@@ -73,9 +72,8 @@ except Exception:
     section_header(
         "Portfolio",
         level_text(
-            beginner="Pick a client, pick a risk tier, and see the crypto ETF basket we recommend.",
-            intermediate="5-tier risk-profiled basket construction with forward-looking risk metrics.",
-            advanced="Phase-2 pairwise-correlation basket, issuer-tier adjusted, with forward MC projection.",
+            advisor="Phase-2 pairwise-correlation basket, issuer-tier adjusted, with forward MC projection.",
+            client="Pick a client, pick a risk tier, and see the crypto ETF basket we recommend.",
         ),
     )
 
@@ -122,19 +120,15 @@ tier_name = tier_pill_selector(tier_names, default_index=default_tier_idx, key="
 
 tier_meta = PORTFOLIO_TIERS[tier_name]
 st.caption(level_text(
-    beginner=(
-        f"Tier {tier_meta['tier_number']} · {tier_meta['typical_client']}. "
-        f"Rebalance every {tier_meta['rebalance']}."
-    ),
-    intermediate=(
-        f"Tier {tier_meta['tier_number']} · ceiling {tier_meta['ceiling_pct']}% "
-        f"of total portfolio · rebalance {tier_meta['rebalance']}."
-    ),
-    advanced=(
+               advisor=(
         f"Tier {tier_meta['tier_number']} · ceiling {tier_meta['ceiling_pct']}% · "
         f"max_drawdown_pct={tier_meta['max_drawdown_pct']} · rebalance {tier_meta['rebalance']}."
     ),
-))
+               client=(
+        f"Tier {tier_meta['tier_number']} · {tier_meta['typical_client']}. "
+        f"Rebalance every {tier_meta['rebalance']}."
+    ),
+           ))
 
 
 # ── 2026-04-25 redesign: render the mockup-style top KPI strip right after
@@ -312,7 +306,14 @@ _portfolio_forward_return = (_fwd_numer / _fwd_denom) if _fwd_denom > 0 else Non
 # Provenance: the two return framings (historical vs forward) need a
 # small note so the FA doesn't read short-window CAGR as steady-state.
 _provenance = level_text(
-    beginner=(
+                  advisor=(
+        f"Historical: per-ETF CAGR(end/start, full period) × basket weights. "
+        f"Forward: 10y BTC-USD / ETH-USD CAGR mapped per category, net of "
+        f"expense-ratio drag. Sources — return={_n_live_ret}/{_n_total}, "
+        f"vol={_n_live_vol}/{_n_total}, corr={_n_live_corr}/{_n_total}, "
+        f"forward={_n_fwd_live}/{_n_total}."
+    ),
+                  client=(
         f"**Historical return** = what each fund actually did over its "
         f"available price history (most launched Jan 2024 → ~2 years). "
         f"Short-term and regime-dependent; BTC outperformed ETH in this "
@@ -326,22 +327,7 @@ _provenance = level_text(
         f"corr: {_n_live_corr}/{_n_total} · "
         f"forward estimate: {_n_fwd_live}/{_n_total}."
     ),
-    intermediate=(
-        f"Historical = each ETF's full-history CAGR (capped ±300%). "
-        f"Forward estimate = long-run BTC-USD / ETH-USD CAGR with "
-        f"category drag/premium (btc_futures × 0.90 for contango, "
-        f"thematic × 1.10 equity beta). Live coverage: "
-        f"return {_n_live_ret}/{_n_total} · vol {_n_live_vol}/{_n_total} "
-        f"· corr {_n_live_corr}/{_n_total} · forward {_n_fwd_live}/{_n_total}."
-    ),
-    advanced=(
-        f"Historical: per-ETF CAGR(end/start, full period) × basket weights. "
-        f"Forward: 10y BTC-USD / ETH-USD CAGR mapped per category, net of "
-        f"expense-ratio drag. Sources — return={_n_live_ret}/{_n_total}, "
-        f"vol={_n_live_vol}/{_n_total}, corr={_n_live_corr}/{_n_total}, "
-        f"forward={_n_fwd_live}/{_n_total}."
-    ),
-)
+              )
 st.caption(_provenance)
 
 # Risk-free-rate source transparency — ONLY affects the Sharpe tile
@@ -469,25 +455,19 @@ with card("Allocation"):
 
 with card("Risk-optimized allocation"):
     st.caption(level_text(
-        beginner=(
-            "Same expected return, less risk. This runs a mean-variance "
-            "optimization to find the weights that minimize portfolio "
-            "volatility while holding expected return at or above the "
-            "current level. Click to see what the math recommends."
-        ),
-        intermediate=(
-            "Markowitz mean-variance optimization: minimize w·Σ·w "
-            "subject to w·r ≥ current return, weights sum to 1, "
-            "single-position cap 30%. Current category selection is "
-            "preserved — only the weights shift."
-        ),
-        advanced=(
+                   advisor=(
             "SLSQP solver on the 28-entry pairwise covariance Σ + "
             "same expected-return vector used by compute_portfolio_metrics. "
             "Floors at 0, ceilings at MAX_SINGLE_POSITION_PCT=30%. "
             "Diff vs. current weights surfaced as a side-by-side table."
         ),
-    ))
+                   client=(
+            "Same expected return, less risk. This runs a mean-variance "
+            "optimization to find the weights that minimize portfolio "
+            "volatility while holding expected return at or above the "
+            "current level. Click to see what the math recommends."
+        ),
+               ))
     if st.button("Optimize — minimize risk at current return",
                  type="primary", width="content"):
         from core.portfolio_engine import optimize_min_variance
@@ -546,10 +526,9 @@ with card("Risk-optimized allocation"):
 
 with card("Performance"):
     st.caption(level_text(
-        beginner="How this basket has performed historically and where it could land over the next year.",
-        intermediate="Historical returns + forward Monte Carlo projection.",
-        advanced="1Y/3Y/5Y historical from yfinance (live fallback chain) + 10k-path forward projection.",
-    ))
+                   advisor="1Y/3Y/5Y historical from yfinance (live fallback chain) + 10k-path forward projection.",
+                   client="How this basket has performed historically and where it could land over the next year.",
+               ))
 
     tabs = st.tabs(["Historical", "Forward projection (Monte Carlo)"])
 
@@ -592,12 +571,11 @@ with card("Performance"):
         else:
             st.info(
                 level_text(
-                    beginner=(
+                    advisor="Live price chain (yfinance → Stooq) returned empty for every holding. Check circuit breaker state in Settings.",
+                    client=(
                         "Historical returns aren't available right now — the market-data "
                         "service is temporarily unreachable. The forward-projection tab still works."
                     ),
-                    intermediate="No historical data from any fallback source. Try the Retry button on the banner, or switch to forward projection.",
-                    advanced="Live price chain (yfinance → Stooq) returned empty for every holding. Check circuit breaker state in Settings.",
                 )
             )
 
@@ -654,7 +632,10 @@ with card("Performance"):
             with kk3: kpi_tile("95th pctile", f"${mc['percentile_95']:,.0f}")
             with kk4: kpi_tile("P(loss)",     f"{mc['prob_loss_pct']:.1f}%")
 
-            if is_advanced():
+            # Advisor mode: show MC engine internals (paths / seed) for the
+            # FA's own diagnostic. Hidden in Client mode — too granular for
+            # screen-share with a client.
+            if is_advisor():
                 st.caption(
                     f"Paths computed: {mc['n_simulations']:,} · "
                     f"retained for render: {mc['paths_retained']:,} · "
@@ -704,19 +685,15 @@ def _confirm_body() -> None:
     missing_live = [t for t, p in per_ticker_price.items() if p is None]
 
     st.caption(level_text(
-        beginner=(
-            f"You are about to submit {len(holdings)} orders totalling "
-            f"${crypto_sleeve_usd:,.0f} to the demo broker. No real money will move."
-        ),
-        intermediate=(
-            f"{len(holdings)} orders · total notional ${crypto_sleeve_usd:,.0f} · "
-            "demo broker (mock fills)."
-        ),
-        advanced=(
+                   advisor=(
             f"{len(holdings)} orders · ${crypto_sleeve_usd:,.0f} gross · "
             "broker=mock · est. slippage 12.5 bps · tif=day."
         ),
-    ))
+                   client=(
+            f"You are about to submit {len(holdings)} orders totalling "
+            f"${crypto_sleeve_usd:,.0f} to the demo broker. No real money will move."
+        ),
+               ))
 
     if missing_live:
         st.warning(
@@ -886,10 +863,9 @@ with _exec_l:
         key="exec_basket_cta",
     )
     st.caption(level_text(
-        beginner="Demo mode — no real orders will be placed.",
-        intermediate="Broker = mock. Post-demo flips to Alpaca paper, then Alpaca live.",
-        advanced="BROKER_PROVIDER='mock' per config.py. Day-4+ routes to alpaca_paper.",
-    ))
+                   advisor="BROKER_PROVIDER='mock' per config.py. Day-4+ routes to alpaca_paper.",
+                   client="Demo mode — no real orders will be placed.",
+               ))
 
 with _exec_r:
     st.markdown(
