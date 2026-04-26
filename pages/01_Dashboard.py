@@ -317,115 +317,184 @@ def _ret_fmt(v: float | None, decimals: int = 1) -> tuple[str, str]:
     return (f"{sign}{abs(fv):.{decimals}f}%", color)
 
 
-# Build table rows
-_roster_rows: list[str] = []
+# ── 2026-04-25 redesign: roster as per-row st.columns with inline "Open →"
+# Cowork walkthrough: 3 large CTA buttons under the table looked like loose
+# duplicates. The mockup has the Open trailing each row (small text-link
+# style at the row's right edge). HTML <table> cells can't host Streamlit
+# widgets, so we render the roster as a sequence of st.columns rows where
+# the last column is a real st.button. CSS overrides scope the button to
+# look like an inline text link rather than a chunky chip.
+#
+# vs-bench reference is the same as before — IBIT spot CAGR.
+_bench = next(
+    (e.get("expected_return") for e in universe_live
+     if (e.get("ticker") or "").upper() == "IBIT"),
+    None,
+)
+
+# Inline CSS — paints the per-row "Open →" Streamlit button to look like a
+# text link rather than a chip. Scoped via a marker class on the wrapping
+# card so it can't bleed into other pages.
+_roster_inline_btn_css = """
+<style>
+.eap-roster-card [data-testid="stHorizontalBlock"] {
+  align-items: center;
+}
+.eap-roster-card .eap-row-divider {
+  border-bottom: 1px solid var(--border);
+  margin: 0 -24px;
+}
+.eap-roster-card [data-testid="stButton"] > button {
+  background: transparent !important;
+  border: none !important;
+  color: var(--accent) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 4px 0 !important;
+  min-height: 0 !important;
+  text-align: right !important;
+  justify-content: flex-end !important;
+  box-shadow: none !important;
+}
+.eap-roster-card [data-testid="stButton"] > button:hover {
+  color: var(--text-primary) !important;
+  background: transparent !important;
+  text-decoration: underline;
+}
+</style>
+"""
+st.markdown(_roster_inline_btn_css, unsafe_allow_html=True)
+
+# Open the roster card (with marker class so the inline-btn CSS only
+# applies to buttons inside this card).
+st.markdown(
+    '<div class="ds-card eap-roster-card" style="margin-bottom:20px;padding:20px 24px;">'
+    '<div style="font-family:var(--font-display);font-weight:500;font-size:16px;'
+    'color:var(--text-primary);margin:0;">Client roster</div>'
+    '<div style="font-size:12.5px;color:var(--text-muted);margin-top:2px;'
+    'margin-bottom:12px;">Click <b>Open →</b> at the end of any row to drill '
+    "into that client's portfolio.</div>",
+    unsafe_allow_html=True,
+)
+
+_roster_layout = [3.0, 1.6, 1.1, 1.0, 1.0, 1.4, 0.9, 0.8]  # 8 cols total
+
+# Header row
+_hdr_cells = [
+    ("Client",        "left"),
+    ("Tier",          "left"),
+    ("AUM · crypto",  "right"),
+    ("Hist return",   "right"),
+    ("vs bench",      "right"),
+    ("Rebalance",     "left"),
+    ("Last reviewed", "left"),
+    ("",              "right"),  # Open column header is intentionally blank
+]
+_hdr_cols = st.columns(_roster_layout)
+for _hcol, (_label, _align) in zip(_hdr_cols, _hdr_cells):
+    _hcol.markdown(
+        f'<div style="font-size:10.5px;text-transform:uppercase;'
+        f'letter-spacing:0.07em;color:var(--text-muted);font-weight:500;'
+        f'text-align:{_align};padding:6px 0;border-bottom:1px solid var(--border);">'
+        f'{_label}</div>',
+        unsafe_allow_html=True,
+    )
+
+# Data rows
 for c in DEMO_CLIENTS:
     m = per_client_metrics.get(c["id"], {})
     sleeve = c["total_portfolio_usd"] * c["crypto_allocation_pct"] / 100.0
     hist = m.get("hist_return")
-    # vs bench: per-client basket return minus a simple BTC-only benchmark.
-    # Use the universe's cached BTC-spot expected_return when available; else "—".
-    _bench = next(
-        (e.get("expected_return") for e in universe_live
-         if (e.get("ticker") or "").upper() == "IBIT"),
-        None,
-    )
     vs_bench = (hist - _bench) if (hist is not None and _bench is not None) else None
 
     _hist_txt, _hist_col = _ret_fmt(hist, 1)
     _vs_txt, _vs_col = _ret_fmt(vs_bench, 1) if vs_bench is not None else ("—", "var(--text-muted)")
 
     if c["rebalance_needed"]:
-        flag_html = (
-            f'<span class="ds-flag" style="display:inline-flex;align-items:center;gap:6px;'
+        _flag_html = (
+            f'<span style="display:inline-flex;align-items:center;gap:6px;'
             f'padding:2px 9px;border-radius:999px;font-size:10.5px;font-weight:600;'
-            f'background:color-mix(in srgb,var(--warning) 14%,transparent);color:var(--warning);">'
-            f'drift {c["drift_pct"]:.1f}σ · rebal</span>'
+            f'background:color-mix(in srgb,var(--warning) 14%,transparent);'
+            f'color:var(--warning);">drift {c["drift_pct"]:.1f}σ · rebal</span>'
         )
-        tier_pill_color = (
-            'background:color-mix(in srgb,var(--warning) 14%,transparent);color:var(--warning);'
-        )
+        _tier_pill_bg = 'color-mix(in srgb,var(--warning) 14%,transparent)'
+        _tier_pill_fg = 'var(--warning)'
     else:
-        flag_html = (
-            '<span class="ds-flag" style="display:inline-flex;align-items:center;gap:6px;'
+        _flag_html = (
+            '<span style="display:inline-flex;align-items:center;gap:6px;'
             'padding:2px 9px;border-radius:999px;font-size:10.5px;font-weight:600;'
-            'background:color-mix(in srgb,var(--success) 14%,transparent);color:var(--success);">'
-            'on target</span>'
+            'background:color-mix(in srgb,var(--success) 14%,transparent);'
+            'color:var(--success);">on target</span>'
         )
-        tier_pill_color = 'background:var(--accent-soft);color:var(--accent);'
+        _tier_pill_bg = 'var(--accent-soft)'
+        _tier_pill_fg = 'var(--accent)'
 
-    _roster_rows.append(
-        '<tr>'
-        '<td style="padding:14px;border-bottom:1px solid var(--border);">'
-        '<div style="display:inline-flex;align-items:center;gap:10px;">'
-        f'<div style="width:28px;height:28px;border-radius:6px;background:{_avatar_gradient(c)};'
-        'color:white;font-size:11.5px;font-weight:600;display:grid;place-items:center;">'
+    _row_cols = st.columns(_roster_layout)
+    # Cell 0 — avatar + name + label
+    _row_cols[0].markdown(
+        '<div style="display:inline-flex;align-items:center;gap:10px;padding:10px 0;">'
+        f'<div style="width:28px;height:28px;border-radius:6px;'
+        f'background:{_avatar_gradient(c)};color:white;font-size:11.5px;'
+        'font-weight:600;display:grid;place-items:center;flex-shrink:0;">'
         f'{_initials(c["name"])}</div>'
         '<div>'
-        f'<div style="font-weight:600;color:var(--text-primary);">{c["name"]}</div>'
+        f'<div style="font-weight:600;color:var(--text-primary);font-size:13px;">{c["name"]}</div>'
         f'<div style="font-size:11.5px;color:var(--text-muted);">{c["label"].lower()} · age {c["age"]}</div>'
-        '</div></div></td>'
-        f'<td style="padding:14px;border-bottom:1px solid var(--border);">'
-        f'<span style="display:inline-block;padding:2px 9px;border-radius:999px;'
-        f'font-size:10.5px;font-weight:600;{tier_pill_color}">{c["assigned_tier"]}</span></td>'
-        f'<td style="padding:14px;border-bottom:1px solid var(--border);text-align:right;'
-        f'font-family:var(--font-mono);">${sleeve:,.0f}</td>'
-        f'<td style="padding:14px;border-bottom:1px solid var(--border);text-align:right;'
-        f'font-family:var(--font-mono);color:{_hist_col};">{_hist_txt}</td>'
-        f'<td style="padding:14px;border-bottom:1px solid var(--border);text-align:right;'
-        f'font-family:var(--font-mono);color:{_vs_col};">{_vs_txt} ppts</td>'
-        f'<td style="padding:14px;border-bottom:1px solid var(--border);">{flag_html}</td>'
-        f'<td style="padding:14px;border-bottom:1px solid var(--border);'
-        f'color:var(--text-muted);font-size:12px;">{_last_review_str(c["last_rebalance_iso"])}</td>'
-        '</tr>'
+        '</div></div>',
+        unsafe_allow_html=True,
     )
-
-st.markdown(
-    '<div class="ds-card" style="margin-bottom:20px;padding:0;overflow:hidden;">'
-    '<div style="padding:20px 24px 0;">'
-    '<div style="font-family:var(--font-display);font-weight:500;font-size:16px;'
-    'color:var(--text-primary);margin:0;">Client roster</div>'
-    '<div style="font-size:12.5px;color:var(--text-muted);margin-top:2px;">'
-    'Click an Open button below to drill into that client\'s portfolio.</div>'
-    '</div>'
-    '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:16px;">'
-    '<thead><tr>'
-    '<th style="text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.07em;'
-    'color:var(--text-muted);font-weight:500;padding:12px 14px 10px;border-bottom:1px solid var(--border);">Client</th>'
-    '<th style="text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.07em;'
-    'color:var(--text-muted);font-weight:500;padding:12px 14px 10px;border-bottom:1px solid var(--border);">Tier</th>'
-    '<th style="text-align:right;font-size:10.5px;text-transform:uppercase;letter-spacing:0.07em;'
-    'color:var(--text-muted);font-weight:500;padding:12px 14px 10px;border-bottom:1px solid var(--border);">AUM · crypto</th>'
-    '<th style="text-align:right;font-size:10.5px;text-transform:uppercase;letter-spacing:0.07em;'
-    'color:var(--text-muted);font-weight:500;padding:12px 14px 10px;border-bottom:1px solid var(--border);">Hist return</th>'
-    '<th style="text-align:right;font-size:10.5px;text-transform:uppercase;letter-spacing:0.07em;'
-    'color:var(--text-muted);font-weight:500;padding:12px 14px 10px;border-bottom:1px solid var(--border);">vs bench</th>'
-    '<th style="text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.07em;'
-    'color:var(--text-muted);font-weight:500;padding:12px 14px 10px;border-bottom:1px solid var(--border);">Rebalance</th>'
-    '<th style="text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.07em;'
-    'color:var(--text-muted);font-weight:500;padding:12px 14px 10px;border-bottom:1px solid var(--border);">Last reviewed</th>'
-    '</tr></thead>'
-    '<tbody>'
-    + "".join(_roster_rows)
-    + '</tbody></table>'
-    '</div>',
-    unsafe_allow_html=True,
-)
-
-# Real Streamlit buttons for navigation — HTML table cells can't host widgets,
-# so we render a row of "Open" buttons under the table, one per client.
-_open_cols = st.columns(len(DEMO_CLIENTS))
-for _idx, c in enumerate(DEMO_CLIENTS):
-    with _open_cols[_idx]:
-        _label_suffix = " ⚠" if c["rebalance_needed"] else ""
+    # Cell 1 — tier pill
+    _row_cols[1].markdown(
+        f'<div style="padding:14px 0;">'
+        f'<span style="display:inline-block;padding:2px 9px;border-radius:999px;'
+        f'font-size:10.5px;font-weight:600;background:{_tier_pill_bg};'
+        f'color:{_tier_pill_fg};">{c["assigned_tier"]}</span></div>',
+        unsafe_allow_html=True,
+    )
+    # Cell 2 — AUM (right-aligned mono)
+    _row_cols[2].markdown(
+        f'<div style="padding:14px 0;text-align:right;font-family:var(--font-mono);'
+        f'font-size:13px;color:var(--text-primary);">${sleeve:,.0f}</div>',
+        unsafe_allow_html=True,
+    )
+    # Cell 3 — hist return
+    _row_cols[3].markdown(
+        f'<div style="padding:14px 0;text-align:right;font-family:var(--font-mono);'
+        f'font-size:13px;color:{_hist_col};">{_hist_txt}</div>',
+        unsafe_allow_html=True,
+    )
+    # Cell 4 — vs bench
+    _row_cols[4].markdown(
+        f'<div style="padding:14px 0;text-align:right;font-family:var(--font-mono);'
+        f'font-size:13px;color:{_vs_col};">{_vs_txt} ppts</div>',
+        unsafe_allow_html=True,
+    )
+    # Cell 5 — rebalance flag
+    _row_cols[5].markdown(
+        f'<div style="padding:14px 0;">{_flag_html}</div>',
+        unsafe_allow_html=True,
+    )
+    # Cell 6 — last reviewed
+    _row_cols[6].markdown(
+        f'<div style="padding:14px 0;color:var(--text-muted);font-size:12px;">'
+        f'{_last_review_str(c["last_rebalance_iso"])}</div>',
+        unsafe_allow_html=True,
+    )
+    # Cell 7 — inline "Open →" Streamlit button styled as text link
+    with _row_cols[7]:
         if st.button(
-            f"Open {c['name']}{_label_suffix} →",
-            key=f"dash_open_{c['id']}",
+            "Open →",
+            key=f"dash_open_inline_{c['id']}",
             use_container_width=True,
-            type=("primary" if c["rebalance_needed"] else "secondary"),
         ):
             st.session_state["active_client_id"] = c["id"]
             st.switch_page("pages/02_Portfolio.py")
+
+    # Row divider — thin border between rows (matches the HTML table look).
+    st.markdown('<div class="eap-row-divider"></div>', unsafe_allow_html=True)
+
+# Close the roster card
+st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div style="height:24px;"></div>', unsafe_allow_html=True)
 
