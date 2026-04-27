@@ -812,3 +812,101 @@ Tagged `audit-round-4-flow-snapshot-populated-2026-04-29`.
 
 **Next:** Sprint 3 — client adapter abstraction (Wealthbox / Redtail /
 Salesforce FSC / csv_import) — branch `polish/sprint-3-client-adapter-2026-04-30`.
+
+---
+
+## 2026-04-30 — Sprint 2.6 (coverage push-up — 4 buildable extractors + EDGAR facts)
+
+Branch `polish/sprint-2.6-coverage-pushup-2026-04-30` off main `d858e88`.
+8 commits on the branch. Cowork blessed Sprint 2.6 with 5 amendments;
+David's "no fallbacks if at all possible" amended the plan further to
+include EDGAR full-fund-list resolver.
+
+**Commit 0 — smoke-test probe** (per amendment 1). Probed 7 candidate
+sources with `requests.get` + browser UA. Outcome:
+  BUILDABLE: BlackRock iShares, Grayscale, ProShares
+  DEFERRED:  ETF.com (403 WAF), Bitwise (React SPA), Fidelity (JS-render
+             — false positive in initial probe; Asset matched marketing
+             copy not AUM tile), Franklin Templeton (JS-render)
+Bonus discovery: Grayscale's working URL is `etfs.grayscale.com/<ticker>`
+not the docs-original `grayscale.com/funds/<slug>`.
+
+**Commits 1-3 — issuer extractors** (single file: `integrations/issuer_extractors.py`):
+  BlackRock: discovered their product-screener-v3.1.jsn endpoint
+    returns 1.9 MB JSON for ALL ~1700 iShares funds in ONE fetch.
+    Module-cached. Live: IBIT $63B, ETHA $7.4B; IDOG/ILTC/ISOL/IXRP
+    not in screener.
+  Grayscale: regex `AUM[^$]*?\$([\d,]+(?:\.\d+)?)` against
+    etfs.grayscale.com/<ticker>. Sanity-bound 1e6..1e12. Live:
+    GBTC $11.8B, BTC $4.1B, ETHE $1.9B, GDLC $0.43B, GSOL $0.11B.
+  ProShares: dual-path fall-through `/our-etfs/strategic/<ticker>`
+    then `/our-etfs/leveraged-and-inverse/<ticker>`. Regex against
+    `snapshot-netAssets` DOM tile. Live: BITO $1.93B, BITI $0.18B,
+    BITU $0.55B, ETHD $0.07B, BETE $0.009B, EETH $0.07B.
+
+**Commit 4 — SEC EDGAR companyfacts long-tail resolver**
+(`integrations/edgar_facts.py`). Hits SEC's XBRL companyfacts JSON
+(50-500 KB per ETF) with priority order on fact keys: NetAssets >
+InvestmentCompanyNetAssets > Assets > AssetsFairValueDisclosure.
+Resolves CIK via TWO indexes: legacy company_tickers.json + newer
+company_tickers_exchange.json. Live: IBIT $67.4B (us-gaap:Assets),
+GBTC $14.5B, BITB $3.4B, GDLC $0.54B, GSOL $0.16B. Tickers filed
+under parent CIKs (BITO/BITQ/GFIL/ADAX) return None — not in
+either ticker index.
+
+**Commit 5 — tests** (31 new):
+  - test_issuer_extractors.py: 18 tests covering BlackRock screener
+    happy/error paths, Grayscale GAAP-AUM/plain-AUM regex variants,
+    ProShares dual-path fall-through, dispatcher correct-source-label
+    + alias resolution + graceful (None, None) for deferred issuers
+    (Bitwise/Fidelity/Franklin)
+  - test_edgar_facts.py: 13 tests covering CIK resolution via either
+    index, NetAssets-priority-over-Assets, sanity bound rejection,
+    403/no-priority-keys returning None
+  All 363 tests pass (was 332 pre-2.6).
+
+**Commit 6 — re-run capture + script improvements:**
+  Final coverage:
+    AUM:  119/211 (56.4%)  [+6 from Sprint 2.5's 113]
+    Flow:   6/211  (2.8%)  [unchanged — cryptorank silent-fail]
+    Vol:  132/211 (62.6%)  [+8 from Sprint 2.5's 124]
+  Source breakdown for AUM:
+    yfinance: 107  |  SEC EDGAR (facts): 5  |  issuer-site:grayscale: 1
+    reference (bootstrap): 6  |  unavailable: 92
+  vs ≥150 acceptance gate: misses by 31. Per Cowork amendment 3,
+  the contingency is Sprint 2.7 with Playwright rather than re-tuning.
+  Script improvements bundled:
+    - _load_env_file() lightweight .env loader
+    - resume-guard tightened to "skip only if all 3 fields populated"
+    - merge-on-update so transient failures don't undo prior progress
+
+**Commit 7 — docs + freshness indicator + tag + push:**
+  - docs/etf_flow_data_chain.md gains Sprint 2.6 measured-coverage
+    table + "Why coverage stops at 119/211" section (per amendment 5)
+    listing every issuer's status + path-to-coverage
+  - pages/03_ETF_Detail.py freshness indicator now shows
+    "<live>/211 live · <snap>/211 snapshot · <unavail>/211 unavailable"
+    making the gap a visible product decision (amendment 5)
+  - Cryptorank silent-failure documented as Sprint 2.7 follow-up
+  - Tag: audit-round-4-coverage-pushup-2026-04-30
+
+**Sprint 2.6 honest reality check:**
+The new chain steps lift coverage by +6 AUM and +8 Vol. The structural
+gap is that yfinance's coverage failures correlate with issuer-site
+coverage failures (newly-listed funds aren't indexed by either).
+Closing that requires Playwright (deferred 2.7) or time (yfinance
+catches up; issuers publish static tiles). The 6 extractors that
+DO work cover prove correctness — the chain plumbing is sound and
+ready to absorb 2.7's Playwright additions.
+
+**Files touched:**
+- New: `integrations/issuer_extractors.py`, `integrations/edgar_facts.py`,
+  `tests/test_issuer_extractors.py`, `tests/test_edgar_facts.py`,
+  `scripts/smoke_test_extractors.py`
+- Modified: `integrations/etf_flow_data.py`, `pages/03_ETF_Detail.py`,
+  `core/etf_flow_production.json`, `scripts/refresh_etf_flow_production.py`,
+  `docs/etf_flow_data_chain.md`, `pending_work.md`, `MEMORY.md`
+
+**Next:** Sprint 2.7 (Playwright for Bitwise/Fidelity/Franklin/ETF.com
++ cryptorank endpoint URL fix) OR Sprint 3 (client adapter abstraction)
+per Cowork's call.
