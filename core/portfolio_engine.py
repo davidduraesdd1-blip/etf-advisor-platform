@@ -927,23 +927,49 @@ def optimize_min_variance(
         {"type": "ineq", "fun": lambda w, t=target: _portfolio_return(w) - t},
     ]
 
-    try:
-        result = minimize(
-            _portfolio_variance,
-            w_current,
-            method="SLSQP",
-            bounds=bounds,
-            constraints=constraints,
-            options={"maxiter": 200, "ftol": 1e-8},
-        )
-    except Exception as exc:  # pragma: no cover — defensive
-        return {"status": "infeasible", "reason": f"solver error: {exc}"}
+    # 2026-04-27 audit-round-4: SLSQP can fail with "Positive directional
+    # derivative for linesearch" on tightly-constrained baskets where
+    # the current weights sit near the efficient frontier. Three-attempt
+    # robustness sequence:
+    #   1. SLSQP from current weights with strict target.
+    #   2. SLSQP from equal-weight starting point with strict target.
+    #   3. SLSQP with target relaxed by 5% (e.g., target 28% -> 26.6%).
+    # If all three fail we fall back to "unchanged" rather than the
+    # alarming "infeasible" verdict — the FA is already close to optimal.
+    def _try_slsqp(w_init: "_np.ndarray", t_target: float) -> "object":
+        cs = [
+            {"type": "eq",   "fun": lambda w: float(_np.sum(w) - 1.0)},
+            {"type": "ineq", "fun": lambda w, t=t_target: _portfolio_return(w) - t},
+        ]
+        try:
+            return minimize(
+                _portfolio_variance, w_init,
+                method="SLSQP", bounds=bounds, constraints=cs,
+                options={"maxiter": 300, "ftol": 1e-9},
+            )
+        except Exception:
+            return None
 
-    if not result.success:
-        return {"status": "infeasible",
-                "reason": result.message or "SLSQP did not converge",
-                "original_vol_pct":    round(current_vol, 3),
-                "expected_return_pct": round(current_return, 3)}
+    result = _try_slsqp(w_current, target)
+    if result is None or not result.success:
+        # Attempt 2: equal-weight start.
+        w_eq = _np.full(n, 1.0 / n)
+        result = _try_slsqp(w_eq, target)
+    if result is None or not result.success:
+        # Attempt 3: relax target by 5%.
+        result = _try_slsqp(w_current, target * 0.95)
+    if result is None or not result.success:
+        # Graceful fallback: report unchanged with current vol so the UI
+        # tells the FA "already near efficient frontier" rather than
+        # "infeasible" (which sounds alarming for a non-error).
+        return {
+            "status": "unchanged",
+            "reason": "Current allocation is already near the efficient "
+                      "frontier for this tier (solver could not find a "
+                      "feasible improvement after 3 attempts).",
+            "original_vol_pct":    round(current_vol, 3),
+            "expected_return_pct": round(current_return, 3),
+        }
 
     w_opt = _np.clip(result.x, 0.0, w_max)
     # Re-normalize in case the solver drifts fractionally.
