@@ -223,6 +223,16 @@ Items intentionally NOT in scope for the May 1 demo. Pick up after.
 - [x] **Cold-boot perf root cause.**  *(2026-04-28 hotfix on main:
       19.5s -> 2.45s fresh / 1.47s persisted via three-state circuit
       breaker with disk persistence. Production target ≤8s ✓.)*
+- [ ] **Replace CF with NIG / POT / GH tail model at extreme moments —
+      eliminates need for feasibility clip on alt-heavy baskets.**
+      *(2026-04-28 hotfix #2 landed the feasibility clip + boundary
+      disclosure UI as a pragmatic interim fix. The CF polynomial at
+      Maillard caps + 99% confidence extrapolates past 100% loss; the
+      clip displays the long-only hard bound + footnote rather than
+      the impossible polynomial value. Post-demo: replace CF with POT
+      (McNeil & Frey 2000), NIG, or generalized hyperbolic — eliminates
+      polynomial extrapolation at extreme tails. Multi-day refactor.
+      See docs/math_audit_round_5_2026-04-28.md §5.)*
 - [ ] **Investigate the 4 baseline test failures' root causes.** Cleanup
       sprint Commit 1 made them pass with `DEMO_MODE_NO_FETCH=1`, which
       is the right test-harness fix, but the underlying cause (page

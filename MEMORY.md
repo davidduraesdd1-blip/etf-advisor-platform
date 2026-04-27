@@ -4,6 +4,56 @@ Session continuity log. Newest entries on top. See master-template §16.
 
 ---
 
+## 2026-04-28 — Hotfix #2: CF feasibility clip + boundary disclosure
+
+Cowork flagged a math-display problem in the post-no-fallback numbers:
+Marcus Avery T4 VaR_99 = 171.70% and CVaR_95 = 132.79% — mathematically
+impossible for a long-only basket (can't lose more than principal).
+Cornish-Fisher polynomial extrapolates past the feasible region when
+(S, K) hit the Maillard caps and confidence is high. Pragmatic fix
+ships per Cowork's call: clip at the asset-class hard bound (100%) +
+boundary disclosure UI; better tail models (NIG / POT / GH) are
+post-demo.
+
+### What landed (3 commits)
+
+  1. **fix(cf):** feasibility clip in `cornish_fisher_var` / `cvar`.
+     `CFRiskResult(value, cf_boundary_reached)` NamedTuple return type;
+     `_clip_to_loss_bound` helper; `compute_portfolio_metrics` propagates
+     4 boundary flags + `any_cf_boundary_reached` logical-OR. Existing
+     CF VaR tests updated for `.value` access.
+  2. **feat(ui):** `risk_metrics_panel(metrics, sleeve_usd)` helper
+     in `ui/components.py`. Tiles display "≤ -$X / -100% / model
+     boundary" when boundary reached. Calm-tone footnote with
+     methodology link appears when any tile hit the bound. Wired into
+     Portfolio page inside `st.expander("Advanced risk metrics —
+     Advisor mode")`. New `<section id="cf-boundary">` in
+     pages/98_Methodology.py.
+  3. **docs:** Round-5 doc updated with §5 Boundary handling
+     (rationale, post-demo NIG/POT plan), MEMORY entry, pending_work
+     post-demo line for tail-model replacement.
+
+### Marcus Avery T4/T5 risk panel rendering
+
+Both tiers now show:
+- VaR_95: 64.07% (T4) / 62.38% (T5) — under boundary
+- VaR_99: **≤ -$81,200 / -100% / model boundary**
+- CVaR_95: **≤ -$81,200 / -100% / model boundary**
+- CVaR_99: **≤ -$81,200 / -100% / model boundary**
+
+Footnote + methodology link visible. The 171.70% display is gone.
+
+### Test count: 297 → 307 (+10)
+
+  + 8 in TestFeasibilityClip
+  + 2 in TestRiskMetricsPanelUI
+
+### Tag
+
+`audit-round-4-cf-clip-2026-04-28` on main.
+
+---
+
 ## 2026-04-28 — Production hotfix: CF live params + sign correction + no-fallback policy
 
 Cowork lifted the freeze on `main` for this targeted hotfix.

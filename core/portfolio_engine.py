@@ -174,6 +174,43 @@ def get_live_risk_free_rate() -> float:
 _CF_SKEW_CAP: float = 1.5
 _CF_KURT_CAP: float = 15.0
 
+# 2026-04-28 hotfix — feasibility clip. The Cornish-Fisher polynomial
+# extrapolates beyond the feasible range when (S, K) hit the Maillard
+# caps and confidence is high (e.g., 99% on alt-heavy baskets). For
+# long-only crypto ETF baskets, the true upper bound of loss is 100%
+# of allocated principal — a hard mathematical constraint of the asset
+# class. We clip CF-derived VaR/CVaR to this bound and return a
+# `cf_boundary_reached` flag so the UI can surface that the model has
+# reached its feasibility boundary rather than display a polynomial
+# extrapolation that exceeds reality.
+_LONG_ONLY_LOSS_BOUND_PCT: float = 100.0
+
+
+from typing import NamedTuple
+
+
+class CFRiskResult(NamedTuple):
+    """Output of cornish_fisher_var / cornish_fisher_cvar after the
+    feasibility clip lands. `value` is the loss in percent (0..100);
+    `cf_boundary_reached` is True when the unclipped polynomial
+    estimate exceeded the long-only 100% loss bound and was clipped.
+
+    Existing call sites that only need the magnitude can read the
+    `.value` field; the UI risk panel reads `.cf_boundary_reached` to
+    decide whether to display "≤ -100% / model boundary" with the
+    accompanying CF-boundary footnote.
+    """
+    value: float
+    cf_boundary_reached: bool
+
+
+def _clip_to_loss_bound(value: float) -> CFRiskResult:
+    """Clip a CF-derived loss percentage to the long-only feasibility
+    range [0, 100]. Returns the (clipped value, boundary_reached) pair."""
+    if value > _LONG_ONLY_LOSS_BOUND_PCT:
+        return CFRiskResult(value=_LONG_ONLY_LOSS_BOUND_PCT, cf_boundary_reached=True)
+    return CFRiskResult(value=max(0.0, value), cf_boundary_reached=False)
+
 
 def _load_production_config() -> dict[str, tuple[float, float]] | None:
     """
@@ -298,11 +335,17 @@ def cornish_fisher_var(
     confidence: float = 0.95,
     skew: float | None = None,
     excess_kurt: float | None = None,
-) -> float:
+) -> CFRiskResult:
     """
     Cornish-Fisher modified parametric VaR (Boudt, Peterson, Croux 2008;
-    Favre & Galeano 2002). Returns a positive number representing
-    potential loss in percentage points.
+    Favre & Galeano 2002).
+
+    Returns `CFRiskResult(value, cf_boundary_reached)` — a NamedTuple
+    where `value` is the clipped loss percentage (0..100) and
+    `cf_boundary_reached` is True when the unclipped polynomial
+    extrapolation exceeded the long-only 100% loss bound. The flag
+    flows through to the UI risk panel which displays
+    "≤ -100% / model boundary" when set.
 
     `skew` and `excess_kurt` (Fisher convention; standard normal → 0)
     are REQUIRED — the no-fallback policy (Cowork 2026-04-28) removed
@@ -317,15 +360,18 @@ def cornish_fisher_var(
 
     2026-04-28 sign-convention fix: the prior implementation used
     z_g = +Φ⁻¹(c) (right-tail) instead of the correct left-tail
-    quantile z_α = -Φ⁻¹(c) for VaR. With positive z_g, the (z²-1)/6·S
-    coefficient acquires the WRONG sign for negatively-skewed
-    distributions like crypto, materially under-estimating VaR. The
-    fix uses z_α = -Φ⁻¹(c) and applies the standard Boudt et al. 2008
-    CF expansion:
+    quantile z_α = -Φ⁻¹(c) for VaR. The fix uses z_α = -Φ⁻¹(c) and
+    applies the Boudt et al. 2008 CF expansion:
         z_α^CF = z_α + (z_α²-1)/6·γ₁
                  + (z_α³-3z_α)/24·γ₂
                  - (2z_α³-5z_α)/36·γ₁²
         mVaR = -(μ + σ·z_α^CF)
+
+    2026-04-28 feasibility clip: at extreme moments (e.g., altcoin_spot
+    at the Maillard caps S=−1.5, K=15) and high confidence (99%), the
+    CF polynomial extrapolates past the long-only 100% loss bound. We
+    clip and return cf_boundary_reached=True. Better tail models
+    (NIG / POT / generalized hyperbolic) are post-demo work.
     """
     if skew is None or excess_kurt is None:
         raise RuntimeError(
@@ -336,8 +382,6 @@ def cornish_fisher_var(
     S = max(-_CF_SKEW_CAP, min(_CF_SKEW_CAP, float(skew)))
     K = max(0.0, min(_CF_KURT_CAP, float(excess_kurt)))
 
-    # Left-tail quantile of the standard normal at confidence c:
-    # for c=0.95, z_α = -1.645 (the 5th percentile, NOT +1.645).
     z_alpha = -{0.90: 1.282, 0.95: 1.645, 0.99: 2.326}.get(confidence, 1.645)
     z_cf = (
         z_alpha
@@ -345,10 +389,8 @@ def cornish_fisher_var(
         + (z_alpha ** 3 - 3 * z_alpha) / 24 * K
         - (2 * z_alpha ** 3 - 5 * z_alpha) / 36 * S ** 2
     )
-    # mVaR = -(μ + σ·z_α^CF). Floored at 0 since VaR can't be negative
-    # (a portfolio with very high mean dominating the tail still
-    # represents a tail-loss probability ≥ 0).
-    return max(-(mean_return + vol * z_cf), 0.0)
+    raw = -(mean_return + vol * z_cf)
+    return _clip_to_loss_bound(raw)
 
 
 def cornish_fisher_cvar(
@@ -358,19 +400,21 @@ def cornish_fisher_cvar(
     skew: float | None = None,
     excess_kurt: float | None = None,
     n_quantiles: int = 500,
-) -> float:
+) -> CFRiskResult:
     """
     CVaR (Expected Shortfall) computed CONSISTENTLY with the Cornish-
     Fisher distributional assumption used by cornish_fisher_var.
 
     Prior implementation used fixed multipliers on VaR (1.35 at 95%,
-    1.42 at 99%) — those are Gaussian ratios inflated for "fat tail"
-    feel. Internally inconsistent with the CF quantile (Rockafellar
+    1.42 at 99%) — those were Gaussian ratios inflated for "fat-tail
+    feel" but internally inconsistent with the CF quantile (Rockafellar
     & Uryasev 2000). Fix: numerically integrate the CF-adjusted
     quantile function from the tail.
 
-    Returns a positive number representing expected loss CONDITIONAL
-    on being in the tail beyond VaR.
+    Returns `CFRiskResult(value, cf_boundary_reached)` where `value` is
+    the expected loss CONDITIONAL on being in the tail beyond VaR,
+    clipped to the long-only 100% loss bound. `cf_boundary_reached` is
+    True when the unclipped polynomial integral exceeded that bound.
     """
     if skew is None or excess_kurt is None:
         raise RuntimeError(
@@ -411,10 +455,9 @@ def cornish_fisher_cvar(
     alpha = 1.0 - confidence
     ps = [alpha * (i + 0.5) / n_quantiles for i in range(n_quantiles)]
     z_cfs = [_cf_quantile(p) for p in ps]
-    # Loss = -(mean - z*vol), then expected loss in the tail region
     loss_samples = [-(mean_return + z * vol) for z in z_cfs]
     cvar = sum(loss_samples) / len(loss_samples)
-    return max(cvar, 0.0)
+    return _clip_to_loss_bound(cvar)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -989,6 +1032,12 @@ def compute_portfolio_metrics(
     # and weight-aggregate. Cache miss / stale → falls back to the prior
     # crypto-midpoint defaults (no regression risk).
     skew_w, kurt_w = _weighted_cf_params(holdings)
+    # 2026-04-28 hotfix: cornish_fisher_var/cvar return CFRiskResult
+    # (NamedTuple). The `.value` is the loss percentage clipped to the
+    # long-only 100% bound; `.cf_boundary_reached` is True when the
+    # unclipped polynomial estimate exceeded that bound. We propagate
+    # the boundary flag into the metrics dict so the UI risk panel can
+    # surface "≤ -100% / model boundary" with the CF-boundary footnote.
     var_95 = cornish_fisher_var(weighted_return, portfolio_vol, 0.95,
                                 skew=skew_w, excess_kurt=kurt_w)
     var_99 = cornish_fisher_var(weighted_return, portfolio_vol, 0.99,
@@ -1018,10 +1067,21 @@ def compute_portfolio_metrics(
         "sortino_ratio":           _sr(sortino, 3),
         "calmar_ratio":            _sr(calmar, 3),
         "max_drawdown_pct":        _sr(max_drawdown, 3),
-        "var_95_pct":              _sr(var_95, 3),
-        "var_99_pct":              _sr(var_99, 3),
-        "cvar_95_pct":             _sr(cvar_95, 3),
-        "cvar_99_pct":             _sr(cvar_99, 3),
+        "var_95_pct":              _sr(var_95.value, 3),
+        "var_99_pct":              _sr(var_99.value, 3),
+        "cvar_95_pct":             _sr(cvar_95.value, 3),
+        "cvar_99_pct":             _sr(cvar_99.value, 3),
+        # CF-boundary flags (2026-04-28 hotfix). True at any confidence
+        # → UI risk panel shows "≤ -100% / model boundary" + the
+        # CF-boundary footnote linking to methodology.
+        "var_95_cf_boundary_reached":  bool(var_95.cf_boundary_reached),
+        "var_99_cf_boundary_reached":  bool(var_99.cf_boundary_reached),
+        "cvar_95_cf_boundary_reached": bool(cvar_95.cf_boundary_reached),
+        "cvar_99_cf_boundary_reached": bool(cvar_99.cf_boundary_reached),
+        "any_cf_boundary_reached":     bool(
+            var_95.cf_boundary_reached or var_99.cf_boundary_reached
+            or cvar_95.cf_boundary_reached or cvar_99.cf_boundary_reached
+        ),
         "diversification_ratio":   _sr(diversification_r, 3),
         "excess_return_pct":       _sr(excess_return, 3),
         "n_holdings":              n,
@@ -1170,6 +1230,13 @@ def _empty_metrics() -> dict:
         "portfolio_volatility_pct": 0, "sharpe_ratio": 0, "sortino_ratio": 0,
         "calmar_ratio": 0, "max_drawdown_pct": 0, "var_95_pct": 0,
         "var_99_pct": 0, "cvar_95_pct": 0, "cvar_99_pct": 0,
+        # CF-boundary flags (2026-04-28 hotfix) — empty portfolio never
+        # reaches the boundary since it has no risk to model.
+        "var_95_cf_boundary_reached":  False,
+        "var_99_cf_boundary_reached":  False,
+        "cvar_95_cf_boundary_reached": False,
+        "cvar_99_cf_boundary_reached": False,
+        "any_cf_boundary_reached":     False,
         "diversification_ratio": 1, "excess_return_pct": 0, "n_holdings": 0,
     }
 

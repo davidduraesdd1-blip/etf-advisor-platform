@@ -262,6 +262,171 @@ class TestCFFunctionsRequireParams:
             cornish_fisher_cvar(30.0, 50.0, 0.95, skew=None, excess_kurt=8.0)
 
 
+# ── Feasibility clip + cf_boundary_reached flag (2026-04-28 hotfix) ──
+
+class TestFeasibilityClip:
+    """
+    cornish_fisher_var/cvar return CFRiskResult NamedTuples after the
+    2026-04-28 hotfix: `value` is the loss percentage clipped to the
+    long-only 100% bound; `cf_boundary_reached` is True when the
+    unclipped polynomial estimate exceeded that bound.
+    """
+
+    def test_var_under_bound_returns_unchanged_with_flag_false(self):
+        """Mild moments + low confidence: VaR well under 100% → no clip,
+        flag is False."""
+        from core.portfolio_engine import cornish_fisher_var, CFRiskResult
+        # btc_spot-fitted moments + 95% conf + reasonable vol
+        result = cornish_fisher_var(30.0, 30.0, 0.95, skew=-0.058, excess_kurt=2.570)
+        assert isinstance(result, CFRiskResult)
+        assert 0 <= result.value <= 100.0
+        assert result.cf_boundary_reached is False
+
+    def test_var_over_bound_clips_with_flag_true(self):
+        """Extreme moments + 99% conf: polynomial estimate exceeds 100% →
+        clipped to 100%, flag is True."""
+        from core.portfolio_engine import cornish_fisher_var, CFRiskResult
+        # altcoin_spot Maillard-clamped moments + 99% conf + high vol
+        result = cornish_fisher_var(20.0, 80.0, 0.99, skew=-1.5, excess_kurt=15.0)
+        assert isinstance(result, CFRiskResult)
+        assert result.value == 100.0
+        assert result.cf_boundary_reached is True
+
+    def test_cvar_under_bound_unchanged(self):
+        from core.portfolio_engine import cornish_fisher_cvar, CFRiskResult
+        result = cornish_fisher_cvar(30.0, 30.0, 0.95, skew=-0.058, excess_kurt=2.570)
+        assert isinstance(result, CFRiskResult)
+        assert 0 <= result.value <= 100.0
+        assert result.cf_boundary_reached is False
+
+    def test_cvar_over_bound_clips(self):
+        from core.portfolio_engine import cornish_fisher_cvar, CFRiskResult
+        result = cornish_fisher_cvar(20.0, 80.0, 0.99, skew=-1.5, excess_kurt=15.0)
+        assert isinstance(result, CFRiskResult)
+        assert result.value == 100.0
+        assert result.cf_boundary_reached is True
+
+    def test_altcoin_spot_99pct_hits_boundary(self):
+        """Real production-config fixture: altcoin_spot at 99% should hit
+        the boundary on a typical alt-heavy basket (50% vol, 30% mean)."""
+        from core.portfolio_engine import cornish_fisher_var
+        result = cornish_fisher_var(30.0, 50.0, 0.99, skew=-1.5, excess_kurt=15.0)
+        assert result.cf_boundary_reached is True
+
+    def test_btc_spot_95pct_does_not_hit_boundary(self):
+        """Real production-config fixture: btc_spot at 95% should NOT hit
+        the boundary on a typical BTC-only basket (50% vol, 30% mean) —
+        sanity check that the clip isn't over-firing."""
+        from core.portfolio_engine import cornish_fisher_var
+        result = cornish_fisher_var(30.0, 50.0, 0.95, skew=-0.058, excess_kurt=2.570)
+        assert result.cf_boundary_reached is False
+
+    def test_compute_portfolio_metrics_propagates_flag(self):
+        """End-to-end: compute_portfolio_metrics carries the boundary
+        flag into the returned metrics dict."""
+        from core import cf_calibration as cc
+        from core.portfolio_engine import compute_portfolio_metrics
+        import tempfile
+        from pathlib import Path
+        # Use a tmp-dir cache populated with extreme alt moments so the
+        # CF math hits the boundary; verify the dict has the flag set.
+        with tempfile.TemporaryDirectory() as tmp:
+            cc.CACHE_PATH = Path(tmp) / "cf_cache.json"
+            cc._write_cache({"altcoin_spot": (-1.5, 15.0)})
+            holdings = [{
+                "ticker": "X", "category": "altcoin_spot", "weight_pct": 100.0,
+                "expected_return_pct": 30.0, "volatility_pct": 50.0,
+                "correlation_with_btc": 0.7, "issuer": "Test",
+            }]
+            m = compute_portfolio_metrics(holdings, 100_000, "Ultra Aggressive")
+            assert "var_99_cf_boundary_reached" in m
+            assert m["var_99_cf_boundary_reached"] is True
+            assert m["var_99_pct"] == 100.0
+            assert m["any_cf_boundary_reached"] is True
+
+    def test_value_floored_at_zero_when_mean_dominates(self):
+        """Very high mean return + tight vol: unclipped VaR could go
+        negative; we floor at 0 (a portfolio with extreme positive drift
+        still has tail-loss probability ≥ 0%)."""
+        from core.portfolio_engine import cornish_fisher_var
+        result = cornish_fisher_var(200.0, 5.0, 0.95, skew=-0.058, excess_kurt=2.570)
+        assert result.value >= 0.0
+        assert result.cf_boundary_reached is False
+
+
+# ── UI: boundary footnote rendering ────────────────────────────────
+
+class TestRiskMetricsPanelUI:
+    """Verifies the risk_metrics_panel renders the CF-boundary footnote
+    when (and only when) at least one tile hit the boundary."""
+
+    def test_footnote_renders_when_boundary_reached(self):
+        """Alt-heavy metrics dict (any_cf_boundary_reached=True) must
+        emit the boundary footnote text."""
+        pytest.importorskip("streamlit.testing.v1")
+        from streamlit.testing.v1 import AppTest
+        # Build a minimal Streamlit script that calls risk_metrics_panel
+        # with boundary-reached metrics, then run it via AppTest and
+        # scan the rendered markdown for the footnote string.
+        script = '''
+import streamlit as st
+from ui.components import risk_metrics_panel
+metrics = {
+    "var_95_pct": 64.0, "var_99_pct": 100.0,
+    "cvar_95_pct": 100.0, "cvar_99_pct": 100.0,
+    "var_95_cf_boundary_reached": False,
+    "var_99_cf_boundary_reached": True,
+    "cvar_95_cf_boundary_reached": True,
+    "cvar_99_cf_boundary_reached": True,
+    "any_cf_boundary_reached": True,
+}
+risk_metrics_panel(metrics, sleeve_usd=81_200)
+'''
+        at = AppTest.from_string(script, default_timeout=10)
+        at.run()
+        assert not at.exception, f"AppTest crashed: {at.exception}"
+        rendered = " ".join(
+            (el.value or "") if hasattr(el, "value") else str(el)
+            for el in at.markdown
+        )
+        assert "model boundary" in rendered, (
+            "boundary footnote should render when any tile hit boundary"
+        )
+        assert "≤ -$81,200" in rendered or "≤ -$81200" in rendered, (
+            "boundary tile should display ≤ -$<sleeve> dollar amount"
+        )
+
+    def test_footnote_absent_when_no_boundary(self):
+        """BTC-only metrics dict (any_cf_boundary_reached=False) must NOT
+        emit the boundary footnote."""
+        pytest.importorskip("streamlit.testing.v1")
+        from streamlit.testing.v1 import AppTest
+        script = '''
+import streamlit as st
+from ui.components import risk_metrics_panel
+metrics = {
+    "var_95_pct": 30.0, "var_99_pct": 50.0,
+    "cvar_95_pct": 60.0, "cvar_99_pct": 80.0,
+    "var_95_cf_boundary_reached": False,
+    "var_99_cf_boundary_reached": False,
+    "cvar_95_cf_boundary_reached": False,
+    "cvar_99_cf_boundary_reached": False,
+    "any_cf_boundary_reached": False,
+}
+risk_metrics_panel(metrics, sleeve_usd=100_000)
+'''
+        at = AppTest.from_string(script, default_timeout=10)
+        at.run()
+        assert not at.exception, f"AppTest crashed: {at.exception}"
+        rendered = " ".join(
+            (el.value or "") if hasattr(el, "value") else str(el)
+            for el in at.markdown
+        )
+        assert "model boundary" not in rendered, (
+            "footnote should NOT render when no boundary reached"
+        )
+
+
 # ── End-to-end: VaR call site reads weighted params ────────────────
 
 class TestVaRReceivesWeightedParams:
@@ -287,7 +452,8 @@ class TestVaRReceivesWeightedParams:
         mr, vol = 30.0, 50.0
         var_btc = cornish_fisher_var(mr, vol, 0.95, skew=s_btc, excess_kurt=k_btc)
         var_alt = cornish_fisher_var(mr, vol, 0.95, skew=s_alt, excess_kurt=k_alt)
-        assert var_alt > var_btc
+        # CFRiskResult.value access — NamedTuple post-2026-04-28-hotfix.
+        assert var_alt.value > var_btc.value
 
     def test_compute_portfolio_metrics_uses_weighted_params(self, monkeypatch, tmp_path):
         """Smoke-test the wire-up: changing the cached (S, K) for a
