@@ -103,6 +103,50 @@ def main() -> None:
             ),
         )
 
+    # 2026-04-29 Sprint 2 commit 4: data freshness indicator. Reads the
+    # last cron pre-warm summary from data/portfolio_snapshot.json
+    # (written by core.scheduler.recalculate_all_portfolios + the new
+    # prewarm_etf_flow_cache step). Tells the FA at a glance how live
+    # the AUM/Flow/Vol tiles below actually are.
+    try:
+        from core.scheduler import load_latest_snapshot
+        from datetime import datetime as _dt, timezone as _tz
+        _snap = load_latest_snapshot() or {}
+        _flow_summary = _snap.get("flow_prewarm") or {}
+        if _flow_summary:
+            _warmed = _flow_summary.get("warmed_at_utc", "")
+            _n_total = int(_flow_summary.get("n_total", 0) or 0)
+            # Sum live (non-snapshot, non-none) sources for AUM as the
+            # representative "how many tickers got live data" stat.
+            _aum_dist = _flow_summary.get("aum") or {}
+            _n_live = sum(
+                c for s, c in _aum_dist.items()
+                if s and "snapshot" not in s and s not in ("none", "error")
+            )
+            _n_snap = sum(c for s, c in _aum_dist.items() if s and "snapshot" in s)
+            _age_str = "—"
+            try:
+                _w_dt = _dt.fromisoformat(_warmed.replace("Z", "+00:00"))
+                _delta_h = (_dt.now(_tz.utc) - _w_dt).total_seconds() / 3600.0
+                if _delta_h < 1:
+                    _age_str = f"{int(_delta_h * 60)}m ago"
+                elif _delta_h < 48:
+                    _age_str = f"{_delta_h:.1f}h ago"
+                else:
+                    _age_str = f"{int(_delta_h / 24)}d ago"
+            except Exception:
+                pass
+            st.markdown(
+                f'<div style="font-size:11px;color:var(--text-muted);'
+                f'margin:-8px 0 12px 0;font-family:var(--font-mono);">'
+                f'Data refreshed: {_age_str} · '
+                f'{_n_live}/{_n_total} tickers live · '
+                f'{_n_snap}/{_n_total} from snapshot</div>',
+                unsafe_allow_html=True,
+            )
+    except Exception:
+        pass   # freshness indicator is informational; never blocks render
+
     # Data-source panel intentionally omitted on research pages per FA
     # feedback. Tile-level `data_source_badge` calls still surface any
     # active fallback exactly where it affects the number. Full stack
@@ -301,30 +345,25 @@ def main() -> None:
                        ))
 
 
-    # ── 2026-04-25 redesign: mockup-fidelity KPI tiles per advisor-etf-DETAIL.html
-    # Mockup shows: Expense ratio · AUM · 30D net flows · Avg daily vol.
-    # AUM / flows / volume aren't in the universe analytics dict (those are
-    # derived from price history, not from the ETF reference data). For the
-    # major spot ETFs we ship hardcoded reference values labelled "stub" so
-    # the demo doesn't hit "—" everywhere; for less-common ETFs we surface
-    # "—" with a footnote per CLAUDE.md §10's "no silent fallbacks" rule.
-    # A real follow-up PR should wire these via SEC EDGAR N-PORT (AUM) +
-    # cryptorank.io / SoSoValue (flows) + yfinance avg-volume (already in
-    # close_series — could compute here when available).
+    # ── 2026-04-29 Sprint 2: live multi-source flow chain ───────────────
+    # AUM · 30D net flows · Avg daily vol now pulled live via the chain
+    # in integrations/etf_flow_data:
+    #   AUM:  yfinance → SEC EDGAR N-PORT → ETF.com → issuer-site
+    #   Flow: cryptorank → SoSoValue → Farside → N-PORT-derived
+    #   Vol:  yfinance 3M → 10D → ETF.com → 60D history
+    # Cache (24h TTL) + production-snapshot (committed safety net) +
+    # em-dash placeholder if every source exhausts. NO hardcoded
+    # constants per Cowork's no-fallback policy 2026-04-29.
 
-    # Stub reference values for the major spot crypto ETFs. Source: public
-    # AUM / flow trackers (cryptorank.io, SoSoValue, issuer fact sheets) as
-    # of 2026-04. These are the funds in DEMO_CLIENTS' baskets — anything
-    # else falls through to "—".
-    _ETF_REFERENCE_STUB = {
-        "IBIT": {"aum_usd": 62_400_000_000, "net_flows_30d_usd":  2_100_000_000, "avg_daily_vol_usd": 1_240_000_000},
-        "FBTC": {"aum_usd": 20_100_000_000, "net_flows_30d_usd":    580_000_000, "avg_daily_vol_usd":   480_000_000},
-        "BITB": {"aum_usd":  3_200_000_000, "net_flows_30d_usd":     45_000_000, "avg_daily_vol_usd":    78_000_000},
-        "ETHA": {"aum_usd":  9_300_000_000, "net_flows_30d_usd":    220_000_000, "avg_daily_vol_usd":   195_000_000},
-        "FETH": {"aum_usd":  1_050_000_000, "net_flows_30d_usd":     22_000_000, "avg_daily_vol_usd":    34_000_000},
-        "BKCH": {"aum_usd":    180_000_000, "net_flows_30d_usd":      4_200_000, "avg_daily_vol_usd":     8_500_000},
-    }
-    _etf_ref = _ETF_REFERENCE_STUB.get(etf["ticker"], {})
+    from integrations.etf_flow_data import (
+        get_etf_aum,
+        get_etf_30d_net_flow,
+        get_etf_avg_daily_volume,
+    )
+
+    _aum_v, _aum_src = get_etf_aum(etf["ticker"])
+    _flow_v, _flow_src = get_etf_30d_net_flow(etf["ticker"])
+    _vol_v, _vol_src = get_etf_avg_daily_volume(etf["ticker"])
 
 
     def _fmt_usd_compact(v: float | int | None) -> str:
@@ -354,28 +393,81 @@ def main() -> None:
             return "—"
 
 
+    def _src_badge(src: str | None) -> str:
+        """Render the source-attribution badge below a tile. Empty when
+        the value is None; otherwise muted-color caption naming the
+        upstream source ('via yfinance' / 'via SEC EDGAR' / etc.) so
+        the FA can audit data provenance at a glance."""
+        if not src:
+            return ""
+        return (
+            f'<div style="font-size:10.5px;color:var(--text-muted);'
+            f'margin-top:2px;font-family:var(--font-mono);">via {src}</div>'
+        )
+
+
+    def _flow_color(v: float | int | None) -> str:
+        """Green for inflows, red for outflows, default text for None."""
+        if v is None:
+            return "var(--text-primary)"
+        try:
+            fv = float(v)
+            if fv > 0: return "var(--success)"
+            if fv < 0: return "var(--danger)"
+            return "var(--text-primary)"
+        except Exception:
+            return "var(--text-primary)"
+
+
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         er_bps = etf.get("expense_ratio_bps")
         kpi_tile("Expense ratio", f"{er_bps} bps" if er_bps else "—")
     with k2:
-        kpi_tile("AUM", _fmt_usd_compact(_etf_ref.get("aum_usd")))
+        st.markdown(
+            '<div>'
+            '<div data-testid="stMetricLabel" style="font-size:11px;color:var(--text-muted);'
+            'text-transform:uppercase;letter-spacing:0.06em;">AUM</div>'
+            f'<div data-testid="stMetricValue" style="font-size:22px;font-weight:600;'
+            f'font-family:var(--font-mono);line-height:1.1;">'
+            f'{_fmt_usd_compact(_aum_v)}</div>'
+            f'{_src_badge(_aum_src)}'
+            '</div>',
+            unsafe_allow_html=True,
+        )
     with k3:
-        kpi_tile("30D net flows", _fmt_signed_usd_compact(_etf_ref.get("net_flows_30d_usd")))
+        st.markdown(
+            '<div>'
+            '<div data-testid="stMetricLabel" style="font-size:11px;color:var(--text-muted);'
+            'text-transform:uppercase;letter-spacing:0.06em;">30D net flows</div>'
+            f'<div data-testid="stMetricValue" style="font-size:22px;font-weight:600;'
+            f'font-family:var(--font-mono);line-height:1.1;color:{_flow_color(_flow_v)};">'
+            f'{_fmt_signed_usd_compact(_flow_v)}</div>'
+            f'{_src_badge(_flow_src)}'
+            '</div>',
+            unsafe_allow_html=True,
+        )
     with k4:
-        kpi_tile("Avg daily vol", _fmt_usd_compact(_etf_ref.get("avg_daily_vol_usd")))
+        st.markdown(
+            '<div>'
+            '<div data-testid="stMetricLabel" style="font-size:11px;color:var(--text-muted);'
+            'text-transform:uppercase;letter-spacing:0.06em;">Avg daily vol</div>'
+            f'<div data-testid="stMetricValue" style="font-size:22px;font-weight:600;'
+            f'font-family:var(--font-mono);line-height:1.1;">'
+            f'{_fmt_usd_compact(_vol_v)} {"shares" if _vol_v else ""}</div>'
+            f'{_src_badge(_vol_src)}'
+            '</div>',
+            unsafe_allow_html=True,
+        )
 
-    # Footnote on the KPI source — CLAUDE.md §10 transparency rule. Shown
-    # only when at least one of the AUM/flows/vol fields is unavailable
-    # (the major ETFs in the stub dict have all three; obscure tickers
-    # fall through to "—" and need the footnote to explain why).
-    if not _etf_ref:
+    # Em-dash footnote ONLY when all three live + snapshot paths exhausted.
+    if _aum_v is None and _flow_v is None and _vol_v is None:
         st.caption(
-            "AUM / 30D net flows / Avg daily vol unavailable for this ticker — "
-            "data feed integration (SEC EDGAR + cryptorank.io / SoSoValue) is "
-            "in build for the post-demo PR. Major spot ETFs (IBIT / FBTC / "
-            "BITB / ETHA / FETH / BKCH) carry reference values from public "
-            "trackers; less-common funds show — until the live wire-up ships."
+            "AUM / 30D net flows / Avg daily vol unavailable for this "
+            "ticker — every chain step (yfinance / SEC EDGAR / ETF.com / "
+            "cryptorank / SoSoValue / Farside / production snapshot) "
+            "returned empty. Try the Refresh button in the topbar; the "
+            "next nightly cron run will re-attempt and populate."
         )
 
     # Volatility / correlation / issuer tier — moved into a secondary row

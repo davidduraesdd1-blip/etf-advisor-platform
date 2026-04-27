@@ -124,7 +124,103 @@ def recalculate_all_portfolios(*, sleeve_basis: str = "default") -> dict[str, An
     tmp.replace(SNAPSHOT_PATH)
     logger.info("Auto-rebalance snapshot written: %s clients @ %s",
                 len(snapshot["clients"]), snapshot["timestamp"])
+
+    # 2026-04-29 Sprint 2 commit 4: pre-warm the ETF flow data cache
+    # for all 211 universe tickers so the FA opens ETF Detail to
+    # sub-100ms tile renders the next morning. Continues past per-
+    # ticker failures; persists a summary that the page header reads
+    # for the "data freshness" indicator.
+    try:
+        flow_summary = prewarm_etf_flow_cache(universe)
+        snapshot["flow_prewarm"] = flow_summary
+        # Re-persist the snapshot now that flow_prewarm is populated.
+        tmp.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
+        tmp.replace(SNAPSHOT_PATH)
+    except Exception as exc:
+        logger.warning("Flow prewarm failed (non-fatal): %s", exc)
+
     return snapshot
+
+
+def prewarm_etf_flow_cache(universe: list[dict]) -> dict[str, Any]:
+    """
+    Walk the universe and pre-populate `data/etf_flow_cache.json` for
+    every ticker by calling get_etf_aum / get_etf_30d_net_flow /
+    get_etf_avg_daily_volume. By the time the FA opens ETF Detail in
+    the morning, the cache is warm and tile renders are instant
+    (cache-hit path inside each fetcher).
+
+    Returns a per-source summary suitable for display in the page-
+    header "data freshness" indicator:
+
+      {
+        "warmed_at_utc":   "<iso>",
+        "n_total":         211,
+        "aum":  {"yfinance": 18, "SEC EDGAR": 4, ..., "snapshot": 188, "none": 1},
+        "flow": {...},
+        "vol":  {...}
+      }
+
+    Continues past per-ticker failures so a transient yfinance hiccup
+    on one ticker doesn't block the rest. The per-fetcher cache layer
+    in integrations/etf_flow_data already deduplicates calls within
+    24h, so this is idempotent (safe to call multiple times per day).
+    """
+    from collections import Counter
+    from integrations.etf_flow_data import (
+        get_etf_aum,
+        get_etf_30d_net_flow,
+        get_etf_avg_daily_volume,
+    )
+
+    aum_sources: Counter = Counter()
+    flow_sources: Counter = Counter()
+    vol_sources: Counter = Counter()
+
+    for entry in universe:
+        tkr = entry.get("ticker") or ""
+        if not tkr:
+            continue
+        try:
+            _, aum_src = get_etf_aum(tkr)
+            aum_sources[aum_src or "none"] += 1
+        except Exception as exc:
+            logger.info("prewarm AUM failed for %s: %s", tkr, exc)
+            aum_sources["error"] += 1
+        try:
+            _, flow_src = get_etf_30d_net_flow(tkr)
+            flow_sources[flow_src or "none"] += 1
+        except Exception as exc:
+            logger.info("prewarm flow failed for %s: %s", tkr, exc)
+            flow_sources["error"] += 1
+        try:
+            _, vol_src = get_etf_avg_daily_volume(tkr)
+            vol_sources[vol_src or "none"] += 1
+        except Exception as exc:
+            logger.info("prewarm vol failed for %s: %s", tkr, exc)
+            vol_sources["error"] += 1
+
+    summary = {
+        "warmed_at_utc":  datetime.now(timezone.utc).isoformat(),
+        "n_total":        len(universe),
+        "aum":            dict(aum_sources),
+        "flow":           dict(flow_sources),
+        "vol":            dict(vol_sources),
+    }
+    logger.info(
+        "Flow prewarm complete: AUM live=%d/snapshot=%d/none=%d "
+        "Flow live=%d/snapshot=%d/none=%d  Vol live=%d/snapshot=%d/none=%d",
+        sum(c for s, c in aum_sources.items() if "snapshot" not in (s or "") and s != "none"),
+        sum(c for s, c in aum_sources.items() if "snapshot" in (s or "")),
+        aum_sources.get("none", 0),
+        sum(c for s, c in flow_sources.items() if "snapshot" not in (s or "") and s != "none"),
+        sum(c for s, c in flow_sources.items() if "snapshot" in (s or "")),
+        flow_sources.get("none", 0),
+        sum(c for s, c in vol_sources.items() if "snapshot" not in (s or "") and s != "none"),
+        sum(c for s, c in vol_sources.items() if "snapshot" in (s or "")),
+        vol_sources.get("none", 0),
+    )
+    return summary
 
 
 def load_latest_snapshot() -> dict[str, Any] | None:
