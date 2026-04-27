@@ -135,15 +135,139 @@ _yf_memo: dict[tuple[str, str, str], dict] = {}
 _last_close: dict[str, float] = {}
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Circuit breaker state (session-scoped, in-memory)
+# Circuit breaker state — in-memory + persisted across cold-boots
 # ═══════════════════════════════════════════════════════════════════════════
+#
+# 2026-04-28 polish round 5 / Sprint 1 / Commit 3 — cold-boot perf fix.
+# Profile (yfinance unreachable scenario) showed cold-boot at ~19.5s total
+# (~16.5s in the universe-loader live-enrichment loop). Root cause: each
+# of the 130 ETFs not in the precomputed snapshot calls
+# get_etf_prices() which tries yfinance, times out, falls through to
+# Stooq, times out — serially across all tickers.
+#
+# Fix: persist circuit-breaker state to data/circuit_breaker_state.json.
+# On cold boot, if the persisted state is fresh (within
+# CB_PERSIST_TTL_SEC = 300s = 5 min) AND was tripped, initialize the
+# breaker tripped. Skips redundant yfinance probing during outages while
+# still allowing recovery after 5 min when the persisted state ages out.
 
-_circuit_state: dict[str, Any] = {
-    "active_source":  "yfinance",
-    "failure_times":  deque(),   # monotonic timestamps of recent failures
-    "tripped_at":     None,
-    "new_etf_misses": 0,         # legitimately empty (new listing) — diagnostic only
-}
+from pathlib import Path as _Path
+import json as _json
+
+CB_STATE_PATH: _Path = _Path(__file__).resolve().parents[1] / "data" / "circuit_breaker_state.json"
+CB_PERSIST_TTL_SEC: int = 300   # 5 min — long enough to skip redundant
+                                 # probing during a sustained outage, short
+                                 # enough to allow auto-recovery on the
+                                 # next cold-boot once the outage clears.
+
+
+def _load_persisted_cb_state() -> dict | None:
+    """Read the persisted circuit-breaker state. Returns None if missing,
+    malformed, or older than CB_PERSIST_TTL_SEC."""
+    if not CB_STATE_PATH.exists():
+        return None
+    try:
+        data = _json.loads(CB_STATE_PATH.read_text(encoding="utf-8"))
+        saved_at = float(data.get("saved_at_unix", 0))
+        if saved_at <= 0:
+            return None
+        age = time.time() - saved_at
+        if age > CB_PERSIST_TTL_SEC:
+            return None
+        return data
+    except (OSError, _json.JSONDecodeError, ValueError):
+        return None
+
+
+def _save_persisted_cb_state() -> None:
+    """Atomic write of current breaker state to disk."""
+    payload = {
+        "active_source":  _circuit_state["active_source"],
+        "tripped_at":     _circuit_state["tripped_at"],
+        "saved_at_unix":  time.time(),
+        "saved_at_iso":   _now_iso_safe(),
+    }
+    try:
+        CB_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = CB_STATE_PATH.with_suffix(".json.tmp")
+        tmp.write_text(_json.dumps(payload, indent=2), encoding="utf-8")
+        tmp.replace(CB_STATE_PATH)
+    except OSError as exc:  # pragma: no cover — defensive
+        logger.info("Could not persist circuit breaker state: %s", exc)
+
+
+def _now_iso_safe() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _initialize_circuit_state() -> dict[str, Any]:
+    """Build the initial _circuit_state dict, honoring a fresh persisted
+    breaker-tripped state if one exists. New states accepted:
+      - "yfinance"    — primary live source (default)
+      - "stooq"       — yfinance tripped; using delayed Stooq feed
+      - "unavailable" — BOTH primary + secondary tripped; fail-fast all
+                        fetches until manual reset / TTL expiry.
+    The "unavailable" state is what prevents the cold-boot 16.5s loop
+    when both yfinance AND Stooq are unreachable: once we've confirmed
+    both are down, we don't keep trying for every remaining ticker."""
+    persisted = _load_persisted_cb_state()
+    initial_source = "yfinance"
+    tripped_at = None
+    if persisted:
+        active = persisted.get("active_source")
+        if active in ("stooq", "unavailable"):
+            initial_source = active
+            tripped_at = persisted.get("tripped_at")
+            logger.info(
+                "Cold-boot: restored persisted circuit-breaker state "
+                "(active=%s, tripped_at=%s) — skipping live probes",
+                initial_source, tripped_at,
+            )
+    return {
+        "active_source":      initial_source,
+        "failure_times":      deque(),
+        "stooq_failure_times": deque(),
+        "tripped_at":         tripped_at,
+        "new_etf_misses":     0,
+    }
+
+
+# Once Stooq fails this many times in CB_PERSIST_TTL_SEC seconds, mark
+# the whole session "unavailable" so cold-boot doesn't burn 130 × 10s
+# timeouts. Threshold is the same as YF_CIRCUIT_BREAKER_THRESHOLD for
+# symmetry.
+_STOOQ_FAILURE_THRESHOLD: int = 3
+
+
+def _record_stooq_failure(ticker: str) -> None:
+    """When stooq is the active source and it ALSO fails, escalate to
+    'unavailable' after a small number of consecutive failures so
+    subsequent calls short-circuit instead of waiting 10s each."""
+    if ticker not in _KNOWN_HISTORY_TICKERS:
+        return
+    now = time.monotonic()
+    times: deque = _circuit_state["stooq_failure_times"]
+    times.append(now)
+    cutoff = now - YF_CIRCUIT_BREAKER_WINDOW_SEC
+    while times and times[0] < cutoff:
+        times.popleft()
+    if (
+        _circuit_state["active_source"] == "stooq"
+        and len(times) >= _STOOQ_FAILURE_THRESHOLD
+    ):
+        _circuit_state["active_source"] = "unavailable"
+        _circuit_state["tripped_at"] = time.time()
+        logger.warning(
+            "Stooq circuit breaker TRIPPED (%d failures in %ds) — "
+            "flipping to fail-fast 'unavailable' for rest of session "
+            "(prevents 10s-timeout-per-ticker on cold boot).",
+            len(times), YF_CIRCUIT_BREAKER_WINDOW_SEC,
+        )
+        _save_persisted_cb_state()
+
+
+_circuit_state: dict[str, Any] = _initialize_circuit_state()
 
 
 def get_active_price_source() -> str:
@@ -188,14 +312,25 @@ def _record_failure(ticker: str) -> None:
             len(times),
             YF_CIRCUIT_BREAKER_WINDOW_SEC,
         )
+        # Persist so the next cold-boot starts tripped (skips redundant probing).
+        _save_persisted_cb_state()
 
 
 def reset_circuit_breaker() -> None:
-    """Test hook + manual override for the UI's 'Refresh All Data' button."""
+    """Test hook + manual override for the UI's 'Refresh All Data' button.
+    Also clears the persisted state so the next cold-boot starts fresh on
+    yfinance (i.e., a manual reset asks the system to re-test live)."""
     _circuit_state["active_source"] = "yfinance"
     _circuit_state["failure_times"].clear()
+    if "stooq_failure_times" in _circuit_state:
+        _circuit_state["stooq_failure_times"].clear()
     _circuit_state["tripped_at"] = None
     _circuit_state["new_etf_misses"] = 0
+    try:
+        if CB_STATE_PATH.exists():
+            CB_STATE_PATH.unlink()
+    except OSError:
+        pass
 
 
 def circuit_breaker_state() -> dict[str, Any]:
@@ -253,6 +388,17 @@ def _fetch_single_ticker(ticker: str, period: str, interval: str) -> dict:
             return {k: v for k, v in memo_hit.items() if not k.startswith("_")}
 
     source = get_active_price_source()
+
+    # 2026-04-28 Sprint 1 Commit 3 cold-boot perf fix: when the breaker
+    # has flipped to "unavailable" (yfinance + Stooq both tripped this
+    # session OR persisted from a recent cold-boot), short-circuit
+    # immediately. Without this, every ticker burns 10s on a
+    # connection-timeout to Stooq before returning empty.
+    if source == "unavailable":
+        register_fetch_attempt("etf_price", "none", success=False,
+                               note=f"{ticker}: breaker fail-fast (both sources down)")
+        return {"source": "unavailable", "prices": []}
+
     if source == "yfinance":
         data = _fetch_yfinance(ticker, period, interval)
         if data:
@@ -265,6 +411,8 @@ def _fetch_single_ticker(ticker: str, period: str, interval: str) -> dict:
                                note=f"{ticker}: empty or failed")
         _record_failure(ticker)
         source = get_active_price_source()
+        if source == "unavailable":
+            return {"source": "unavailable", "prices": []}
 
     if source == "stooq":
         data = _fetch_stooq(ticker, period)
@@ -277,6 +425,10 @@ def _fetch_single_ticker(ticker: str, period: str, interval: str) -> dict:
             return result
         register_fetch_attempt("etf_price", "stooq", success=False,
                                note=f"{ticker}: stooq returned empty")
+        # Escalate to fail-fast 'unavailable' if Stooq keeps failing too.
+        # Subsequent _fetch_single_ticker calls will short-circuit at the
+        # top of the function instead of waiting another 10s timeout.
+        _record_stooq_failure(ticker)
 
     # Alpha Vantage intentionally NOT in the active chain. Free tier is
     # 25 req/day — insufficient for even one user across the 19-ETF
@@ -1115,6 +1267,26 @@ def get_etf_prices_batch(
     """
     out: dict[str, dict] = {}
 
+    # Test-harness short-circuit (mirror get_etf_prices). Without this,
+    # the conftest patch of get_etf_prices doesn't extend to the batch
+    # path; tests that exercise the universe loader's slow path then
+    # hit real yfinance + time out.
+    if os.environ.get("DEMO_MODE_NO_FETCH") == "1":
+        for tkr in tickers:
+            out[tkr] = {"source": "unavailable", "prices": []}
+        return out
+
+    # 2026-04-28 Sprint 1 Commit 3: when the breaker is fully tripped
+    # ("unavailable"), short-circuit the entire batch — same fail-fast
+    # path as _fetch_single_ticker. This is the cold-boot perf fix:
+    # once we've confirmed both yfinance + Stooq are down, every
+    # subsequent batch call returns instantly instead of waiting for
+    # yf.download (which has its own internal threaded timeouts).
+    if get_active_price_source() == "unavailable":
+        for tkr in tickers:
+            out[tkr] = {"source": "unavailable", "prices": []}
+        return out
+
     # First pass: serve anything that's already in the per-ticker memo
     # so we don't re-fetch what's already cached.
     to_fetch: list[str] = []
@@ -1130,6 +1302,16 @@ def get_etf_prices_batch(
         to_fetch.append(tkr)
 
     if not to_fetch:
+        return out
+
+    # If the breaker has flipped to Stooq (yfinance tripped), skip the
+    # batched yf.download entirely and route every ticker through the
+    # per-ticker Stooq path. Otherwise we'd burn yf.download's batch
+    # timeout on every cold-boot batch call.
+    source_now = get_active_price_source()
+    if source_now == "stooq":
+        for tkr in to_fetch:
+            out[tkr] = _fetch_single_ticker(tkr, period, interval)
         return out
 
     # Single batched yfinance call.
