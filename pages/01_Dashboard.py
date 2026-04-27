@@ -251,6 +251,24 @@ def main() -> None:
     except Exception:
         pass
 
+    # 2026-04-27 auto-rebalance hook — read snapshot timestamp so the
+    # FA sees when the daily scanner last recomputed every client's
+    # basket. The cron at 9 AM EST writes data/portfolio_snapshot.json
+    # via core.scheduler.recalculate_all_portfolios().
+    try:
+        from core.scheduler import load_latest_snapshot, snapshot_age_hours
+        _snap = load_latest_snapshot()
+        _snap_age_h = snapshot_age_hours()
+        if _snap and _snap_age_h is not None:
+            if _snap_age_h < 1:
+                _scan_sub += f" · auto-rebal {int(_snap_age_h * 60)}m ago"
+            elif _snap_age_h < 48:
+                _scan_sub += f" · auto-rebal {_snap_age_h:.1f}h ago"
+            else:
+                _scan_sub += f" · auto-rebal {int(_snap_age_h / 24)}d ago"
+    except Exception:
+        pass
+
 
     def _kpi_card_html(label: str, value: str, sub: str, *, value_color: str = "",
                        value_size: str = "24px") -> str:

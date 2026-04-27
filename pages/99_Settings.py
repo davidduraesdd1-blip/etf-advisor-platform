@@ -276,11 +276,15 @@ def main() -> None:
 
                 st.caption(
                     f"Pending {len(_pending)} · approved {_approved_count} · "
-                    f"rejected {_rejected_count}. Run "
-                    "**Run scanner now** above to refresh. Each candidate is "
-                    "auto-enriched with a suggested category/underlying/ticker "
-                    "from the SEC filing — review and approve to flow into the "
-                    "live universe (no config.py edit needed)."
+                    f"rejected {_rejected_count}. "
+                    "**As of 2026-04-27 the daily 9 AM EST scanner "
+                    "auto-decides** — high-confidence crypto matches "
+                    "(ticker + category + underlying all classified) go "
+                    "straight to approved AND into the live universe; "
+                    "off-topic filings auto-reject. After each scan the "
+                    "system also recalculates every demo client's portfolio "
+                    "so fresh allocations are visible immediately. "
+                    "Only ambiguous filings (rare) land here for FA review."
                 )
 
                 if not _pending:

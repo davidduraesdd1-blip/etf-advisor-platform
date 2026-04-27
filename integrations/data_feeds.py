@@ -724,6 +724,7 @@ def get_forward_return_estimate(
     # fall back to BTC × 0.70 with the basis string explicitly noting the
     # fallback path. The Methodology page documents both paths.
     _ALTCOIN_YFINANCE_TICKER: dict[str, str] = {
+        # Original 9 (Bucket 2 fairness fix, 2026-04-26)
         "SOL":   "SOL-USD",
         "XRP":   "XRP-USD",
         "LTC":   "LTC-USD",
@@ -733,6 +734,24 @@ def get_forward_return_estimate(
         "HBAR":  "HBAR-USD",
         "DOT":   "DOT-USD",
         "LINK":  "LINK-USD",
+        # 2026-04-27 universe-expansion v2 — new altcoin spot trusts.
+        # Bitwise filed 11 altcoin ETFs in Dec-2025, approved Mar-2026
+        # (AAVE, UNI, ZEC, SUI, TRX, TAO, STRK, ENA, HYPE, NEAR + 1 spare).
+        # Plus 21Shares Toncoin (TON), Polkadot (DOT — already above),
+        # Canary Pengu (PENGU). Each gets per-coin CAGR via yfinance —
+        # no uniform haircut bias against them.
+        "SUI":    "SUI-USD",
+        "AAVE":   "AAVE-USD",
+        "UNI":    "UNI7083-USD",  # yfinance uses suffixed UNI symbol
+        "TRX":    "TRX-USD",
+        "TAO":    "TAO22974-USD",
+        "NEAR":   "NEAR-USD",
+        "HYPE":   "HYPE32196-USD",
+        "ENA":    "ENA-USD",
+        "STRK":   "STRK22691-USD",
+        "TON":    "TON11419-USD",
+        "PENGU":  "PENGU-USD",
+        "ZEC":    "ZEC-USD",
     }
 
     def _altcoin_cagr_or_none(coin_symbol: str) -> tuple[float | None, str]:

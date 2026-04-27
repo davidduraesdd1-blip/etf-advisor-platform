@@ -188,29 +188,181 @@ def _decided_keys(queue: dict) -> set[str]:
     return out
 
 
-def add_pending(filings: list[dict]) -> int:
+def _auto_classify(entry: dict) -> str:
     """
-    Add new filings to the pending queue, with enrichment.
-    Skips any filing whose accession number is already in approved or
-    rejected. Skips duplicates of existing pending entries.
-    Returns count of newly-pended entries.
+    Decide whether a freshly-enriched filing can be auto-approved /
+    auto-rejected by the system, or whether it needs FA review.
+
+    2026-04-27 user directive: "i don't want the advisor to decide if a
+    new etf should or should not be included in a portfolio that is your
+    job to make that decision". So the queue auto-decides whenever
+    confidence is high; it falls back to "pending" only when the filing
+    is too ambiguous to classify.
+
+    Returns one of:
+      "auto_approve"  — heuristics fully resolved (ticker + category +
+                        underlying), recognized issuer, recognized
+                        crypto category. System adds to universe.
+      "auto_reject"   — clearly off-topic (no crypto category match,
+                        no underlying detected). System rejects so
+                        we don't keep re-presenting it.
+      "pending"       — legitimately ambiguous; FA review is the safer
+                        call (rare path now — most filings classify).
+    """
+    ticker = (entry.get("suggested_ticker") or "").strip().upper()
+    category = (entry.get("suggested_category") or "").strip()
+    underlying = (entry.get("suggested_underlying") or "").strip()
+
+    # Categories the heuristics can confidently produce.
+    _ACCEPTED_CATEGORIES = {
+        "btc_spot", "eth_spot", "altcoin_spot",
+        "btc_futures", "eth_futures",
+        "leveraged", "income_covered_call",
+        "thematic_equity", "multi_asset", "defined_outcome",
+    }
+
+    # Required: ticker + category + underlying all confidently set.
+    has_ticker = bool(ticker) and 2 <= len(ticker) <= 5 and ticker.isalpha()
+    has_category = category in _ACCEPTED_CATEGORIES
+    has_underlying = bool(underlying)
+
+    if has_ticker and has_category and has_underlying:
+        return "auto_approve"
+
+    # No category match AND no underlying — not crypto-related; reject so
+    # we don't keep flagging the same off-topic filing on every scan.
+    if not has_category and not has_underlying:
+        return "auto_reject"
+
+    # Partial information — surface for FA review (rare path).
+    return "pending"
+
+
+def add_pending(filings: list[dict]) -> dict[str, int]:
+    """
+    Ingest filings from the daily EDGAR scanner. Each filing is enriched
+    (ticker / category / underlying suggestions) and then auto-classified:
+
+      - High-confidence crypto matches → moved straight to **approved**
+        AND written to data/etf_user_additions.json so the universe
+        loader picks them up on next refresh. No FA gate.
+      - Clearly off-topic → moved straight to **rejected** (won't be
+        re-flagged on subsequent scans).
+      - Ambiguous → left in **pending** for optional FA review.
+
+    Skips any accession already in approved / rejected / pending.
+
+    Returns a dict with counts: {"approved": n, "rejected": n,
+    "pending": n, "skipped_duplicate": n}.
+
+    2026-04-27 universe-expansion v2: replaces the prior FA-gated flow
+    per user directive. The Settings page still surfaces the rare
+    "pending" rows for FA review when needed, but the daily routine
+    no longer requires manual approval.
     """
     queue = load_queue()
     decided = _decided_keys(queue)
     pending_keys = {_accession(e) for e in queue["pending"] if _accession(e)}
-    n_new = 0
+
+    counts = {"approved": 0, "rejected": 0, "pending": 0, "skipped_duplicate": 0}
+    needs_save = False
+
     for raw in filings:
         acc = str(raw.get("accession_number", "") or "")
         if not acc:
             continue
         if acc in decided or acc in pending_keys:
+            counts["skipped_duplicate"] += 1
             continue
-        queue["pending"].append(enrich_filing(raw))
-        pending_keys.add(acc)
-        n_new += 1
-    if n_new > 0:
+
+        enriched = enrich_filing(raw)
+        decision = _auto_classify(enriched)
+
+        if decision == "auto_approve":
+            # Mark on the entry itself + write directly to approved list.
+            enriched["review_status"] = "approved"
+            enriched["review_notes"] = (
+                "auto-approved by daily-scanner heuristics: ticker + "
+                "category + underlying all confidently classified."
+            )
+            enriched["approved_ticker"] = (
+                enriched.get("suggested_ticker") or ""
+            ).upper()
+            enriched["approved_category"] = enriched.get(
+                "suggested_category"
+            ) or "btc_spot"
+            enriched["approved_underlying"] = enriched.get(
+                "suggested_underlying"
+            ) or "BTC"
+            queue["approved"].append(enriched)
+            decided.add(acc)
+            counts["approved"] += 1
+            needs_save = True
+
+            # Write to user-additions sidecar so the universe loader
+            # merges this ETF on next refresh — same code path as the
+            # legacy approve_entry flow.
+            _append_to_user_additions(enriched)
+
+        elif decision == "auto_reject":
+            enriched["review_status"] = "rejected"
+            enriched["review_notes"] = (
+                "auto-rejected by daily-scanner heuristics: filing did "
+                "not match any crypto-ETF category and no underlying "
+                "asset could be derived."
+            )
+            queue["rejected"].append(enriched)
+            decided.add(acc)
+            counts["rejected"] += 1
+            needs_save = True
+
+        else:  # "pending"
+            queue["pending"].append(enriched)
+            pending_keys.add(acc)
+            counts["pending"] += 1
+            needs_save = True
+
+    if needs_save:
         save_queue(queue)
-    return n_new
+
+    return counts
+
+
+def _append_to_user_additions(entry: dict) -> None:
+    """
+    Append an auto-approved (or manually-approved) entry to
+    data/etf_user_additions.json in the universe-shaped record format.
+    Idempotent on ticker — duplicate adds are no-ops.
+    """
+    ticker = str(entry.get("approved_ticker") or entry.get("suggested_ticker") or "").upper()
+    if not ticker:
+        return
+
+    additions: list[dict] = []
+    if ADDITIONS_PATH.exists():
+        try:
+            additions = json.loads(ADDITIONS_PATH.read_text(encoding="utf-8"))
+            if not isinstance(additions, list):
+                additions = []
+        except (OSError, json.JSONDecodeError):
+            additions = []
+
+    if any(a.get("ticker") == ticker for a in additions):
+        return  # already there
+
+    additions.append({
+        "ticker":             ticker,
+        "issuer":             entry.get("filer_name", ""),
+        "category":           entry.get("approved_category") or entry.get("suggested_category") or "btc_spot",
+        "underlying":         entry.get("approved_underlying") or entry.get("suggested_underlying") or "BTC",
+        "name":               entry.get("filer_name", ""),
+        "expense_ratio_bps":  None,
+        "inception":          entry.get("filing_date", ""),
+        "review_source":      "edgar_scanner_auto",
+        "review_accession":   entry.get("accession_number", ""),
+    })
+    ADDITIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    ADDITIONS_PATH.write_text(json.dumps(additions, indent=2), encoding="utf-8")
 
 
 # ── Approval / rejection actions ──────────────────────────────────────

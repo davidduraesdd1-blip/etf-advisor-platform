@@ -2,10 +2,12 @@ name: Daily ETF scanner
 
 on:
   schedule:
-    # 17:00 UTC = 13:00 ET = ~30 min after US cash close.
-    # EDGAR's full-text index lags 24–48 hours, so looking back 3 days
-    # catches everything that has landed.
-    - cron: "0 17 * * *"
+    # 13:00 UTC = 9 AM EST (08:00 EDT during daylight saving). User
+    # directive 2026-04-27: scan at 9 AM EST so the FA sees fresh
+    # additions before the trading day. EDGAR's full-text index still
+    # lags 24-48 hours, so days_back=3 catches everything that landed
+    # since the prior scan.
+    - cron: "0 13 * * *"
   workflow_dispatch:  # manual trigger for verification + ad-hoc runs
 
 permissions:
@@ -36,10 +38,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run daily scanner
+      - name: Run daily scanner + auto-recalculate portfolios
         env:
           # EDGAR requires an identifiable User-Agent per SEC policy.
-          # Set this as a repository secret in GitHub Settings → Secrets.
+          # Set this as a repository secret in GitHub Settings -> Secrets.
           EDGAR_CONTACT_EMAIL: ${{ secrets.EDGAR_CONTACT_EMAIL }}
         run: |
           python - <<'PY'
@@ -47,10 +49,25 @@ jobs:
           import sys
           from core.etf_universe import daily_scanner, get_scanner_health
 
+          # Step 1: scan EDGAR. add_pending() now auto-classifies each
+          # finding (auto_approve / auto_reject / pending). Universe
+          # picks up the new ETFs via load_user_additions on next refresh.
           matches = daily_scanner(days_back=3)
           print(f"Scanner found {len(matches)} unique filings.")
           health = get_scanner_health()
           print(f"Health snapshot: {json.dumps(health, indent=2, default=str)}")
+
+          # Step 2: auto-recalculate every demo client's portfolio so
+          # the next page render reflects any newly-added ETFs without
+          # waiting for cache TTL expiry. User directive 2026-04-27.
+          try:
+              from core.scheduler import recalculate_all_portfolios
+              snapshot = recalculate_all_portfolios()
+              print(f"Recalculated {len(snapshot.get('clients', {}))} client portfolios.")
+              print(f"Snapshot timestamp: {snapshot.get('timestamp')}")
+          except Exception as exc:
+              print(f"Auto-rebalance failed (non-fatal): {type(exc).__name__}: {exc}")
+
           # Non-zero exit if the scanner guard itself raises; anything
           # else (empty result, EDGAR 429, etc.) is logged but not fatal.
           sys.exit(0)

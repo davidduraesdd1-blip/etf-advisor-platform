@@ -557,9 +557,21 @@ def daily_scanner(days_back: int = 7) -> list[dict]:
     # don't get re-flagged.
     try:
         from core.etf_review_queue import add_pending as _rq_add_pending
-        _n_new = _rq_add_pending(results)
-        if _n_new > 0:
-            logger.info("Review queue: %d new filings added to pending", _n_new)
+        counts = _rq_add_pending(results)
+        # add_pending returns dict {approved, rejected, pending,
+        # skipped_duplicate} since the 2026-04-27 auto-classifier landed
+        # (was int previously). Stay defensive in case of partial deploy.
+        if isinstance(counts, dict):
+            logger.info(
+                "Review queue: +%d auto-approved / +%d auto-rejected / "
+                "+%d pending / %d duplicates",
+                counts.get("approved", 0),
+                counts.get("rejected", 0),
+                counts.get("pending", 0),
+                counts.get("skipped_duplicate", 0),
+            )
+        elif counts > 0:
+            logger.info("Review queue: %d new filings added to pending", counts)
     except Exception as exc:
         logger.warning("Review-queue enqueue failed (non-fatal): %s", exc)
 
