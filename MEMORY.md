@@ -4,6 +4,63 @@ Session continuity log. Newest entries on top. See master-template §16.
 
 ---
 
+## 2026-04-28 — Polish round 5 / Sprint 1 (math precision + cold-boot perf)
+
+Sprint 1 of Cowork's post-demo polish plan. Branch
+`polish/sprint-1-math-perf-2026-04-28` off `audit-round-4-2026-04-27`
+(commit `3214a54`). NOT merged to main pre-May-1 demo per freeze
+directive — main stays at `3214a54` for the demo.
+
+### Commits (4)
+
+  1. `core/cf_calibration.py` — CF per-category fit infrastructure.
+     `fit_skew_kurtosis()` (scipy, Maillard caps), `fetch_category_returns()`
+     (yfinance via data_feeds), `fit_per_category()` (cache to
+     `data/cf_params_cache.json`, 30-day TTL). 14 tests.
+
+  2. Wire per-category CF into portfolio_engine. `_get_cf_params(category)`
+     reads cache, falls back to crypto-midpoint defaults. `_weighted_cf_params(holdings)`
+     linear-aggregates by holding weight, re-clamps to Maillard caps.
+     ALL FOUR CF VaR / CVaR call sites in `compute_portfolio_metrics`
+     now use weighted per-category params. 12 tests.
+
+     **Pre-existing bug fix:** `cornish_fisher_var` had a sign-
+     convention error — used +z_g (right-tail) instead of -z_α
+     (left-tail), inverting the (z²-1)/6·γ₁ skew term sign for
+     negatively-skewed crypto returns. Fixed to Boudt, Peterson &
+     Croux 2008 formulation. VaR magnitudes shift +50-60% more
+     conservative — corrects months of silently-under-estimated VaR.
+
+  3. Cold-boot perf: persisted circuit-breaker state with 3-state
+     transition (yfinance → stooq → unavailable). On cold-boot,
+     restore persisted "unavailable" state to skip redundant probing
+     during sustained outages. 5-min TTL allows auto-recovery.
+     Cold-boot 19.5s → 2.45s fresh / 1.47s with persisted state.
+     2 tests.
+
+  4. This documentation entry + `docs/math_audit_round_5_2026-04-28.md`
+     + `pending_work.md` updates.
+
+### Per-category CF fit result (live yfinance run 2026-04-27)
+
+| Category | S (skew) | K (excess kurt) | Source |
+|---|---:|---:|---|
+| btc_spot | -0.058 | 2.570 | fitted |
+| eth_spot | -0.264 | 2.141 | fitted |
+| altcoin_spot | -1.500 | 15.000 | fitted (Maillard caps hit — alts ARE that fat-tailed) |
+| 7 others | -0.700 | 8.000 | fallback (yfinance breaker tripped mid-fit) |
+
+The altcoin_spot result confirms the user's 2026-04-26 "treat alts
+fairly" directive: empirical realized fat-tailedness on the 16 altcoin
+spot ETFs in the universe materially exceeds the BTC-tuned defaults —
+alt-heavy tier VaR will rise meaningfully when the cache is consumed.
+
+### Test count: 262 → 290 (+28).
+
+### Next: Sprint 2 (ETF Detail AUM live wire-up — cryptorank.io / Farside / SoSoValue chain).
+
+---
+
 ## 2026-04-26 — Audit-round-2 (overnight verification pass)
 
 Re-audit of the 8-commit + 7-bonus round-1 work and a deep math /

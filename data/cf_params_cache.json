@@ -1,0 +1,49 @@
+{
+  "_metadata": {
+    "fitted_at_iso": "2026-04-27T17:48:55.351003+00:00",
+    "fitted_at_unix": 1777312135.351013,
+    "ttl_seconds": 2592000
+  },
+  "params": {
+    "btc_spot": [
+      -0.05824944696627321,
+      2.5697972688051784
+    ],
+    "eth_spot": [
+      -0.2638447437873442,
+      2.1414164097261406
+    ],
+    "altcoin_spot": [
+      -1.5,
+      15.0
+    ],
+    "btc_futures": [
+      -0.7,
+      8.0
+    ],
+    "eth_futures": [
+      -0.7,
+      8.0
+    ],
+    "leveraged": [
+      -0.7,
+      8.0
+    ],
+    "income_covered_call": [
+      -0.7,
+      8.0
+    ],
+    "thematic_equity": [
+      -0.7,
+      8.0
+    ],
+    "multi_asset": [
+      -0.7,
+      8.0
+    ],
+    "defined_outcome": [
+      -0.7,
+      8.0
+    ]
+  }
+}

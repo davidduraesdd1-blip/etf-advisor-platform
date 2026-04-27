@@ -213,6 +213,16 @@ Items intentionally NOT in scope for the May 1 demo. Pick up after.
       `--bg-1` / `--text-primary`) then delete the legacy block.
       Explicit risk: any inline-style sweep needs visual regression
       testing, hence post-demo.
+- [x] **CF S/K + MDD recalibration on altcoin holdout.**  *(Sprint 1
+      2026-04-28: per-category fit shipped. altcoin_spot now uses
+      empirically-fitted (S=-1.5, K=15.0) clamped to Maillard caps —
+      empirical alt fat-tailedness materially exceeds prior crypto-
+      midpoint default. Sign-convention bug in cornish_fisher_var
+      fixed alongside. See `docs/math_audit_round_5_2026-04-28.md`.)*
+- [x] **Cold-boot perf root cause.**  *(Sprint 1 2026-04-28: 19.5s ->
+      2.45s on yfinance-unreachable scenario via persisted circuit-
+      breaker state + escalation to "unavailable" after 3 stooq
+      failures. Cold-boot now < 8s production target.)*
 - [ ] **Investigate the 4 baseline test failures' root causes.** Cleanup
       sprint Commit 1 made them pass with `DEMO_MODE_NO_FETCH=1`, which
       is the right test-harness fix, but the underlying cause (page
