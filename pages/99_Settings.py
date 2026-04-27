@@ -82,20 +82,43 @@ def main() -> None:
         st.session_state["broker_provider_override"] = selected
         if selected == "alpaca_paper":
             from config import ALPACA_API_KEY, ALPACA_API_SECRET
-            if not ALPACA_API_KEY or not ALPACA_API_SECRET:
+            # Detect alpaca-py presence — we ship it in requirements.txt
+            # but the import is still optional (graceful fallback to mock
+            # if pip install fails on a constrained environment).
+            try:
+                import alpaca  # noqa: F401
+                _alpaca_pkg_present = True
+            except ImportError:
+                _alpaca_pkg_present = False
+
+            if not _alpaca_pkg_present:
+                st.warning(
+                    "`alpaca-py` SDK isn't importable in this environment. "
+                    "Add it to `requirements.txt` (it's there as of "
+                    "audit-round-1 — pin `alpaca-py>=0.30.0`) and let "
+                    "Streamlit Cloud rebuild. Until then, basket-execute "
+                    "falls back to the mock broker."
+                )
+            elif not ALPACA_API_KEY or not ALPACA_API_SECRET:
                 st.info(
-                    "Alpaca paper-trading routing is wired (audit-round-1). "
-                    "Set `ALPACA_API_KEY` + `ALPACA_API_SECRET` in `.env` and "
-                    "restart Streamlit to enable real paper-trading order "
-                    "submission. Until then, basket-execute falls back to "
-                    "the mock broker — fallback is recorded in the response "
+                    "Alpaca paper-trading routing is wired and the SDK is "
+                    "installed. To enable real paper-trading order "
+                    "submission, set `ALPACA_API_KEY` + `ALPACA_API_SECRET`:\n\n"
+                    "- **Local dev:** add to `.env` and restart Streamlit.\n"
+                    "- **Streamlit Cloud:** Manage app → Settings → Secrets:\n"
+                    "  ```toml\n"
+                    "  ALPACA_API_KEY = \"PK…\"\n"
+                    "  ALPACA_API_SECRET = \"…\"\n"
+                    "  ```\n\n"
+                    "Until then, basket-execute falls back to the mock "
+                    "broker — fallback is recorded in the response "
                     "payload's `broker` field for audit."
                 )
             else:
                 st.success(
-                    "Alpaca paper-trading credentials detected. Basket-execute "
-                    "will submit real paper orders to alpaca paper endpoint "
-                    f"({ALPACA_BASE_URL_DISPLAY})."
+                    "Alpaca paper-trading credentials detected and SDK is "
+                    "installed. Basket-execute will submit real paper "
+                    f"orders to {ALPACA_BASE_URL_DISPLAY}."
                 )
         elif selected == "alpaca":
             st.warning(
