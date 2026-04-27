@@ -1,0 +1,98 @@
+{
+  "fitted_at_utc": "2026-04-27T19:04:37.645513Z",
+  "method": "5-year yfinance daily log-returns; scipy.stats.skew(bias=False) + scipy.stats.kurtosis(fisher=True, bias=False); Maillard 2012 caps S in [-1.5, 1.5], K_excess in [0, 15]; pooled per category",
+  "git_ref_at_fit": "6e8f9fa",
+  "categories": {
+    "btc_spot": {
+      "S": -0.058,
+      "K": 2.57,
+      "n_funds": 11,
+      "n_observations": 11000,
+      "fit_basis": "live"
+    },
+    "eth_spot": {
+      "S": -0.264,
+      "K": 2.141,
+      "n_funds": 9,
+      "n_observations": 9000,
+      "fit_basis": "live"
+    },
+    "altcoin_spot": {
+      "S": -1.5,
+      "K": 15.0,
+      "n_funds": 16,
+      "n_observations": 8000,
+      "fit_basis": "live",
+      "note": "Maillard cap clamping fired \u2014 empirical realized moments for the 16 altcoin spot ETFs exceed monotone-domain bounds"
+    },
+    "btc_futures": {
+      "S": -0.058,
+      "K": 2.57,
+      "n_funds": 0,
+      "n_observations": 0,
+      "fit_basis": "nearest_neighbor",
+      "override_source": "btc_spot",
+      "rationale": "BTC futures track BTC spot tightly with contango drag layered on top \u2014 moment shape is dominated by underlying BTC distribution"
+    },
+    "eth_futures": {
+      "S": -0.264,
+      "K": 2.141,
+      "n_funds": 0,
+      "n_observations": 0,
+      "fit_basis": "nearest_neighbor",
+      "override_source": "eth_spot",
+      "rationale": "ETH futures follow ETH spot underlying"
+    },
+    "leveraged": {
+      "S": -0.058,
+      "K": 2.57,
+      "n_funds": 0,
+      "n_observations": 0,
+      "fit_basis": "nearest_neighbor",
+      "override_source": "btc_spot",
+      "rationale": "Most leveraged crypto ETFs are BTC-linked (BITX, BITU, BTCL); 2x daily reset preserves moment shape"
+    },
+    "income_covered_call": {
+      "S": -0.058,
+      "K": 2.57,
+      "n_funds": 0,
+      "n_observations": 0,
+      "fit_basis": "nearest_neighbor",
+      "override_source": "btc_spot",
+      "rationale": "Covered-call wrappers (BTCI, BMAX, IBIY, YBTC) on BTC underlier; option overlay reshapes return distribution but skew direction follows underlying"
+    },
+    "multi_asset": {
+      "S": -0.1404,
+      "K": 2.3984,
+      "n_funds": 0,
+      "n_observations": 0,
+      "fit_basis": "nearest_neighbor",
+      "override_source": "blended_btc_spot_eth_spot_60_40",
+      "rationale": "60% BTC + 40% ETH weight aggregate of fitted moments \u2014 matches Bitwise BITW / Hashdex DEFI typical weighting"
+    },
+    "thematic_equity": {
+      "S": -0.1404,
+      "K": 2.3984,
+      "n_funds": 0,
+      "n_observations": 0,
+      "fit_basis": "nearest_neighbor",
+      "override_source": "multi_asset",
+      "rationale": "Crypto-industry equities (BLOK, DAPP, BKCH) co-move with the BTC/ETH blend at ~0.55-0.85 correlation; moment shape matches multi-asset"
+    },
+    "defined_outcome": {
+      "S": -0.1404,
+      "K": 2.3984,
+      "n_funds": 0,
+      "n_observations": 0,
+      "fit_basis": "nearest_neighbor",
+      "override_source": "multi_asset",
+      "rationale": "Calamos buffer ETFs (CBOJ-series) decouple from BTC on drawdowns by design; we use multi_asset moments as the conservative substitute (stricter VaR than pure BTC)."
+    }
+  },
+  "deprecated_constants": {
+    "S": -0.7,
+    "K": 8.0,
+    "removed_at": "2026-04-28",
+    "reason": "Cowork no-fallback directive \u2014 production-config replaces hardcoded crypto-midpoint defaults. Any reference to (-0.7, 8.0) elsewhere in the codebase is a regression."
+  }
+}

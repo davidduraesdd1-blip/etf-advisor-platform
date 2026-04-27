@@ -102,32 +102,27 @@ class TestFitSkewKurtosis:
 # ── fit_per_category ───────────────────────────────────────────────
 
 class TestFitPerCategory:
-    def test_demo_mode_returns_fallback_for_every_category(self, monkeypatch, tmp_path):
-        """DEMO_MODE_NO_FETCH=1 causes fetch_category_returns to return
-        empty; fit_per_category must hand back the crypto-midpoint fallback
-        for every category."""
+    def test_demo_mode_returns_empty_dict(self, monkeypatch, tmp_path):
+        """DEMO_MODE_NO_FETCH=1 short-circuits fit_per_category to return
+        an empty dict (no-fallback policy 2026-04-28). Caller falls
+        through to production-config — no silent crypto-midpoint default."""
         from core import cf_calibration as cc
         monkeypatch.setenv("DEMO_MODE_NO_FETCH", "1")
         monkeypatch.setattr(cc, "CACHE_PATH", tmp_path / "cf_cache.json")
         out = cc.fit_per_category(write_cache=True)
-        assert set(out.keys()) == set(cc.CATEGORY_LIST)
-        for cat, (s, k) in out.items():
-            assert s == cc.FALLBACK_SKEW
-            assert k == cc.FALLBACK_KURT
+        assert out == {}
 
-    def test_cache_write_atomic(self, monkeypatch, tmp_path):
-        """After a successful fit, the cache JSON must exist + parse + carry
-        the metadata block."""
+    def test_demo_mode_short_circuits_without_writing_cache(self, monkeypatch, tmp_path):
+        """Under DEMO_MODE_NO_FETCH=1, fit_per_category early-returns
+        empty without touching the cache file. Caller falls through to
+        production-config (no-fallback policy 2026-04-28)."""
         from core import cf_calibration as cc
         monkeypatch.setenv("DEMO_MODE_NO_FETCH", "1")
         monkeypatch.setattr(cc, "CACHE_PATH", tmp_path / "cf_cache.json")
-        cc.fit_per_category(write_cache=True)
-        assert (tmp_path / "cf_cache.json").exists()
-        loaded = json.loads((tmp_path / "cf_cache.json").read_text())
-        assert "_metadata" in loaded
-        assert "params" in loaded
-        assert "fitted_at_unix" in loaded["_metadata"]
-        assert loaded["_metadata"]["ttl_seconds"] == 30 * 24 * 3600
+        result = cc.fit_per_category(write_cache=True)
+        assert result == {}
+        # Cache file should NOT be written under demo mode.
+        assert not (tmp_path / "cf_cache.json").exists()
 
 
 # ── load_cache TTL ────────────────────────────────────────────────

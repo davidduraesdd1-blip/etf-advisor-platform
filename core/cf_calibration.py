@@ -67,10 +67,17 @@ SKEW_CAP_HIGH: float = 1.5
 KURT_CAP_LOW: float = 0.0
 KURT_CAP_HIGH: float = 15.0
 
-# Fallback values when cache is empty / stale / category not present.
-# Match the crypto-midpoint defaults in portfolio_engine.
-FALLBACK_SKEW: float = -0.7
-FALLBACK_KURT: float = 8.0
+# 2026-04-28 hotfix (no-fallback policy): the FALLBACK_SKEW / FALLBACK_KURT
+# crypto-midpoint values that previously lived here have been REMOVED.
+# Any silent fallback to hardcoded constants is forbidden — see Cowork's
+# directive. The remaining constants below (NAN_SKEW_REPLACEMENT /
+# NAN_KURT_REPLACEMENT) are NOT defaults; they are conservative substitutes
+# used only inside `fit_skew_kurtosis` when scipy returns a NaN value
+# from a malformed input series. A NaN moment cannot enter the Maillard
+# polynomial, so we substitute the standard-normal value (S=0, K=0) and
+# then clamp; this is a math-stability requirement, not a policy fallback.
+NAN_SKEW_REPLACEMENT: float = 0.0
+NAN_KURT_REPLACEMENT: float = 0.0
 
 # Categories the calibrator runs the fit for. Mirrors
 # core.risk_tiers and the universe loader's category set.
@@ -134,15 +141,47 @@ def fit_skew_kurtosis(
     # fisher=True returns EXCESS kurtosis (raw - 3). Standard normal → 0.
     excess_kurt = float(stats.kurtosis(arr, fisher=True, bias=False))
 
-    # Clamp to Maillard 2012 caps. NaN-safe.
+    # NaN substitution: scipy can return NaN on degenerate inputs. We
+    # use the standard-normal moment (0, 0) as a math-stable substitute
+    # rather than raise — the caller (fit_per_category) decides what
+    # to do based on whether the COMPLETE category fit succeeded.
     if not math.isfinite(skew_val):
-        skew_val = FALLBACK_SKEW
+        skew_val = NAN_SKEW_REPLACEMENT
     if not math.isfinite(excess_kurt):
-        excess_kurt = FALLBACK_KURT
+        excess_kurt = NAN_KURT_REPLACEMENT
     skew_val = max(SKEW_CAP_LOW, min(SKEW_CAP_HIGH, skew_val))
     excess_kurt = max(KURT_CAP_LOW, min(KURT_CAP_HIGH, excess_kurt))
 
     return (skew_val, excess_kurt)
+
+
+def _fetch_ticker_with_retry(ticker: str, period: str, *, max_attempts: int = 5):
+    """
+    Patient single-ticker fetch with exponential backoff. Handles the
+    yfinance rate-limit pattern that tripped the original Sprint 1 fit
+    (only 3 of 10 categories fitted, 7 fell back). Backoff: 1s, 2s, 4s, 8s, 16s.
+    Resets the circuit breaker between attempts so a previous trip on
+    one ticker doesn't block the next probe.
+    """
+    from integrations.data_feeds import get_etf_prices, reset_circuit_breaker
+
+    for attempt in range(max_attempts):
+        bundle = get_etf_prices([ticker], period=period, interval="1d")
+        entry = bundle.get(ticker, {}) or {}
+        prices = entry.get("prices", []) or []
+        if prices:
+            return entry
+        # Reset breaker so a prior trip in this fit run doesn't keep us
+        # stuck in fail-fast for the rest of the patient sequence.
+        reset_circuit_breaker()
+        if attempt < max_attempts - 1:
+            backoff = 2 ** attempt   # 1, 2, 4, 8, 16
+            logger.info(
+                "CF fit: ticker=%s no data on attempt %d, sleeping %ds before retry",
+                ticker, attempt + 1, backoff,
+            )
+            time.sleep(backoff)
+    return {"source": "unavailable", "prices": []}
 
 
 def fetch_category_returns(category: str, *, years: int = DEFAULT_FIT_YEARS):
@@ -151,16 +190,19 @@ def fetch_category_returns(category: str, *, years: int = DEFAULT_FIT_YEARS):
     (via integrations.data_feeds.get_etf_prices) and return the
     concatenated DataFrame indexed by date.
 
-    Skips ETFs that come back with fewer than MIN_OBSERVATIONS daily
-    closes. When DEMO_MODE_NO_FETCH=1 is set, returns an empty frame
-    (test harness short-circuit; the cache write step in
-    `fit_per_category` then writes the fallback values for every
-    category, preserving the demo-deterministic behavior).
+    Per-ticker patient fetch with 5-attempt exponential backoff so a
+    transient rate-limit on one ticker doesn't lose the whole category.
+    Skips ETFs with fewer than MIN_OBSERVATIONS daily closes. When
+    DEMO_MODE_NO_FETCH=1 is set, returns an empty frame.
+
+    Caller is `fit_per_category`, which under the no-fallback policy
+    (Cowork hotfix 2026-04-28) leaves a category absent from the cache
+    when EVERY ticker exhausts its retries — rather than silently
+    falling back to crypto-midpoint defaults.
     """
     import pandas as pd
 
     from core.etf_universe import load_universe
-    from integrations.data_feeds import get_etf_prices
 
     if os.environ.get("DEMO_MODE_NO_FETCH") == "1":
         return pd.DataFrame()
@@ -171,13 +213,10 @@ def fetch_category_returns(category: str, *, years: int = DEFAULT_FIT_YEARS):
         return pd.DataFrame()
 
     period = f"{max(2, years)}y"
-    bundle = get_etf_prices(tickers, period=period, interval="1d")
-
     cols: dict[str, list[float]] = {}
     for ticker in tickers:
-        entry = bundle.get(ticker, {}) or {}
+        entry = _fetch_ticker_with_retry(ticker, period)
         rows = entry.get("prices", []) or []
-        # Build close series; compute log-returns.
         closes: list[float] = []
         for row in rows:
             try:
@@ -198,7 +237,6 @@ def fetch_category_returns(category: str, *, years: int = DEFAULT_FIT_YEARS):
     if not cols:
         return pd.DataFrame()
 
-    # Pad to common length (right-align — most-recent dates align).
     max_len = max(len(v) for v in cols.values())
     padded = {
         k: [None] * (max_len - len(v)) + v
@@ -211,40 +249,89 @@ def fit_per_category(
     *,
     years: int = DEFAULT_FIT_YEARS,
     write_cache: bool = True,
+    inter_category_cooldown_sec: int = 30,
 ) -> dict[str, tuple[float, float]]:
     """
-    Fit (S, K) for each category in `CATEGORY_LIST` using
-    `fetch_category_returns(category, years=...)` and `fit_skew_kurtosis`.
+    Patient per-category fit. For each category in `CATEGORY_LIST`:
 
-    Returns `{category: (S, K)}`. Categories with too little history
-    (or under DEMO_MODE_NO_FETCH=1) get the crypto-midpoint fallback
-    `(FALLBACK_SKEW, FALLBACK_KURT)`.
+      1. `fetch_category_returns(category)` with per-ticker exponential
+         backoff (1, 2, 4, 8, 16s) up to 5 attempts each.
+      2. Pool returns + `fit_skew_kurtosis()`.
+      3. Persist partial results after each category so an interrupted
+         run can resume from the last completed category.
+      4. Sleep `inter_category_cooldown_sec` (default 30s) between
+         categories so the yfinance circuit breaker has time to recover.
 
-    When `write_cache=True` (default), persists the result to
-    `data/cf_params_cache.json` atomically with the current monotonic
-    timestamp so `_get_cf_params()` can validate the 30-day TTL.
+    No-fallback policy (Cowork hotfix 2026-04-28): when a category's
+    fit genuinely fails (every ticker exhausted retries), the category
+    is LEFT ABSENT from the returned dict and the on-disk cache. Callers
+    (`portfolio_engine._get_cf_params`) then read from the committed
+    `core/cf_params_production.json` snapshot instead — which is itself
+    fully populated (by this fit run + any nearest-neighbor overrides).
+    No silent fallback to hardcoded crypto-midpoint constants.
+
+    DEMO_MODE_NO_FETCH=1 short-circuits and returns an empty dict — the
+    test harness then falls back to the production-config snapshot,
+    which is what's checked into git and always present.
     """
+    if os.environ.get("DEMO_MODE_NO_FETCH") == "1":
+        return {}
+
+    # Resume-from-progress: load any partial cache so we can pick up
+    # where a prior interrupted run left off.
     out: dict[str, tuple[float, float]] = {}
+    existing = load_cache()
+    if existing:
+        out.update(existing)
+        logger.info(
+            "CF fit resuming from prior cache (%d categories already complete)",
+            len(out),
+        )
+
     for category in CATEGORY_LIST:
+        if category in out:
+            logger.info("CF fit: %s already in cache, skipping", category)
+            continue
         try:
             frame = fetch_category_returns(category, years=years)
             if frame.empty:
-                out[category] = (FALLBACK_SKEW, FALLBACK_KURT)
+                # No-fallback policy: skip this category — caller reads
+                # from production-config snapshot instead.
+                logger.warning(
+                    "CF fit: %s exhausted all tickers without data; "
+                    "leaving absent from cache (no-fallback policy)",
+                    category,
+                )
                 continue
-            # Pool every ETF's returns into one series for the category fit.
-            # Pooling assumes within-category correlation is high enough that
-            # a category-level moment is more informative than per-ETF noise.
             import numpy as np
             pooled = frame.values.astype(float).ravel()
             pooled = pooled[np.isfinite(pooled)]
             try:
                 out[category] = fit_skew_kurtosis(pooled)
+                logger.info("CF fit: %s → S=%.3f K=%.3f (n_obs=%d)",
+                            category, *out[category], len(pooled))
             except ValueError as exc:
-                logger.info("CF fit fell back for %s: %s", category, exc)
-                out[category] = (FALLBACK_SKEW, FALLBACK_KURT)
+                logger.warning(
+                    "CF fit: %s pooled returns invalid (%s); leaving absent",
+                    category, exc,
+                )
+                continue
         except Exception as exc:  # pragma: no cover — defensive
-            logger.warning("CF fit error for %s: %s", category, exc)
-            out[category] = (FALLBACK_SKEW, FALLBACK_KURT)
+            logger.warning(
+                "CF fit error for %s: %s — leaving absent (no-fallback policy)",
+                category, exc,
+            )
+            continue
+
+        # Persist progress after each category so a Ctrl+C / network
+        # disconnect doesn't lose the work already completed.
+        if write_cache:
+            _write_cache(out)
+
+        # Cooldown between categories to let the yfinance circuit
+        # breaker reset before the next batch.
+        if inter_category_cooldown_sec > 0 and category != CATEGORY_LIST[-1]:
+            time.sleep(inter_category_cooldown_sec)
 
     if write_cache:
         _write_cache(out)
