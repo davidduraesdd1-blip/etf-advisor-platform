@@ -218,6 +218,93 @@ neighbor overrides resolve.
     pass explicit (S, K) since the function now requires them
 ```
 
-## Tag at this state
+## §5 — Boundary handling (CF feasibility clip)
 
-`audit-round-4-cf-live-2026-04-28` on `main` HEAD after PR merge.
+After the no-fallback policy + per-category fit landed, real-world
+output exposed an additional issue: the CF polynomial at the Maillard
+caps + 99% confidence extrapolates past the long-only 100% loss bound.
+Marcus Avery's Tier 4 Aggressive basket showed VaR_99 = 171.70% and
+CVaR_95 = 132.79% — mathematically impossible for a long-only basket
+(can't lose more than principal). This is a known CF limitation
+(polynomial vs. actual distribution divergence at the deep tail), not
+a bug in our implementation.
+
+### Fix
+
+Pragmatic feasibility clip + boundary disclosure (Cowork's directive
+"the clip is right" for the demo).
+
+`core/portfolio_engine.py`:
+- New `CFRiskResult(value, cf_boundary_reached)` NamedTuple is the
+  return type of `cornish_fisher_var` and `cornish_fisher_cvar`.
+- `_clip_to_loss_bound(value)` helper: `max(0, min(value, 100))` plus
+  setting the `cf_boundary_reached` flag to True when the clip fired.
+- `compute_portfolio_metrics` propagates 4 boundary flags +
+  `any_cf_boundary_reached` (logical-OR) into the metrics dict.
+
+`ui/components.py::risk_metrics_panel(metrics, sleeve_usd)`:
+- Renders VaR_95 / VaR_99 / CVaR_95 / CVaR_99 as 4-up tile strip.
+- Boundary-reached tiles display "≤ -$X / -100% / model boundary"
+  in warning-tone color instead of the polynomial extrapolation.
+- When ANY tile hit the bound, footnote disclosure appears:
+  > "Cornish-Fisher tail estimate reaches model boundary at extreme
+  > moments. Maximum loss is bounded at 100% of allocated principal —
+  > a hard constraint of long-only positions. The displayed value
+  > shows the bound rather than the polynomial extrapolation."
+- Methodology link to `pages/98_Methodology.py#cf-boundary`.
+
+`pages/02_Portfolio.py` wires the panel inside an
+`st.expander("Advanced risk metrics — Advisor mode", expanded=False)`
+block, gated on `is_advisor()`. Hidden in Client mode (too granular
+for screen-share).
+
+`pages/98_Methodology.py` adds a 3-paragraph `<section id="cf-boundary">`
+block: CF formulation + Maillard caps; why polynomial extrapolates;
+the planned NIG / POT post-demo replacement.
+
+### Marcus Avery T4/T5 results post-clip
+
+| Metric | T4 Aggressive | T5 Ultra Aggressive |
+|---|---:|---:|
+| VaR_95 | 64.07% | 62.38% |
+| **VaR_99** | **≤ −$81,200 (−100% / boundary)** | **≤ −$81,200 (−100% / boundary)** |
+| **CVaR_95** | **≤ −$81,200 (−100% / boundary)** | **≤ −$81,200 (−100% / boundary)** |
+| **CVaR_99** | **≤ −$81,200 (−100% / boundary)** | **≤ −$81,200 (−100% / boundary)** |
+
+Both tiers show VaR_95 < 100% (sub-100% is the realistic "5% chance of
+losing more than X" magnitude). The 99% tail and CVaR hit the
+boundary on alt-heavy baskets — now disclosed honestly rather than
+displayed as a 171% impossibility.
+
+### Why the clip is honest, not a fallback
+
+The 100% loss bound is a hard mathematical constraint of the asset
+class — a long-only position cannot lose more than its principal,
+ever. The CF polynomial is a tail APPROXIMATION; at extreme moments
+it extrapolates beyond the support of any real distribution. Clipping
+to the bound is closer to truth than displaying the polynomial
+extrapolation. The boundary indicator + methodology link give the FA
+full visibility into when the model has reached its feasibility
+region.
+
+This is distinct from the no-fallback policy: there is no silent
+substitution of a hardcoded constant. The clip uses the asset-class
+mathematical constant (100%) which is independent of the input data.
+
+### Post-demo plan
+
+Replace CF at extreme moments with one of:
+- **POT (Peaks-Over-Threshold, McNeil & Frey 2000)** — generalized
+  Pareto fit on the tail, no polynomial extrapolation; standard in
+  bank risk practice.
+- **NIG (Normal-Inverse-Gaussian)** — exponential-family distribution
+  with closed-form quantiles; handles fat tails without saturation.
+- **Generalized hyperbolic** — superset of NIG; flexible tail shape.
+
+Eliminates the boundary-clip path on alt-heavy baskets. Multi-day
+refactor; explicitly post-demo work per Cowork's call.
+
+## Tags at this state
+
+- `audit-round-4-cf-live-2026-04-28` (commit `39886cb`) — CF live params + sign fix + no-fallback
+- **`audit-round-4-cf-clip-2026-04-28`** — this hotfix (feasibility clip + boundary disclosure)
