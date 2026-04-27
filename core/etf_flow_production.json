@@ -1,0 +1,1695 @@
+{
+  "captured_at_utc": "2026-04-27T19:47:32.127999+00:00",
+  "method": "bootstrap from prior reference values pending live refresh; nightly cron + scripts/refresh_etf_flow_production.py supersede this with multi-source live captures",
+  "note": "Sprint 2 commit 2 bootstrap snapshot. Tickers without entries here will fall through to the live chain at render time. Schedule a refresh once yfinance + cryptorank rate limits cooperate.",
+  "tickers": {
+    "IBIT": {
+      "aum_usd": 62400000000,
+      "flow_30d_usd": 2100000000,
+      "avg_daily_vol": 1240000000,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": "reference (bootstrap)",
+      "vol_source": "reference (bootstrap)"
+    },
+    "FBTC": {
+      "aum_usd": 20100000000,
+      "flow_30d_usd": 580000000,
+      "avg_daily_vol": 480000000,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": "reference (bootstrap)",
+      "vol_source": "reference (bootstrap)"
+    },
+    "BITB": {
+      "aum_usd": 3200000000,
+      "flow_30d_usd": 45000000,
+      "avg_daily_vol": 78000000,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": "reference (bootstrap)",
+      "vol_source": "reference (bootstrap)"
+    },
+    "ARKB": {
+      "aum_usd": 2800000000,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BTCO": {
+      "aum_usd": 900000000,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": null,
+      "vol_source": null
+    },
+    "EZBC": {
+      "aum_usd": 400000000,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BRRR": {
+      "aum_usd": 300000000,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": null,
+      "vol_source": null
+    },
+    "HODL": {
+      "aum_usd": 800000000,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BTCW": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BTC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GBTC": {
+      "aum_usd": 18000000000,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": null,
+      "vol_source": null
+    },
+    "DEFI": {
+      "aum_usd": 180000000,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ETHA": {
+      "aum_usd": 9300000000,
+      "flow_30d_usd": 220000000,
+      "avg_daily_vol": 195000000,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": "reference (bootstrap)",
+      "vol_source": "reference (bootstrap)"
+    },
+    "FETH": {
+      "aum_usd": 1050000000,
+      "flow_30d_usd": 22000000,
+      "avg_daily_vol": 34000000,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": "reference (bootstrap)",
+      "vol_source": "reference (bootstrap)"
+    },
+    "ETH": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ETHE": {
+      "aum_usd": 4300000000,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ETHW": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CETH": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "QETH": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "EZET": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BSOL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "FSOL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "SSOL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "QSOL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GSOL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "XRPC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "XRPR": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "XRP": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BXRP": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "LTCO": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GLTC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "DOJE": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CDOG": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "HBR": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "AVAX": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ADAX": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BITO": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BTF": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "EETH": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BITX": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BITU": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BTCL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ETHU": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ETHT": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "SOLT": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "XRPT": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MSTU": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MSTX": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CONL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MARL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "RIOX": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MSTY": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CONY": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BTCI": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ETHI": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "YBIT": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "YETH": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "IBIY": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ETHY": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MSFO": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "COII": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MARO": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BLOK": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BITQ": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BKCH": {
+      "aum_usd": 180000000,
+      "flow_30d_usd": 4200000,
+      "avg_daily_vol": 8500000,
+      "aum_source": "reference (bootstrap)",
+      "flow_source": "reference (bootstrap)",
+      "vol_source": "reference (bootstrap)"
+    },
+    "DAPP": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "LEGR": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "SATO": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "WGMI": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BITS": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "DTCR": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BITW": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "EFBC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CBOJ": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CBXJ": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CBTJ": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CBOQ": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CBOS": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CBOO": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BMAX": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "IMST": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ETHV": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ESK": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "SSK": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "OBTC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BTCZ": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ETU": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "SOLX": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "XRPK": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MSTZ": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CEPI": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MSII": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "LFGY": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "WNTR": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "FIAT": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MSST": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CRCO": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GDOG": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GXRP": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GSUI": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GLNK": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GADA": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GDLC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BAAV": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BUNI": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BSUI": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BTRX": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BTAO": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BNRR": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BHYP": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BENA": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BSTK": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BITC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "OWNB": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BITI": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "EETU": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CBQO": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CBOA": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "QBJL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "COIW": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MSTU2": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CONG": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "NCIQ": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ADAC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "AVAC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "SUIQ": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "PNGU": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "TOIN": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "TPOL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "FSUI": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MAXI": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "SBIT": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "SETH": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BETE": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BETH": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BYBT": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MAGS": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CRPT": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BTCY": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BTCG": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BAGG": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BZEC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "TKAS": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CXLM": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GHBR": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GFIL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GMCR": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GBAT": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "QQQY": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "VSOL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "XSOL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "VXRP": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "FXRP": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "QBJK": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "QBJA": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CBOY": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BSOLE": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BETHE": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ISOL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "IXRP": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "YBTC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "IRE": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BTFL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "HOOX": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "HOOZ": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "SMST": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MST": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BMNZ": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "SPBC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BESO": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "SOLC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "RIOX2": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BSCN": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BPOL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BLNK": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BCFI": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "TLNK": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "TAVA": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "TLTC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "TXLM": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GAVA": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GTRX": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GTAO": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GAAVE": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GUNI": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GBAT2": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "GMANA": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BMAX2": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ATCL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ARKW": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ARKF": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "IDOG": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ILTC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "FSOLE": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "FDOG": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "EZSO": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "EZXR": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "EZDG": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "VXRP2": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "VLTC": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ETHD": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "BITT": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "ETHL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "DEFIQ": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CBOM": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CBOG": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "CBOD": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "FTHR": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "STKE": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MSBT": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    },
+    "MSSL": {
+      "aum_usd": null,
+      "flow_30d_usd": null,
+      "avg_daily_vol": null,
+      "aum_source": null,
+      "flow_source": null,
+      "vol_source": null
+    }
+  }
+}

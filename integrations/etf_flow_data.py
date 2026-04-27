@@ -142,6 +142,18 @@ def _cache_put(ticker: str, fn: str, value: Optional[float], source: Optional[st
 PRODUCTION_PATH = REPO_ROOT / "core" / "etf_flow_production.json"
 
 
+def reset_circuit_breaker_safely() -> None:
+    """Helper for the refresh script: reset the data_feeds circuit
+    breaker between batches so a session-wide trip from rate-limit
+    errors doesn't permanently block subsequent fetches. Imported
+    from data_feeds at runtime to avoid circular imports."""
+    try:
+        from integrations.data_feeds import reset_circuit_breaker
+        reset_circuit_breaker()
+    except Exception:
+        pass
+
+
 def _production_snapshot_get(
     ticker: str, field: str,
 ) -> tuple[Optional[float], Optional[str]]:
