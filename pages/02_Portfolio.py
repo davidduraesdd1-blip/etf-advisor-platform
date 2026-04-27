@@ -301,6 +301,18 @@ def main() -> None:
     except Exception as _e_kpi:
         pass  # Strip is decorative; legacy tiles below still render the same data
 
+    # 2026-04-28 hotfix: Advanced risk metrics panel (Advisor mode only).
+    # Surfaces VaR_95 / VaR_99 / CVaR_95 / CVaR_99 with $ amounts +
+    # CF-boundary disclosure when the polynomial estimate exceeds the
+    # 100% long-only loss bound. Hidden in Client mode (too granular for
+    # screen-share) and gated behind an expander to keep the page chrome
+    # uncluttered for the FA's primary view.
+    if is_advisor():
+        with st.expander("Advanced risk metrics (VaR / CVaR — Advisor mode)",
+                         expanded=False):
+            from ui.components import risk_metrics_panel
+            risk_metrics_panel(metrics, sleeve_usd=crypto_sleeve_usd)
+
     # Count per-metric live vs category-default for the transparency caption.
     _holding_tickers = {h["ticker"] for h in holdings}
     _basket = [e for e in universe_live if e["ticker"] in _holding_tickers]

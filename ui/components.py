@@ -430,6 +430,144 @@ def extended_modules_banner(*, margin_top_px: int = 24) -> None:
     )
 
 
+# ── Risk metrics panel (Cornish-Fisher VaR/CVaR with boundary disclosure) ──
+#
+# 2026-04-28 hotfix — feasibility-clip disclosure UI.
+# Renders VaR_95 / VaR_99 / CVaR_95 / CVaR_99 in $ amounts + %, and
+# when the CF polynomial extrapolation reached the long-only 100% loss
+# bound (cf_boundary_reached=True from compute_portfolio_metrics), the
+# tile renders as "≤ -$X / -100% / model boundary" instead of the
+# unclipped magnitude. Below the panel, when ANY tile hit the boundary,
+# a calm-tone footnote links to the Methodology page #cf-boundary
+# anchor explaining why CF reaches its feasibility region on alt-heavy
+# tiers and previewing the post-demo NIG/POT/GH replacement.
+#
+# The footnote + clipped display ONLY appear when
+# metrics["any_cf_boundary_reached"] is True. Don't inject unconditionally.
+
+def _fmt_loss_dollars(pct: float, sleeve_usd: float) -> str:
+    """Format a loss percentage as a negative dollar amount."""
+    dollars = (pct / 100.0) * sleeve_usd
+    return f"-${dollars:,.0f}"
+
+
+def _fmt_loss_tile(
+    label: str,
+    pct_value: float,
+    boundary_reached: bool,
+    sleeve_usd: float,
+) -> str:
+    """
+    Render a single VaR/CVaR tile. When boundary_reached, the tile
+    displays "≤ -$X (-100% / model boundary)" instead of the unclipped
+    magnitude — represents the long-only loss bound honestly rather
+    than the CF polynomial extrapolation.
+    """
+    if boundary_reached:
+        dollars = _fmt_loss_dollars(100.0, sleeve_usd)
+        primary = f"≤ {dollars}"
+        secondary = "−100% / model boundary"
+        color = "var(--warning)"
+    else:
+        dollars = _fmt_loss_dollars(pct_value, sleeve_usd)
+        primary = dollars
+        secondary = f"−{pct_value:.1f}%"
+        color = "var(--danger)"
+    return (
+        '<div style="display:flex;flex-direction:column;gap:4px;">'
+        f'<div style="font-size:11px;color:var(--text-muted);'
+        'text-transform:uppercase;letter-spacing:0.06em;">'
+        f'{label}</div>'
+        f'<div style="font-size:18px;font-weight:600;font-family:var(--font-mono);'
+        f'line-height:1.1;color:{color};">{primary}</div>'
+        f'<div style="font-size:11.5px;color:var(--text-muted);'
+        f'font-family:var(--font-mono);">{secondary}</div>'
+        '</div>'
+    )
+
+
+def risk_metrics_panel(
+    metrics: dict,
+    sleeve_usd: float,
+    *,
+    methodology_anchor: str = "pages/98_Methodology.py#cf-boundary",
+) -> None:
+    """
+    Advanced risk metrics panel for Advisor mode. Renders VaR_95 / VaR_99 /
+    CVaR_95 / CVaR_99 with $ amounts + boundary-reached disclosure.
+
+    `metrics` is the dict returned by
+    `core.portfolio_engine.compute_portfolio_metrics`. Required keys:
+      var_95_pct, var_99_pct, cvar_95_pct, cvar_99_pct,
+      var_95_cf_boundary_reached, var_99_cf_boundary_reached,
+      cvar_95_cf_boundary_reached, cvar_99_cf_boundary_reached,
+      any_cf_boundary_reached.
+
+    `sleeve_usd` is the basket notional in USD — converts the percentage
+    losses into dollar amounts.
+
+    When `metrics["any_cf_boundary_reached"]` is True, the panel appends
+    a footnote: "Cornish-Fisher tail estimate reaches model boundary at
+    extreme moments. Maximum loss bounded at 100% of allocated principal.
+    See methodology for tail-model assumptions."
+    """
+    var_95 = metrics.get("var_95_pct", 0)
+    var_99 = metrics.get("var_99_pct", 0)
+    cvar_95 = metrics.get("cvar_95_pct", 0)
+    cvar_99 = metrics.get("cvar_99_pct", 0)
+
+    var_95_b = bool(metrics.get("var_95_cf_boundary_reached"))
+    var_99_b = bool(metrics.get("var_99_cf_boundary_reached"))
+    cvar_95_b = bool(metrics.get("cvar_95_cf_boundary_reached"))
+    cvar_99_b = bool(metrics.get("cvar_99_cf_boundary_reached"))
+    any_boundary = bool(metrics.get("any_cf_boundary_reached"))
+
+    tiles_html = (
+        '<div class="ds-card" style="margin-bottom:16px;">'
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap);">'
+        + _fmt_loss_tile("VaR 95%",  var_95,  var_95_b,  sleeve_usd)
+        + _fmt_loss_tile("VaR 99%",  var_99,  var_99_b,  sleeve_usd)
+        + _fmt_loss_tile("CVaR 95%", cvar_95, cvar_95_b, sleeve_usd)
+        + _fmt_loss_tile("CVaR 99%", cvar_99, cvar_99_b, sleeve_usd)
+        + '</div></div>'
+    )
+    st.markdown(tiles_html, unsafe_allow_html=True)
+
+    # CF-boundary footnote — only when at least one tile hit the bound.
+    if any_boundary:
+        st.markdown(
+            '<div style="display:flex;gap:12px;align-items:flex-start;'
+            'padding:12px 16px;margin-bottom:16px;'
+            'background:color-mix(in srgb,var(--warning) 6%,var(--bg-1));'
+            'border:1px solid color-mix(in srgb,var(--warning) 18%,var(--border));'
+            'border-left:3px solid var(--warning);border-radius:6px;'
+            'font-size:12px;line-height:1.5;color:var(--text-secondary);">'
+            '<div style="width:20px;height:20px;border-radius:50%;'
+            'background:color-mix(in srgb,var(--warning) 16%,transparent);'
+            'color:var(--warning);display:grid;place-items:center;'
+            'font-weight:600;font-size:12px;flex-shrink:0;">!</div>'
+            '<div>'
+            '<strong style="color:var(--text-primary);">Cornish-Fisher tail '
+            'estimate reaches model boundary at extreme moments.</strong> '
+            'Maximum loss is bounded at 100% of allocated principal — a '
+            'hard constraint of long-only positions. The displayed value '
+            'shows the bound rather than the polynomial extrapolation. '
+            'See the methodology page for tail-model assumptions and '
+            'the planned NIG / POT replacement at extreme tails.'
+            '</div></div>',
+            unsafe_allow_html=True,
+        )
+        # Methodology link (uses safe_page_link for AppTest tolerance).
+        try:
+            st.page_link(
+                "pages/98_Methodology.py",
+                label="Read methodology — CF boundary handling →",
+                icon="📋",
+            )
+        except Exception:
+            st.caption("→ Methodology — CF boundary handling")
+
+
 # ── DV-2 compliance helper (CLAUDE.md §22 item 5) ───────────────────────
 #
 # Every performance display must include: 1Y / 3Y / 5Y / since-inception

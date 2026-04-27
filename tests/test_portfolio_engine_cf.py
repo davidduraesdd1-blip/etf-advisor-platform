@@ -354,6 +354,79 @@ class TestFeasibilityClip:
         assert result.cf_boundary_reached is False
 
 
+# ── UI: boundary footnote rendering ────────────────────────────────
+
+class TestRiskMetricsPanelUI:
+    """Verifies the risk_metrics_panel renders the CF-boundary footnote
+    when (and only when) at least one tile hit the boundary."""
+
+    def test_footnote_renders_when_boundary_reached(self):
+        """Alt-heavy metrics dict (any_cf_boundary_reached=True) must
+        emit the boundary footnote text."""
+        pytest.importorskip("streamlit.testing.v1")
+        from streamlit.testing.v1 import AppTest
+        # Build a minimal Streamlit script that calls risk_metrics_panel
+        # with boundary-reached metrics, then run it via AppTest and
+        # scan the rendered markdown for the footnote string.
+        script = '''
+import streamlit as st
+from ui.components import risk_metrics_panel
+metrics = {
+    "var_95_pct": 64.0, "var_99_pct": 100.0,
+    "cvar_95_pct": 100.0, "cvar_99_pct": 100.0,
+    "var_95_cf_boundary_reached": False,
+    "var_99_cf_boundary_reached": True,
+    "cvar_95_cf_boundary_reached": True,
+    "cvar_99_cf_boundary_reached": True,
+    "any_cf_boundary_reached": True,
+}
+risk_metrics_panel(metrics, sleeve_usd=81_200)
+'''
+        at = AppTest.from_string(script, default_timeout=10)
+        at.run()
+        assert not at.exception, f"AppTest crashed: {at.exception}"
+        rendered = " ".join(
+            (el.value or "") if hasattr(el, "value") else str(el)
+            for el in at.markdown
+        )
+        assert "model boundary" in rendered, (
+            "boundary footnote should render when any tile hit boundary"
+        )
+        assert "≤ -$81,200" in rendered or "≤ -$81200" in rendered, (
+            "boundary tile should display ≤ -$<sleeve> dollar amount"
+        )
+
+    def test_footnote_absent_when_no_boundary(self):
+        """BTC-only metrics dict (any_cf_boundary_reached=False) must NOT
+        emit the boundary footnote."""
+        pytest.importorskip("streamlit.testing.v1")
+        from streamlit.testing.v1 import AppTest
+        script = '''
+import streamlit as st
+from ui.components import risk_metrics_panel
+metrics = {
+    "var_95_pct": 30.0, "var_99_pct": 50.0,
+    "cvar_95_pct": 60.0, "cvar_99_pct": 80.0,
+    "var_95_cf_boundary_reached": False,
+    "var_99_cf_boundary_reached": False,
+    "cvar_95_cf_boundary_reached": False,
+    "cvar_99_cf_boundary_reached": False,
+    "any_cf_boundary_reached": False,
+}
+risk_metrics_panel(metrics, sleeve_usd=100_000)
+'''
+        at = AppTest.from_string(script, default_timeout=10)
+        at.run()
+        assert not at.exception, f"AppTest crashed: {at.exception}"
+        rendered = " ".join(
+            (el.value or "") if hasattr(el, "value") else str(el)
+            for el in at.markdown
+        )
+        assert "model boundary" not in rendered, (
+            "footnote should NOT render when no boundary reached"
+        )
+
+
 # ── End-to-end: VaR call site reads weighted params ────────────────
 
 class TestVaRReceivesWeightedParams:

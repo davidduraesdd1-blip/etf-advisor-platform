@@ -278,6 +278,13 @@ _article_html = """
       <p>Max drawdown via Magdon-Ismail-Atiya approximation; MDD factor 2.7 retuned for crypto-ETF volatility profile (vs RWA 3.0 / equity 2.3-2.5).</p>
     </section>
 
+    <section id="cf-boundary">
+      <h2>Cornish-Fisher boundary handling</h2>
+      <p>The Cornish-Fisher (CF) modified VaR is a polynomial expansion that adjusts the Gaussian quantile for the realized skewness and kurtosis of the return distribution. Per Boudt, Peterson &amp; Croux (2008), z<sub>α</sub><sup>CF</sup> = z<sub>α</sub> + (z<sub>α</sub><sup>2</sup>−1)/6·γ<sub>1</sub> + (z<sub>α</sub><sup>3</sup>−3z<sub>α</sub>)/24·γ<sub>2</sub> − (2z<sub>α</sub><sup>3</sup>−5z<sub>α</sub>)/36·γ<sub>1</sub><sup>2</sup>, with mVaR = −(μ + σ·z<sub>α</sub><sup>CF</sup>). Per-category (S, K) parameters are fitted live from 5-year yfinance data; Maillard 2012 caps clamp them to the polynomial's monotone-domain bounds — skewness ∈ [−1.5, +1.5], excess kurtosis ∈ [0, 15]. The committed snapshot lives at <code>core/cf_params_production.json</code>.</p>
+      <p>For alt-heavy baskets where the realized moments saturate the Maillard caps (altcoin_spot fits to S=−1.5, K=15.0), the CF polynomial at 99% confidence can extrapolate past the long-only 100% loss bound. A long-only basket cannot lose more than 100% of allocated principal — this is a hard mathematical constraint of the asset class, not a model parameter. The platform therefore <strong>clips</strong> CF VaR/CVaR at 100% and surfaces an explicit boundary indicator on the risk panel ("≤ −100% / model boundary") plus the calm-tone footnote linking back to this section. The clip represents reality more honestly than the polynomial extrapolation; it is not a hidden fallback.</p>
+      <p><em>Post-demo work:</em> replace CF at extreme moments with a tail model that handles the deep tail without polynomial extrapolation — Peaks-Over-Threshold (POT, McNeil &amp; Frey 2000), Normal-Inverse-Gaussian (NIG), or generalized hyperbolic. This eliminates the boundary-clip path on alt-heavy baskets; until then, the clip is the right pragmatic disclosure.</p>
+    </section>
+
     <section id="simplifications">
       <h2>Known simplifications</h2>
       <div class="eap-meth-callout"><div class="icon">i</div><div>We call out every simplification rather than hiding it. Advisors reviewing this page should know exactly where the model stops.</div></div>
