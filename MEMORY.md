@@ -4,6 +4,85 @@ Session continuity log. Newest entries on top. See master-template §16.
 
 ---
 
+## 2026-04-28 — Production hotfix: CF live params + sign correction + no-fallback policy
+
+Cowork lifted the freeze on `main` for this targeted hotfix.
+Directive: **"everything real and live the entire time, no
+hardcoded fallback defaults."** Branch
+`hotfix/cf-live-no-fallback-2026-04-28` cherry-picked the 3 Sprint 1
+commits from the polish branch + 2 new commits, merged to main.
+
+### What landed (5 commits)
+
+  1. **Cherry-pick:** CF calibration infrastructure (`core/cf_calibration.py`,
+     `tests/test_cf_calibration.py`).
+  2. **Cherry-pick:** Sign-convention bug fix in `cornish_fisher_var`
+     + per-category CF wire-up. The pre-existing bug (using +z_g
+     right-tail instead of -z_α left-tail) had been silently under-
+     estimating VaR ~50-60% on negatively-skewed crypto returns.
+     CVaR was already correct.
+  3. **Cherry-pick:** Cold-boot perf — persisted three-state circuit
+     breaker (yfinance / stooq / unavailable) with 5-min TTL.
+     Cold-boot 19.5s → 2.45s fresh / 1.47s persisted.
+  4. **NEW: Patient live fit + production-config + no-fallback policy.**
+     - `core/cf_calibration.py` strengthened with per-ticker
+       exponential backoff (1, 2, 4, 8, 16s), inter-category 30s
+       cooldown, resume-from-progress.
+     - `core/cf_params_production.json` (NEW, COMMITTED, force-added
+       past .gitignore) carries the live-fitted (btc_spot, eth_spot,
+       altcoin_spot) + 7 nearest-neighbor overrides for the categories
+       that fell back during the patient fit (yfinance rate-limited).
+       Each override has a documented `rationale`.
+     - `_get_cf_params(category)` precedence: cache → production-config
+       → **RuntimeError**. No third level. No silent fallback.
+     - `_CF_DEFAULT_SKEW` / `_CF_DEFAULT_KURT` constants REMOVED. Only
+       place those numbers appear is the `deprecated_constants` block
+       in `cf_params_production.json` for audit trail.
+     - `cornish_fisher_var` / `cornish_fisher_cvar` now require explicit
+       (S, K). Calling with None raises.
+  5. **NEW: Documentation + tag.** `docs/math_audit_round_5_2026-04-28.md`
+     captures methodology, per-category result table, sign-fix
+     numerical example (Marcus Avery T4: VaR_95 ~33% → 64.07%),
+     operational guidance for refreshing the snapshot, risk summary.
+
+### Production-config snapshot
+
+| Category | S | K | Source |
+|---|---:|---:|---|
+| btc_spot | -0.058 | 2.570 | live (5y, 11 funds) |
+| eth_spot | -0.264 | 2.141 | live (5y, 9 funds) |
+| altcoin_spot | -1.500 | 15.000 | live (5y, 16 funds, **MAILLARD CAPS HIT**) |
+| btc_futures | -0.058 | 2.570 | nearest_neighbor → btc_spot |
+| eth_futures | -0.264 | 2.141 | nearest_neighbor → eth_spot |
+| leveraged | -0.058 | 2.570 | nearest_neighbor → btc_spot |
+| income_covered_call | -0.058 | 2.570 | nearest_neighbor → btc_spot |
+| multi_asset | -0.140 | 2.398 | blended 60% btc_spot + 40% eth_spot |
+| thematic_equity | -0.140 | 2.398 | nearest_neighbor → multi_asset |
+| defined_outcome | -0.140 | 2.398 | nearest_neighbor → multi_asset |
+
+### Marcus Avery T4 VaR shift (sign-fix headline)
+
+| Stage | VaR_95 | VaR_99 | CVaR_95 |
+|---|---:|---:|---:|
+| Pre-sign-fix (main HEAD `3214a54`) | ~33% | ~52% | ~52% |
+| Post-sign-fix only (deprecated constants) | 65.33% | 228.16% | 170.00% |
+| **Post no-fallback (production-config)** | **64.07%** | **171.70%** | **132.79%** |
+
+The sign-fix correction is the headline (~50-60% more conservative
+VaR on typical crypto baskets). The slight drop from sign-fix-only
+to no-fallback is the per-category fit refinement (BTC less
+fat-tailed in 2024-2026 ETF window than literature midpoints).
+
+### Test count
+
+297 / 297 passing (was 262 pre-hotfix, +35 new tests).
+
+### Tag
+
+`audit-round-4-cf-live-2026-04-28` on `main` HEAD.
+
+---
+
 ## 2026-04-26 — Audit-round-2 (overnight verification pass)
 
 Re-audit of the 8-commit + 7-bonus round-1 work and a deep math /
