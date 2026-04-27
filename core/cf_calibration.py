@@ -3,6 +3,13 @@ core/cf_calibration.py — Cornish-Fisher per-category skew + kurtosis fit.
 
 Polish round 5, Sprint 1, Commit 1 (2026-04-28).
 
+CONVENTION: this module returns EXCESS kurtosis (Fisher convention,
+                K_excess = raw_kurt − 3; standard normal has K_excess = 0).
+                This matches the existing portfolio_engine.cornish_fisher_var
+                signature, which expects excess kurtosis per the Cornish-Fisher
+                expansion (Favre & Galeano 2002) and Maillard 2012's monotone-
+                domain caps (which are on excess, not raw).
+
 The crypto-midpoint defaults (S=−0.7, K=8.0) shipped in
 `portfolio_engine.cornish_fisher_var` are calibrated to BTC daily
 returns. They under-estimate fat-tail risk on alt-heavy tiers, where
@@ -52,7 +59,12 @@ CACHE_TTL_SECONDS: int = 30 * 24 * 3600   # 30 days
 # computation produces nonsense. Hard-clip every fitted moment.
 SKEW_CAP_LOW: float = -1.5
 SKEW_CAP_HIGH: float = 1.5
-KURT_CAP_LOW: float = 0.0   # raw kurtosis ≥ 0 always; we report raw, not excess
+# EXCESS kurtosis: standard normal = 0, leptokurtic (fat tails) > 0.
+# Maillard 2012's monotone-domain analysis caps excess kurtosis at ~15.
+# Lower bound at 0 since financial returns are essentially never sub-
+# Gaussian (excess < 0); we don't want a fitted -2.0 to feed bad math
+# into the CF polynomial.
+KURT_CAP_LOW: float = 0.0
 KURT_CAP_HIGH: float = 15.0
 
 # Fallback values when cache is empty / stale / category not present.
@@ -90,15 +102,16 @@ def fit_skew_kurtosis(
     min_observations: int = MIN_OBSERVATIONS,
 ) -> tuple[float, float]:
     """
-    Fit (skew, raw_kurtosis) on a Series / array of log-returns.
+    Fit (skew, excess_kurtosis) on a Series / array of log-returns.
 
-    Uses scipy.stats.skew(bias=False, ...) for the bias-corrected
-    sample skewness and scipy.stats.kurtosis(fisher=True, bias=False)
-    for excess kurtosis (raw - 3); we add 3 back so callers and the
-    portfolio engine consume RAW kurtosis consistently.
+    Uses scipy.stats.skew(bias=False) for the bias-corrected sample
+    skewness and scipy.stats.kurtosis(fisher=True, bias=False) for
+    excess kurtosis (Fisher convention: standard normal → 0).
 
     Returns the pair clamped to Maillard 2012 monotone-domain caps so
     downstream Cornish-Fisher quantile evaluation stays well-defined.
+    Match the convention of portfolio_engine.cornish_fisher_var which
+    accepts excess (not raw) kurtosis.
 
     Raises ValueError if `returns` is empty or has fewer than
     `min_observations` finite samples.
@@ -116,20 +129,20 @@ def fit_skew_kurtosis(
             f"(min {min_observations})"
         )
 
-    # bias=False uses the unbiased estimator (Fisher–Pearson).
+    # bias=False uses the unbiased estimator (Fisher-Pearson).
     skew_val = float(stats.skew(arr, bias=False))
+    # fisher=True returns EXCESS kurtosis (raw - 3). Standard normal → 0.
     excess_kurt = float(stats.kurtosis(arr, fisher=True, bias=False))
-    raw_kurt = excess_kurt + 3.0   # convert Fisher (excess) → Pearson (raw)
 
     # Clamp to Maillard 2012 caps. NaN-safe.
     if not math.isfinite(skew_val):
         skew_val = FALLBACK_SKEW
-    if not math.isfinite(raw_kurt):
-        raw_kurt = FALLBACK_KURT
+    if not math.isfinite(excess_kurt):
+        excess_kurt = FALLBACK_KURT
     skew_val = max(SKEW_CAP_LOW, min(SKEW_CAP_HIGH, skew_val))
-    raw_kurt = max(KURT_CAP_LOW, min(KURT_CAP_HIGH, raw_kurt))
+    excess_kurt = max(KURT_CAP_LOW, min(KURT_CAP_HIGH, excess_kurt))
 
-    return (skew_val, raw_kurt)
+    return (skew_val, excess_kurt)
 
 
 def fetch_category_returns(category: str, *, years: int = DEFAULT_FIT_YEARS):

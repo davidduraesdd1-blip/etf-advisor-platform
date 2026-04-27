@@ -27,7 +27,8 @@ import pytest
 
 class TestFitSkewKurtosis:
     def test_normal_distribution_skew_near_zero(self):
-        """Standard normal has population skewness 0 and raw kurtosis 3."""
+        """Standard normal has population skewness 0 and excess kurtosis 0
+        (Fisher convention; raw - 3)."""
         from core.cf_calibration import fit_skew_kurtosis
         rng = np.random.default_rng(42)
         # 5000 samples → bias-corrected estimator should converge
@@ -35,7 +36,7 @@ class TestFitSkewKurtosis:
         sample = rng.standard_normal(5000)
         s, k = fit_skew_kurtosis(sample)
         assert abs(s) < 0.1, f"normal-dist skew should be near 0, got {s}"
-        assert abs(k - 3.0) < 0.3, f"normal-dist raw kurtosis should be near 3, got {k}"
+        assert abs(k) < 0.3, f"normal-dist excess kurtosis should be near 0, got {k}"
 
     def test_skewed_distribution_returns_negative_skew(self):
         """Right-skew → positive skewness; left-skew → negative skewness.
@@ -49,8 +50,8 @@ class TestFitSkewKurtosis:
         sample = np.concatenate([normal, jumps])
         s, k = fit_skew_kurtosis(sample)
         assert s < -0.3, f"left-skewed sample should have negative skew, got {s}"
-        # Mixture has heavier-than-normal tails → kurtosis > 3.
-        assert k > 3.0, f"mixture should have raw kurtosis > 3, got {k}"
+        # Mixture has heavier-than-normal tails → excess kurtosis > 0.
+        assert k > 0.0, f"mixture should have excess kurtosis > 0, got {k}"
 
     def test_empty_input_raises(self):
         from core.cf_calibration import fit_skew_kurtosis
