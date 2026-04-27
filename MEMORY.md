@@ -4,6 +4,68 @@ Session continuity log. Newest entries on top. See master-template §16.
 
 ---
 
+## 2026-04-26 — Audit-round-2 (overnight verification pass)
+
+Re-audit of the 8-commit + 7-bonus round-1 work and a deep math /
+universe-fairness pass per user override ("dig as deeply as necessary
+to ensure that everything including all the math functions and calls
+the portfolio determinations and weights are as accurate as possible
+make sure that you have included the daily routine of searching deeply
+for and adding when deemed correct the new etfs to the full list and
+making sure that you are fully considering all the etfs including those
+that are alt coins and leveraged etfs as well").
+
+### Round 2 audits run + results
+
+  1. **build_portfolio sanity** — every tier sums to 100.00% weight,
+     Sharpe is finite, MDD ≤ tier ceiling for all 5 tiers.
+  2. **Forward-return per altcoin** — SOL/XRP/LTC/DOGE/ADA/AVAX/HBAR/
+     DOT/LINK each route through `_altcoin_cagr_or_none` first. When
+     yfinance has data → per-coin CAGR with no haircut. When not →
+     BTC × 0.70 fallback with EXPLICIT basis string flagging the
+     fallback path. Confirmed in
+     `integrations/data_feeds.py::get_forward_return_estimate`.
+  3. **Leveraged + income wrappers on alts** — `_underlying_cagr()`
+     resolves SOLT/XRPT through the per-coin path. Leveraged uses
+     1.10× (vol-decay-adjusted, not naive 2.0×). Income covered-call
+     uses 0.55× (call-cap haircut).
+  4. **AUM tiebreaker actually fires** — verified BTC spot category
+     has 5 funds at 25 bps (IBIT/FBTC/BTCO/BRRR/BTCW). Within the
+     tie, IBIT ($62B) ranks ahead of FBTC ($20B), then issuer
+     diversity. Fee + AUM + diversity all functional in the sort key.
+  5. **Universe coverage** — 82 ETFs in live universe across 10
+     categories; 16 altcoin spots (5 SOL, 4 XRP, 2 LTC, 2 DOGE, 1
+     each of ADA/AVAX/HBAR), 12 leveraged, 13 income covered-call.
+  6. **Composite signal across categories** — every category renders
+     a BUY/HOLD/SELL with consistent threshold logic. Phase-1 fallback
+     path active when no live history available; technical_composite
+     path takes over when history present. Both paths labeled in
+     output `source` field.
+  7. **Daily scanner GitHub Action** — `.github/workflows/daily_scanner.yml`
+     fires at 17:00 UTC daily, runs `daily_scanner(days_back=3)`,
+     pushes any data/ changes. Both `data/scanner_health.json` AND
+     `data/etf_review_queue.json` are auto-committed back to repo
+     when there are new findings. Manual override via Settings page
+     "Run scanner now" button.
+  8. **Tier allocation matrix** — Ultra Conservative excludes
+     altcoin entirely (correct for retiree IPS); Conservative +
+     Moderate stay BTC/ETH-only; Aggressive adds 15% altcoin;
+     Ultra Aggressive adds 20% altcoin + 5% leveraged + 10% thematic
+     equity. Compliance filter (default ON) strips the 5% leveraged
+     sleeve and redistributes proportionally.
+  9. **Weight cap respected** — every holding ≤ MAX_SINGLE_POSITION_PCT
+     (30%) at every tier. Largest holdings: Tier 1 = 20% on BTC.
+  10. **261/261 tests passing**. Verifier 9/9 on prod.
+
+### Round 2 verdict
+
+No code changes required. The round-1 + bonus scope already addressed
+every fairness concern. New `docs/math_audit_round_2_2026-04-26.md`
+captures the verification chain. Tag `audit-round-1-2026-04-26` is
+the final demo-ready state.
+
+---
+
 ## 2026-04-26 — Audit-round-1 + bonus scope shipped (overnight session)
 
 **Tag `audit-round-1-2026-04-26`** shipped on `main` after the post-bucket
