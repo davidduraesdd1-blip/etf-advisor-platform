@@ -1,6 +1,42 @@
 """
 scripts/smoke_test_extractors.py — Sprint 2.6 commit 0 (2026-04-30).
 
+DEEPER-PROBE FINDINGS (post initial run, 2026-04-30):
+
+After the initial 7-target probe came back with 4 buildable / 3
+deferred, an extended round of probing was done on the 3 deferred
+sources to confirm they're genuinely static-HTML-unreachable (not
+just URL-pattern misses). Findings:
+
+  ETF.com:
+    Hard 403 across Chrome / Googlebot / iPhone Mobile-Safari UAs
+    and all /api/* paths. WAF (likely Cloudflare) blocks at the
+    edge before HTML render. No static-HTML path. Defer to Sprint 2.7
+    with Playwright + residential-proxy infra (or post-demo paid API).
+
+  Bitwise:
+    Site is a Next.js SPA, build id "G_NDq09aRNK2RSB3BJm0P". The
+    /_next/data/<build>/<page>.json endpoints all return empty {}
+    (200 OK with body of 2 chars). Homepage __NEXT_DATA__ contains
+    ticker records (BITB, BWOW, ETHW, BTOP, AETH, etc.) with
+    title/ticker/slug/fundType/abbreviation/excerpt/sections fields
+    only — NO aum / netAssets / volume keys. Fund-detail AUM is
+    hydrated client-side from a private API. No static-HTML path.
+    Defer to Sprint 2.7 with Playwright.
+
+  Franklin Templeton:
+    JS-rendered SPA. Public API DNS api.franklintempleton.com does
+    not resolve. /api/products/etf/<TICKER> paths 404. Defer to
+    Sprint 2.7 with Playwright.
+
+Conclusion: the 4-buildable / 3-deferred split is an accurate
+reflection of what static `requests.get` can reach today on free
+infra. The em-dash for tickers issued only by Bitwise / ETF.com-
+indexed-only / Franklin is the correct no-fallback behavior per
+CLAUDE.md §22, not a missing feature.
+
+
+
 Cowork's amendment #1: probe each candidate source ONCE before writing
 extractors against it. Reports HTTP status, body length, presence of
 expected AUM / Vol / Flow text snippets, and detected anti-bot
