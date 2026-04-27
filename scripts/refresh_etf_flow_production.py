@@ -63,11 +63,40 @@ def _save_partial(data: dict) -> None:
     tmp.replace(OUT_PATH)
 
 
+def _load_env_file() -> None:
+    """Lightweight .env loader (no python-dotenv dep). Reads
+    `<repo>/.env` if it exists, parses KEY=VALUE lines, and sets
+    `os.environ[KEY] = VALUE` only if not already set in the
+    environment. Quiet on missing file or parse errors."""
+    env_path = REPO_ROOT / ".env"
+    if not env_path.exists():
+        return
+    try:
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+    except OSError:
+        pass
+
+
 def main() -> None:
+    # Load .env first so EDGAR_CONTACT_EMAIL / CRYPTORANK_API_KEY pulled
+    # from the operator's local config become visible to the chain.
+    _load_env_file()
     # Force live fetches (script is run manually post-Sprint-2-merge or
     # from the nightly cron — DEMO_MODE_NO_FETCH=0 either way).
     os.environ.pop("DEMO_MODE_NO_FETCH", None)
     os.environ["DEMO_MODE_NO_FETCH"] = "0"
+    if os.environ.get("CRYPTORANK_API_KEY"):
+        logger.info("Cryptorank: key loaded — flow chain step 1 active")
+    else:
+        logger.info("Cryptorank: no key set — flow chain skips to step 2")
 
     from core.etf_universe import load_universe
     from integrations.etf_flow_data import (
@@ -91,15 +120,22 @@ def main() -> None:
         "Vol chain (yfinance 3M → 10D → ETF.com → 60D history mean)"
     )
     captured_tickers = snapshot.setdefault("tickers", {})
-    # Resume-from-progress: only skip tickers that already have at least one
-    # captured value. Bootstrap entries with all-null fields must be retried,
-    # otherwise the script no-ops on first run after the bootstrap commit.
-    def _has_real_data(entry: dict) -> bool:
-        return any(
+    # Resume-from-progress: skip ONLY tickers that have ALL THREE fields
+    # populated (AUM, Flow, Vol). Tickers missing any field are retried
+    # so a Sprint 2.6+ chain change (new extractor / cryptorank key
+    # going live / EDGAR resolver) gets a chance to populate the gaps.
+    # Tickers fully populated stay cached.
+    def _fully_populated(entry: dict) -> bool:
+        return all(
             entry.get(k) is not None
             for k in ("aum_usd", "flow_30d_usd", "avg_daily_vol")
         )
-    already = {t for t, v in captured_tickers.items() if _has_real_data(v)}
+    already = {t for t, v in captured_tickers.items() if _fully_populated(v)}
+    if already:
+        logger.info(
+            "Resume-from-progress: skipping %d tickers with full coverage",
+            len(already),
+        )
 
     # Process in batches with cooldowns between batches.
     completed_in_run = 0
@@ -112,14 +148,26 @@ def main() -> None:
                 aum_v, aum_src = get_etf_aum(tkr)
                 flow_v, flow_src = get_etf_30d_net_flow(tkr)
                 vol_v, vol_src = get_etf_avg_daily_volume(tkr)
-                captured_tickers[tkr] = {
-                    "aum_usd":       aum_v,
-                    "flow_30d_usd":  flow_v,
-                    "avg_daily_vol": vol_v,
-                    "aum_source":    aum_src,
-                    "flow_source":   flow_src,
-                    "vol_source":    vol_src,
-                }
+                # Merge: don't OVERWRITE a previously-captured value
+                # with None. The new run might fail a step that the old
+                # run succeeded on (transient rate-limit, etc.) — keep
+                # the better value of the two for each field.
+                prev = captured_tickers.get(tkr) or {}
+                merged: dict = {}
+                for field, new_val, new_src, src_field in (
+                    ("aum_usd",       aum_v,  aum_src,  "aum_source"),
+                    ("flow_30d_usd",  flow_v, flow_src, "flow_source"),
+                    ("avg_daily_vol", vol_v,  vol_src,  "vol_source"),
+                ):
+                    if new_val is not None:
+                        merged[field] = new_val
+                        merged[src_field] = new_src
+                    else:
+                        # Keep the previous capture if it had a value;
+                        # otherwise carry forward None.
+                        merged[field] = prev.get(field)
+                        merged[src_field] = prev.get(src_field)
+                captured_tickers[tkr] = merged
                 completed_in_run += 1
                 logger.info(
                     "  %-6s aum=%s (%s) flow=%s (%s) vol=%s (%s)",

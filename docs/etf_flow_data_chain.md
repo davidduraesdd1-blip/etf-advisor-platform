@@ -1,21 +1,68 @@
 # ETF flow data chain — full specification
 
-Polish round 5, Sprint 2 (2026-04-29) + Sprint 2.5 (2026-04-29).
-Cowork directive: "everything real and live, no hardcoded fallback
-values."
+Polish round 5, Sprint 2 (2026-04-29) + Sprint 2.5 (2026-04-29) +
+Sprint 2.6 (2026-04-30). Cowork directive: "everything real and
+live, no hardcoded fallback values."
 
-## Measured coverage (Sprint 2.5 capture run, 2026-04-29)
+## Measured coverage (Sprint 2.6 capture run, 2026-04-30)
 
-After the live capture run across all 211 universe tickers
-(`scripts/refresh_etf_flow_production.py`, 11 batches × 20 tickers,
-30s inter-batch cooldown, ~10 min wall):
+| Field | Sprint 2.5 (2026-04-29) | Sprint 2.6 (2026-04-30) | Δ |
+|---|---|---|---|
+| AUM           | 113 / 211 (53.6%) | 119 / 211 (56.4%) | +6 |
+| 30D net flow  |   6 / 211 ( 2.8%) |   6 / 211 ( 2.8%) | — |
+| Avg daily vol | 124 / 211 (58.8%) | 132 / 211 (62.6%) | +8 |
+| Errors        |   0 / 211         |   0 / 211         |  0 |
 
-| Field | Coverage | Sources active |
-|---|---|---|
-| AUM           | 113 / 211 (53.6%) | 99 yfinance + 14 bootstrap |
-| 30D net flow  |   6 / 211 ( 2.8%) | 6 bootstrap (chain steps below) |
-| Avg daily vol | 124 / 211 (58.8%) | 118 yfinance 3M + 6 bootstrap |
-| Errors        |   0 / 211         | clean run                    |
+Sprint 2.6 source distribution (AUM):
+  yfinance:                107
+  SEC EDGAR (facts):         5  (NEW commit 4)
+  issuer-site:grayscale:     1  (NEW commits 1-3)
+  reference (bootstrap):     6
+  unavailable (em-dash):    92
+
+VS Cowork's ≥150 acceptance gate from amendment 3 of Sprint 2.6:
+119/211 misses by 31 tickers. Per amendment 3 the contingency was
+"Sprint 2.7 with Playwright" rather than re-tuning 2.6.
+
+## Why coverage stops at 119/211 (Sprint 2.6 commit 7 per amendment 5)
+
+The 92 unavailable-from-any-free-source tickers concentrate by issuer:
+
+| Issuer | Unavail | Sprint 2.6 status | Path to coverage |
+|---|---|---|---|
+| Bitwise            | 17 | DEFERRED        | Sprint 2.7 — Playwright (React SPA, no static HTML AUM) |
+| Grayscale          | 13 | partial         | Most are tickers whose `etfs.grayscale.com/<ticker>` URL 404s. Not a fix; URL discovery for newly-listed slugs is per-ticker work |
+| 21Shares           |  9 | not yet wired   | Sprint 2.7 — issuer extractor (next priority after Playwright trio) |
+| Canary             |  6 | not yet wired   | Sprint 2.7 |
+| Calamos            |  6 | not yet wired   | Sprint 2.7 |
+| Franklin Templeton |  4 | DEFERRED        | Sprint 2.7 — Playwright (JS-rendered SPA) |
+| BlackRock iShares  |  3 | partial         | IDOG/ILTC/ISOL/IXRP not in the iShares product-screener JSON yet (newly listed) |
+| Fidelity           |  3 | DEFERRED        | Sprint 2.7 — Playwright (JS-rendered) |
+| ProShares          |  1 | partial         | EETU not in their public sitemap |
+| (15 other issuers) | 30 | not yet wired   | Long tail; Sprint 2.7+ |
+
+The deeper structural reason: yfinance's coverage failure correlates
+with issuer-site coverage failure. Newly-listed funds that yfinance
+hasn't indexed yet are also the funds whose static issuer pages
+404 or are JS-rendered. The two failure modes share a root cause
+(time-since-listing). Filling the gap requires either time (yfinance
+catches up; issuers publish static AUM tiles) or a render path that
+can execute the SPA (Playwright in Sprint 2.7).
+
+## Cryptorank silent-failure (Sprint 2.6 finding)
+
+`_fetch_cryptorank_flow` in `integrations/etf_flow_data.py` calls
+`https://api.cryptorank.io/v1/etfs/<ticker>/flows` with `X-API-Key`
+header. The endpoint URL is speculative — Cryptorank's actual API
+schema is at `/v0/...` with different path structure. Their key-
+gated step returned non-200 silently for every ticker in the
+Sprint 2.6 capture run, contributing 0 net flow values.
+
+Fixing this requires looking up the correct cryptorank.io endpoint
+in their dev portal docs (David's key has portal access on the
+Basic/Free tier). Flagged for Sprint 2.7 as a separate (cheap)
+commit since it's a single endpoint URL fix, not infrastructure.
+
 
 Demo-critical 20 BTC/ETH spot ETFs (IBIT/FBTC/BITB/ARKB/BTCO/EZBC/
 BRRR/HODL/BTCW/BTC/GBTC/DEFI/ETHA/FETH/ETH/ETHE/ETHW/CETH/QETH/EZET)

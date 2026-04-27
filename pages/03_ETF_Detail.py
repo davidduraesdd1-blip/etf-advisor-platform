@@ -124,6 +124,11 @@ def main() -> None:
                 if s and "snapshot" not in s and s not in ("none", "error")
             )
             _n_snap = sum(c for s, c in _aum_dist.items() if s and "snapshot" in s)
+            # Sprint 2.6 commit 7 per Cowork amendment 5: surface the
+            # "unavailable from any free source" count alongside live +
+            # snapshot. Makes the coverage gap a visible product
+            # decision rather than a hidden limitation.
+            _n_unavailable = int(_aum_dist.get("none", 0) or 0) + int(_aum_dist.get("error", 0) or 0)
             _age_str = "—"
             try:
                 _w_dt = _dt.fromisoformat(_warmed.replace("Z", "+00:00"))
@@ -140,8 +145,10 @@ def main() -> None:
                 f'<div style="font-size:11px;color:var(--text-muted);'
                 f'margin:-8px 0 12px 0;font-family:var(--font-mono);">'
                 f'Data refreshed: {_age_str} · '
-                f'{_n_live}/{_n_total} tickers live · '
-                f'{_n_snap}/{_n_total} from snapshot</div>',
+                f'{_n_live}/{_n_total} live · '
+                f'{_n_snap}/{_n_total} from snapshot · '
+                f'{_n_unavailable}/{_n_total} unavailable from any free source'
+                f'</div>',
                 unsafe_allow_html=True,
             )
     except Exception:

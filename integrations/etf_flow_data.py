@@ -220,7 +220,15 @@ def get_etf_aum(ticker: str) -> tuple[Optional[float], Optional[str]]:
     except Exception as exc:
         logger.info("yfinance AUM fetch failed for %s: %s", tkr, exc)
 
-    # Step 2: SEC EDGAR N-PORT total_net_assets
+    # Step 2: SEC EDGAR — two-pronged attack.
+    #
+    # 2a) N-PORT via integrations.edgar_nport for the curated list of
+    #     SUPPORTED_TICKERS (spot trusts + futures funds that publish
+    #     full holdings). Highest-quality TNA when applicable.
+    # 2b) XBRL company-facts via integrations.edgar_facts for ANY
+    #     ticker whose registrant is in the SEC ticker index. Lighter
+    #     fetch (50-500 KB JSON vs full N-PORT XML), broader coverage
+    #     than the curated list. Sprint 2.6 commit 4 long-tail resolver.
     try:
         from integrations.edgar_nport import get_etf_composition, SUPPORTED_TICKERS
         if tkr in SUPPORTED_TICKERS:
@@ -231,6 +239,15 @@ def get_etf_aum(ticker: str) -> tuple[Optional[float], Optional[str]]:
                 return (float(tna), "SEC EDGAR")
     except Exception as exc:
         logger.info("EDGAR N-PORT AUM fetch failed for %s: %s", tkr, exc)
+
+    try:
+        from integrations.edgar_facts import get_etf_aum_via_facts
+        v = get_etf_aum_via_facts(tkr)
+        if v is not None and v > 0:
+            _cache_put(tkr, "aum", float(v), "SEC EDGAR (facts)")
+            return (float(v), "SEC EDGAR (facts)")
+    except Exception as exc:
+        logger.info("EDGAR companyfacts AUM fetch failed for %s: %s", tkr, exc)
 
     # Step 3: ETF.com public page scrape
     v = _scrape_etfcom_aum(tkr)
@@ -281,28 +298,26 @@ def _scrape_etfcom_aum(ticker: str) -> Optional[float]:
 def _scrape_issuer_aum(ticker: str) -> tuple[Optional[float], Optional[str]]:
     """
     Issuer-site scraper for the top 6 issuers. Reads the ETF's
-    `issuer` field from the universe and routes to a per-issuer
-    extractor callable. Returns (aum, source_name) or (None, None).
+    `issuer` field from the universe and dispatches to the per-issuer
+    extractor in `integrations.issuer_extractors`. Returns
+    (aum, source_name) or (None, None).
 
-    NOTE: actual issuer-site scrapers are stubbed in this commit —
-    each returns None pending bespoke implementation per issuer site.
-    The architecture is in place; populating extractors 1-6 lands
-    in a follow-up commit since each issuer site has its own DOM
-    structure and rate-limit posture.
+    Sprint 2.6 commit 1-3: BlackRock iShares (JSON screener),
+    Grayscale (etfs.grayscale.com), ProShares (dual-path strategic /
+    leveraged-and-inverse) extractors are now wired live. Bitwise /
+    Fidelity / Franklin Templeton remain stubbed pending Sprint 2.7
+    Playwright work — see scripts/smoke_test_extractors.py for the
+    detected JS-render / SPA / WAF-block reasons.
     """
     try:
         from core.etf_universe import load_universe
+        from integrations.issuer_extractors import extract_issuer_aum
         universe = load_universe()
         entry = next((e for e in universe if e.get("ticker") == ticker), None)
         if not entry:
             return (None, None)
         issuer = entry.get("issuer", "") or ""
-        extractor_key = _ISSUER_EXTRACTOR_REGISTRY.get(issuer)
-        if not extractor_key:
-            return (None, None)
-        # Per-issuer extractors are pluggable; each returns Optional[float].
-        # Stubs return None — chain falls through to production snapshot.
-        return (None, f"issuer-site:{extractor_key}")
+        return extract_issuer_aum(ticker, issuer)
     except Exception as exc:
         logger.info("issuer-site scraper failed for %s: %s", ticker, exc)
         return (None, None)
