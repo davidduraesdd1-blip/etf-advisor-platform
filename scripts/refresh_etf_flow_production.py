@@ -91,7 +91,15 @@ def main() -> None:
         "Vol chain (yfinance 3M → 10D → ETF.com → 60D history mean)"
     )
     captured_tickers = snapshot.setdefault("tickers", {})
-    already = set(captured_tickers.keys())
+    # Resume-from-progress: only skip tickers that already have at least one
+    # captured value. Bootstrap entries with all-null fields must be retried,
+    # otherwise the script no-ops on first run after the bootstrap commit.
+    def _has_real_data(entry: dict) -> bool:
+        return any(
+            entry.get(k) is not None
+            for k in ("aum_usd", "flow_30d_usd", "avg_daily_vol")
+        )
+    already = {t for t, v in captured_tickers.items() if _has_real_data(v)}
 
     # Process in batches with cooldowns between batches.
     completed_in_run = 0
