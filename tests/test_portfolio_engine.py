@@ -42,23 +42,32 @@ MINIMAL_UNIVERSE = [
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestCornishFisherVar:
+    """Note: as of 2026-04-28 hotfix, cornish_fisher_var requires explicit
+    skew + excess_kurt under the no-fallback policy. These tests pass
+    crypto-equivalent moments to exercise the math behavior contract."""
+    _CRYPTO_S = -0.7   # representative test value (NOT a default)
+    _CRYPTO_K = 8.0
+
     def test_returns_non_negative(self):
-        v = cornish_fisher_var(mean_return=10.0, vol=30.0, confidence=0.95)
+        v = cornish_fisher_var(mean_return=10.0, vol=30.0, confidence=0.95,
+                               skew=self._CRYPTO_S, excess_kurt=self._CRYPTO_K)
         assert v >= 0
 
     def test_higher_confidence_means_larger_loss(self):
-        v95 = cornish_fisher_var(10.0, 30.0, 0.95)
-        v99 = cornish_fisher_var(10.0, 30.0, 0.99)
+        v95 = cornish_fisher_var(10.0, 30.0, 0.95, skew=self._CRYPTO_S, excess_kurt=self._CRYPTO_K)
+        v99 = cornish_fisher_var(10.0, 30.0, 0.99, skew=self._CRYPTO_S, excess_kurt=self._CRYPTO_K)
         assert v99 >= v95
 
     def test_higher_vol_means_larger_var(self):
-        v_low = cornish_fisher_var(10.0, 20.0, 0.95)
-        v_high = cornish_fisher_var(10.0, 50.0, 0.95)
+        v_low = cornish_fisher_var(10.0, 20.0, 0.95, skew=self._CRYPTO_S, excess_kurt=self._CRYPTO_K)
+        v_high = cornish_fisher_var(10.0, 50.0, 0.95, skew=self._CRYPTO_S, excess_kurt=self._CRYPTO_K)
         assert v_high > v_low
 
     def test_positive_mean_reduces_var(self):
-        v_pos = cornish_fisher_var(mean_return=20.0, vol=30.0, confidence=0.95)
-        v_neg = cornish_fisher_var(mean_return=-20.0, vol=30.0, confidence=0.95)
+        v_pos = cornish_fisher_var(mean_return=20.0, vol=30.0, confidence=0.95,
+                                   skew=self._CRYPTO_S, excess_kurt=self._CRYPTO_K)
+        v_neg = cornish_fisher_var(mean_return=-20.0, vol=30.0, confidence=0.95,
+                                   skew=self._CRYPTO_S, excess_kurt=self._CRYPTO_K)
         assert v_neg > v_pos
 
 

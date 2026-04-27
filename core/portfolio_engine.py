@@ -154,14 +154,142 @@ def get_live_risk_free_rate() -> float:
 # (2012) domain-of-validity where the CF quantile remains monotone. If
 # inputs not provided, fall back to crypto-calibrated defaults that
 # match the literature midpoint, not equity-ETF values.
-_CF_DEFAULT_SKEW: float = -0.7   # crypto midpoint (was -0.25, equity-grade)
-_CF_DEFAULT_KURT: float = 8.0    # crypto midpoint excess kurtosis (was 2.5)
+# 2026-04-28 hotfix: NO-FALLBACK POLICY per Cowork directive.
+# The crypto-midpoint defaults (-0.7, 8.0) that previously lived here
+# as `_CF_DEFAULT_SKEW` / `_CF_DEFAULT_KURT` have been REMOVED. Any
+# silent fallback to hardcoded constants is forbidden. Per-category
+# (S, K) are read from one of:
+#   1. data/cf_params_cache.json — runtime cache populated by the
+#      patient `core.cf_calibration.fit_per_category()` job (gitignored,
+#      regenerated nightly when cron is wired)
+#   2. core/cf_params_production.json — committed production-config
+#      snapshot, ALWAYS present in the repo, fitted manually + stored
+#      with metadata (fit timestamp, git ref, n_funds/n_observations
+#      per category, fit_basis = "live" or "nearest_neighbor")
+# If both fail, `_get_cf_params` raises RuntimeError. No third level.
 
-# Maillard (2012) monotone-domain caps — beyond these, CF quantile
-# inverts and produces nonsense. Use as a hard clip on any realized
-# moments we compute from small-sample data.
+# Maillard (2012) monotone-domain caps — applied after weighted
+# aggregation so the polynomial stays well-defined even if a
+# pathological per-category value somehow gets cached.
 _CF_SKEW_CAP: float = 1.5
 _CF_KURT_CAP: float = 15.0
+
+
+def _load_production_config() -> dict[str, tuple[float, float]] | None:
+    """
+    Read the committed production-config snapshot at
+    core/cf_params_production.json. Always present in the repo after
+    the 2026-04-28 hotfix. Returns {category: (S, K)} or None if the
+    file is missing / malformed (which is a deployment error).
+    """
+    from pathlib import Path as _Path
+    import json as _json
+    cfg_path = _Path(__file__).resolve().parents[1] / "core" / "cf_params_production.json"
+    if not cfg_path.exists():
+        logger.error("cf_params_production.json missing — repository is misconfigured")
+        return None
+    try:
+        data = _json.loads(cfg_path.read_text(encoding="utf-8"))
+        out: dict[str, tuple[float, float]] = {}
+        for cat, info in (data.get("categories") or {}).items():
+            try:
+                s = float(info["S"])
+                k = float(info["K"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            # Re-clamp on read against Maillard caps.
+            s = max(-_CF_SKEW_CAP, min(_CF_SKEW_CAP, s))
+            k = max(0.0, min(_CF_KURT_CAP, k))
+            out[str(cat)] = (s, k)
+        return out
+    except (OSError, _json.JSONDecodeError, ValueError) as exc:
+        logger.error("cf_params_production.json unreadable (%s) — repo misconfigured", exc)
+        return None
+
+
+def _get_cf_params(category: str) -> tuple[float, float]:
+    """
+    Return per-category (skew, excess_kurtosis) for the Cornish-Fisher
+    quantile expansion under the NO-FALLBACK policy.
+
+    Precedence:
+      1. data/cf_params_cache.json (runtime cache, <30 days TTL,
+         populated by core.cf_calibration.fit_per_category nightly)
+      2. core/cf_params_production.json (committed production snapshot,
+         always present in repo)
+
+    If both fail (production config missing / corrupted / category not
+    present in either), raises RuntimeError with diagnostic message.
+    NEVER returns hardcoded defaults — Cowork's 2026-04-28 directive.
+    """
+    try:
+        from core.cf_calibration import load_cache
+        cache = load_cache()
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.warning("cf_calibration cache load failed (%s) — falling through", exc)
+        cache = None
+    if cache and category in cache:
+        return cache[category]
+
+    prod = _load_production_config()
+    if prod and category in prod:
+        return prod[category]
+
+    raise RuntimeError(
+        f"CF params unavailable for category={category!r}. "
+        f"Run core.cf_calibration.fit_per_category() to populate "
+        f"data/cf_params_cache.json, and/or restore "
+        f"core/cf_params_production.json. No silent fallback per "
+        f"the no-fallback policy (Cowork hotfix 2026-04-28)."
+    )
+
+
+def _weighted_cf_params(holdings: list[dict]) -> tuple[float, float]:
+    """
+    Weight-aggregate (S, K) across the holdings of a multi-category
+    portfolio.
+
+    Method: linear weighted average of per-category (S, K), with each
+    holding contributing its `weight_pct / 100` to its category's slot:
+        S_portfolio = Σ (w_i × S_{cat(i)})
+        K_portfolio = Σ (w_i × K_{cat(i)})
+
+    Linear aggregation is the standard cumulant-based first-order
+    approximation when the per-asset return distributions are weakly
+    dependent. Conservative vs. the exact higher-moment aggregation
+    (which would require the full multivariate cumulant tensor) but
+    captures the dominant signal: alt-heavy tiers get fatter tails
+    than BTC-only tiers.
+
+    Empty holdings or zero-weight holdings → raises RuntimeError per
+    no-fallback policy. Caller is responsible for not invoking this on
+    an empty portfolio (compute_portfolio_metrics already guards).
+    """
+    if not holdings:
+        raise RuntimeError(
+            "_weighted_cf_params called with empty holdings. "
+            "Caller must guard against this (no-fallback policy)."
+        )
+    total_w = sum((h.get("weight_pct") or 0) / 100.0 for h in holdings)
+    if total_w <= 0:
+        raise RuntimeError(
+            "_weighted_cf_params: holdings have zero total weight"
+        )
+    s_sum = 0.0
+    k_sum = 0.0
+    for h in holdings:
+        w = (h.get("weight_pct") or 0) / 100.0
+        if w <= 0:
+            continue
+        s_h, k_h = _get_cf_params(h.get("category", ""))
+        s_sum += w * s_h
+        k_sum += w * k_h
+    s_w = s_sum / total_w
+    k_w = k_sum / total_w
+    # Re-clamp to Maillard caps after aggregation.
+    s_w = max(-_CF_SKEW_CAP, min(_CF_SKEW_CAP, s_w))
+    k_w = max(0.0, min(_CF_KURT_CAP, k_w))
+    return (s_w, k_w)
 
 
 def cornish_fisher_var(
@@ -172,28 +300,55 @@ def cornish_fisher_var(
     excess_kurt: float | None = None,
 ) -> float:
     """
-    Cornish-Fisher modified parametric VaR (Favre & Galeano 2002).
-    Returns a positive number representing potential loss %.
+    Cornish-Fisher modified parametric VaR (Boudt, Peterson, Croux 2008;
+    Favre & Galeano 2002). Returns a positive number representing
+    potential loss in percentage points.
 
-    `skew` and `excess_kurt`: if the caller has a realized per-ETF
-    or per-basket estimate from trailing daily returns, pass them in.
-    Otherwise defaults to crypto-calibrated midpoints (S=-0.7, K=8)
-    which match empirical BTC literature, not equity-ETF values.
+    `skew` and `excess_kurt` (Fisher convention; standard normal → 0)
+    are REQUIRED — the no-fallback policy (Cowork 2026-04-28) removed
+    the implicit crypto-midpoint defaults. Callers must source the
+    pair from `_get_cf_params(category)` / `_weighted_cf_params(holdings)`,
+    which read from `data/cf_params_cache.json` (live nightly fit) or
+    `core/cf_params_production.json` (committed snapshot) and raise
+    RuntimeError if neither is available.
 
     Both inputs are hard-capped to the Maillard (2012) monotone domain
     so the modified-VaR quantile stays well-defined.
-    """
-    S = _CF_DEFAULT_SKEW if skew is None else max(-_CF_SKEW_CAP, min(_CF_SKEW_CAP, float(skew)))
-    K = _CF_DEFAULT_KURT if excess_kurt is None else max(0.0, min(_CF_KURT_CAP, float(excess_kurt)))
 
-    z_g = {0.90: 1.282, 0.95: 1.645, 0.99: 2.326}.get(confidence, 1.645)
+    2026-04-28 sign-convention fix: the prior implementation used
+    z_g = +Φ⁻¹(c) (right-tail) instead of the correct left-tail
+    quantile z_α = -Φ⁻¹(c) for VaR. With positive z_g, the (z²-1)/6·S
+    coefficient acquires the WRONG sign for negatively-skewed
+    distributions like crypto, materially under-estimating VaR. The
+    fix uses z_α = -Φ⁻¹(c) and applies the standard Boudt et al. 2008
+    CF expansion:
+        z_α^CF = z_α + (z_α²-1)/6·γ₁
+                 + (z_α³-3z_α)/24·γ₂
+                 - (2z_α³-5z_α)/36·γ₁²
+        mVaR = -(μ + σ·z_α^CF)
+    """
+    if skew is None or excess_kurt is None:
+        raise RuntimeError(
+            "cornish_fisher_var: skew and excess_kurt are required "
+            "(no-fallback policy 2026-04-28). Source via "
+            "_get_cf_params(category) or _weighted_cf_params(holdings)."
+        )
+    S = max(-_CF_SKEW_CAP, min(_CF_SKEW_CAP, float(skew)))
+    K = max(0.0, min(_CF_KURT_CAP, float(excess_kurt)))
+
+    # Left-tail quantile of the standard normal at confidence c:
+    # for c=0.95, z_α = -1.645 (the 5th percentile, NOT +1.645).
+    z_alpha = -{0.90: 1.282, 0.95: 1.645, 0.99: 2.326}.get(confidence, 1.645)
     z_cf = (
-        z_g
-        + (z_g**2 - 1) / 6 * S
-        + (z_g**3 - 3 * z_g) / 24 * K
-        - (2 * z_g**3 - 5 * z_g) / 36 * S**2
+        z_alpha
+        + (z_alpha ** 2 - 1) / 6 * S
+        + (z_alpha ** 3 - 3 * z_alpha) / 24 * K
+        - (2 * z_alpha ** 3 - 5 * z_alpha) / 36 * S ** 2
     )
-    return max(-(mean_return - z_cf * vol), 0)
+    # mVaR = -(μ + σ·z_α^CF). Floored at 0 since VaR can't be negative
+    # (a portfolio with very high mean dominating the tail still
+    # represents a tail-loss probability ≥ 0).
+    return max(-(mean_return + vol * z_cf), 0.0)
 
 
 def cornish_fisher_cvar(
@@ -217,8 +372,14 @@ def cornish_fisher_cvar(
     Returns a positive number representing expected loss CONDITIONAL
     on being in the tail beyond VaR.
     """
-    S = _CF_DEFAULT_SKEW if skew is None else max(-_CF_SKEW_CAP, min(_CF_SKEW_CAP, float(skew)))
-    K = _CF_DEFAULT_KURT if excess_kurt is None else max(0.0, min(_CF_KURT_CAP, float(excess_kurt)))
+    if skew is None or excess_kurt is None:
+        raise RuntimeError(
+            "cornish_fisher_cvar: skew and excess_kurt are required "
+            "(no-fallback policy 2026-04-28). Source via "
+            "_get_cf_params(category) or _weighted_cf_params(holdings)."
+        )
+    S = max(-_CF_SKEW_CAP, min(_CF_SKEW_CAP, float(skew)))
+    K = max(0.0, min(_CF_KURT_CAP, float(excess_kurt)))
 
     def _cf_quantile(p: float) -> float:
         # Inverse-normal approximation (Beasley-Springer-Moro for p in
@@ -820,16 +981,22 @@ def compute_portfolio_metrics(
 
     calmar = weighted_return / max(max_drawdown, 0.01)
 
-    # VaR + CVaR — Cornish-Fisher with crypto-calibrated moments
-    # (Apr 2026 P0 recalibration: prior equity-ETF S=-0.25/K=2.5 values
-    # suppressed crypto's real fat tails; new defaults S=-0.7/K=8.0
-    # match empirical BTC literature. CVaR now numerically integrated
-    # from the SAME CF quantile as VaR — prior fixed multipliers 1.35 /
-    # 1.42 were internally inconsistent per Rockafellar & Uryasev 2000).
-    var_95 = cornish_fisher_var(weighted_return, portfolio_vol, 0.95)
-    var_99 = cornish_fisher_var(weighted_return, portfolio_vol, 0.99)
-    cvar_95 = cornish_fisher_cvar(weighted_return, portfolio_vol, 0.95)
-    cvar_99 = cornish_fisher_cvar(weighted_return, portfolio_vol, 0.99)
+    # VaR + CVaR — Cornish-Fisher with PER-CATEGORY S/K aggregated by
+    # holding weight (2026-04-28 polish round 5 Sprint 1 commit 2).
+    # Prior single-pair S=-0.7 / K=8.0 was a crypto-midpoint default;
+    # now we look up each category's calibrated values from
+    # data/cf_params_cache.json (built by core.cf_calibration.fit_per_category)
+    # and weight-aggregate. Cache miss / stale → falls back to the prior
+    # crypto-midpoint defaults (no regression risk).
+    skew_w, kurt_w = _weighted_cf_params(holdings)
+    var_95 = cornish_fisher_var(weighted_return, portfolio_vol, 0.95,
+                                skew=skew_w, excess_kurt=kurt_w)
+    var_99 = cornish_fisher_var(weighted_return, portfolio_vol, 0.99,
+                                skew=skew_w, excess_kurt=kurt_w)
+    cvar_95 = cornish_fisher_cvar(weighted_return, portfolio_vol, 0.95,
+                                  skew=skew_w, excess_kurt=kurt_w)
+    cvar_99 = cornish_fisher_cvar(weighted_return, portfolio_vol, 0.99,
+                                  skew=skew_w, excess_kurt=kurt_w)
 
     weighted_avg_vol = float(np.dot(weights, vols))
     diversification_r = weighted_avg_vol / max(portfolio_vol, 0.01)
