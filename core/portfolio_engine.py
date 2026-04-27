@@ -360,6 +360,23 @@ _CATEGORY_PAIR_CORR: dict[tuple[str, str], float] = {
     ("defined_outcome", "leveraged"):           0.50,
     ("defined_outcome", "income_covered_call"): 0.45,
     ("defined_outcome", "multi_asset"):         0.50,
+
+    # 2026-04-27 audit-round-3 follow-up: explicit cross-pairs for the
+    # remaining 11 combinations the audit found falling through to the
+    # generic 0.70 fallback. Values calibrated to keep the pairwise
+    # correlation matrix internally consistent with the BTC/ETH cluster
+    # already defined above.
+    ("altcoin_spot",        "btc_futures"):     0.65,
+    ("altcoin_spot",        "eth_futures"):     0.62,
+    ("btc_futures",         "eth_futures"):     0.85,
+    ("btc_futures",         "income_covered_call"): 0.62,
+    ("btc_futures",         "leveraged"):       0.82,
+    ("btc_futures",         "multi_asset"):     0.78,
+    ("btc_futures",         "thematic_equity"): 0.55,
+    ("eth_futures",         "income_covered_call"): 0.55,
+    ("eth_futures",         "leveraged"):       0.65,
+    ("eth_futures",         "multi_asset"):     0.72,
+    ("eth_futures",         "thematic_equity"): 0.50,
 }
 
 

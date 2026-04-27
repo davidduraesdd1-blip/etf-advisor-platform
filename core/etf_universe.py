@@ -326,10 +326,17 @@ def load_universe_with_live_analytics(
     precomputed = _load_precomputed_analytics()
     if precomputed is not None:
         per_ticker = precomputed.get("etfs", {})
+        # 2026-04-27: track which tickers HAVE a snapshot vs which need
+        # live enrichment so newly-added ETFs (added to universe after
+        # the last precompute run) still get fully populated. Without
+        # this, the universe would expand but the new funds would have
+        # `forward_return=None` and category_default analytics.
+        missing_tickers: list[str] = []
         for etf in base:
             tkr = etf["ticker"]
             snap = per_ticker.get(tkr)
             if not snap:
+                missing_tickers.append(tkr)
                 continue
             for field in (
                 "expected_return", "volatility", "correlation_with_btc",
@@ -343,6 +350,27 @@ def load_universe_with_live_analytics(
                     etf[field] = snap[field]
             etf["analytics_source"] = "precomputed"
             etf["analytics_age_hours"] = precomputed.get("_age_hours")
+
+        # Live-enrich any ticker missing from the snapshot. This keeps
+        # the cold-boot fast path for the bulk of the universe but
+        # ensures NEW ETFs added by the daily scanner / manual additions
+        # never leave the loader without a forward_return / vol / corr.
+        if missing_tickers:
+            logger.info(
+                "Precomputed snapshot covers %d/%d tickers; live-enriching %d new entries: %s",
+                len(base) - len(missing_tickers), len(base),
+                len(missing_tickers), missing_tickers[:10],
+            )
+            try:
+                _enrich_tickers_live(base, missing_tickers)
+            except Exception as exc:  # pragma: no cover — defensive
+                logger.warning(
+                    "Live-enrichment of %d new tickers failed (%s) — "
+                    "they will show category_default until next "
+                    "nightly precompute.",
+                    len(missing_tickers), exc,
+                )
+
         # Mark default-source flags for any field the snapshot didn't fill,
         # so per-tile transparency remains honest.
         for etf in base:
@@ -372,72 +400,106 @@ def load_universe_with_live_analytics(
             "will fall through to individual yfinance calls.", exc,
         )
 
+    _enrich_tickers_live(base, [e["ticker"] for e in base],
+                         vol_lookback_days=vol_lookback_days,
+                         corr_lookback_days=corr_lookback_days)
+    return base
+
+
+def _enrich_tickers_live(
+    base: list[dict],
+    target_tickers: list[str],
+    *,
+    vol_lookback_days: int = 90,
+    corr_lookback_days: int = 90,
+) -> None:
+    """
+    Mutate `base` in place by populating expected_return / forward_return /
+    volatility / correlation_with_btc on every ETF whose ticker is in
+    `target_tickers`. Idempotent — if a field is already populated by a
+    precomputed snapshot, the live computation only fills missing fields.
+
+    2026-04-27 audit-round-3 follow-up: extracted from the slow-path loop
+    so the precomputed-snapshot fast path can call it for ETFs added to
+    the universe AFTER the last nightly precompute. Without this hook,
+    new funds had no forward_return / live volatility / live correlation
+    until the next overnight precompute regenerated the snapshot.
+    """
+    target_set = set(target_tickers)
+    from integrations.data_feeds import (
+        get_btc_correlation,
+        get_forward_return_estimate,
+        get_historical_cagr,
+        get_realized_volatility,
+    )
+
     for etf in base:
         tkr = etf["ticker"]
+        if tkr not in target_set:
+            continue
 
-        # Historical return (1-2yr CAGR from this fund's own price history)
-        try:
-            cagr_info = get_historical_cagr(tkr)
-            if cagr_info.get("cagr_pct") is not None:
-                etf["expected_return"] = round(float(cagr_info["cagr_pct"]), 2)
-                etf["expected_return_source"] = "live"
-                etf["cagr_days_observed"] = cagr_info.get("days_observed")
-        except Exception as exc:  # pragma: no cover — defensive
-            logger.warning("CAGR failed for %s: %s", tkr, exc)
+        # Historical return — only compute if not already populated.
+        if etf.get("expected_return") is None:
+            try:
+                cagr_info = get_historical_cagr(tkr)
+                if cagr_info.get("cagr_pct") is not None:
+                    etf["expected_return"] = round(float(cagr_info["cagr_pct"]), 2)
+                    etf["expected_return_source"] = "live"
+                    etf["cagr_days_observed"] = cagr_info.get("days_observed")
+            except Exception as exc:  # pragma: no cover — defensive
+                logger.warning("CAGR failed for %s: %s", tkr, exc)
 
-        # Forward-return MODEL estimate — long-run BTC / ETH CAGR with
-        # category-specific drag / premium. Pass the fund's `underlying`
-        # (from the JSON registry) so leveraged / income / altcoin funds
-        # route to the correct reference asset — ETHU → ETH CAGR rather
-        # than one-size-fits-all BTC CAGR.
-        try:
-            fwd_info = get_forward_return_estimate(
-                etf.get("category", ""),
-                expense_ratio_bps=etf.get("expense_ratio_bps"),
-                underlying=etf.get("underlying"),
-            )
-            fwd = fwd_info.get("forward_return_pct")
-            if fwd is not None:
-                etf["forward_return"] = round(float(fwd), 2)
-                etf["forward_return_source"] = "live_long_run"
-                etf["forward_return_basis"] = fwd_info.get("basis", "")
-            else:
-                etf.setdefault("forward_return_source", "unavailable")
-        except Exception as exc:  # pragma: no cover — defensive
-            logger.warning("forward_return failed for %s: %s", tkr, exc)
-            etf.setdefault("forward_return_source", "unavailable")
-
-        # Volatility
-        try:
-            vol_info = get_realized_volatility(tkr, lookback_days=vol_lookback_days)
-            if vol_info.get("volatility_pct") is not None:
-                etf["volatility"] = round(float(vol_info["volatility_pct"]), 2)
-                etf["volatility_source"] = "live"
-                etf["vol_n_returns"] = vol_info.get("n_returns")
-            else:
-                etf.setdefault("volatility_source", "category_default")
-        except Exception as exc:  # pragma: no cover — defensive
-            logger.warning("realized_vol failed for %s: %s", tkr, exc)
-            etf.setdefault("volatility_source", "category_default")
-
-        # Correlation with BTC
-        try:
-            corr_info = get_btc_correlation(tkr, lookback_days=corr_lookback_days)
-            corr = corr_info.get("correlation")
-            if corr is not None:
-                etf["correlation_with_btc"] = round(float(corr), 4)
-                etf["correlation_source"] = (
-                    "self" if corr_info.get("source") == "self" else "live"
+        # Forward-return MODEL estimate — always recompute when missing
+        # since it depends on category + underlying, not just price history.
+        if etf.get("forward_return") is None:
+            try:
+                fwd_info = get_forward_return_estimate(
+                    etf.get("category", ""),
+                    expense_ratio_bps=etf.get("expense_ratio_bps"),
+                    underlying=etf.get("underlying"),
                 )
-                etf["corr_n_returns"] = corr_info.get("n_returns")
-                etf["btc_proxy_used"] = corr_info.get("btc_proxy_used")
-            else:
-                etf.setdefault("correlation_source", "category_default")
-        except Exception as exc:  # pragma: no cover — defensive
-            logger.warning("btc_corr failed for %s: %s", tkr, exc)
-            etf.setdefault("correlation_source", "category_default")
+                fwd = fwd_info.get("forward_return_pct")
+                if fwd is not None:
+                    etf["forward_return"] = round(float(fwd), 2)
+                    etf["forward_return_source"] = "live_long_run"
+                    etf["forward_return_basis"] = fwd_info.get("basis", "")
+                else:
+                    etf.setdefault("forward_return_source", "unavailable")
+            except Exception as exc:  # pragma: no cover — defensive
+                logger.warning("forward_return failed for %s: %s", tkr, exc)
+                etf.setdefault("forward_return_source", "unavailable")
 
-    return base
+        # Volatility — fill if missing.
+        if etf.get("volatility") is None:
+            try:
+                vol_info = get_realized_volatility(tkr, lookback_days=vol_lookback_days)
+                if vol_info.get("volatility_pct") is not None:
+                    etf["volatility"] = round(float(vol_info["volatility_pct"]), 2)
+                    etf["volatility_source"] = "live"
+                    etf["vol_n_returns"] = vol_info.get("n_returns")
+                else:
+                    etf.setdefault("volatility_source", "category_default")
+            except Exception as exc:  # pragma: no cover — defensive
+                logger.warning("realized_vol failed for %s: %s", tkr, exc)
+                etf.setdefault("volatility_source", "category_default")
+
+        # Correlation with BTC — fill if missing.
+        if etf.get("correlation_with_btc") is None:
+            try:
+                corr_info = get_btc_correlation(tkr, lookback_days=corr_lookback_days)
+                corr = corr_info.get("correlation")
+                if corr is not None:
+                    etf["correlation_with_btc"] = round(float(corr), 4)
+                    etf["correlation_source"] = (
+                        "self" if corr_info.get("source") == "self" else "live"
+                    )
+                    etf["corr_n_returns"] = corr_info.get("n_returns")
+                    etf["btc_proxy_used"] = corr_info.get("btc_proxy_used")
+                else:
+                    etf.setdefault("correlation_source", "category_default")
+            except Exception as exc:  # pragma: no cover — defensive
+                logger.warning("btc_corr failed for %s: %s", tkr, exc)
+                etf.setdefault("correlation_source", "category_default")
 
 
 # ═══════════════════════════════════════════════════════════════════════════

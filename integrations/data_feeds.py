@@ -759,6 +759,11 @@ def get_forward_return_estimate(
         "XLM":    "XLM-USD",
         "BAT":    "BAT-USD",
         "MANA":   "MANA-USD",
+        # 2026-04-27 audit-round-3 follow-up: FIL is a real altcoin (Filecoin)
+        # used by Grayscale's GFIL trust. Without this entry, GFIL's
+        # forward-return falls through to BTC × 0.70 instead of using FIL's
+        # actual 10yr CAGR — same fairness fix as the other altcoins.
+        "FIL":    "FIL-USD",
     }
 
     def _altcoin_cagr_or_none(coin_symbol: str) -> tuple[float | None, str]:
@@ -792,11 +797,30 @@ def get_forward_return_estimate(
         # BTC-based wrappers (BITX / BITU / BTCL / BTCI / YBIT / IBIY)
         if u in ("BTC", "IBIT", "FBTC"):
             return (btc_cagr, "BTC-USD 10yr")
-        # Equity-underlying wrappers (MSTR / COIN / MARA / RIOT) —
-        # high-beta BTC proxies, modeled at BTC × 1.0 baseline. The
-        # category-level multiplier (e.g., leveraged 1.40) still applies.
-        if u in ("MSTR", "COIN", "MARA", "RIOT"):
-            return (btc_cagr, f"BTC-USD 10yr (as {u} proxy)")
+        # Equity-underlying wrappers — high-beta BTC proxies, modeled
+        # at BTC × 1.0 baseline. The category-level multiplier (e.g.,
+        # leveraged 1.10) still applies on top.
+        # 2026-04-27 audit-round-3: extended set covers all the single-
+        # stock crypto-mining + crypto-exchange + Bitcoin-treasury
+        # equities the leveraged ETFs (T-REX 2X, Defiance 2X, Direxion
+        # 2X) wrap as their underlying. Without these, those wrappers
+        # silently fell through to plain BTC CAGR with no proxy label.
+        _EQUITY_PROXIES = {
+            "MSTR": "MicroStrategy (BTC treasury)",
+            "COIN": "Coinbase",
+            "MARA": "Marathon Digital (BTC miner)",
+            "RIOT": "Riot Platforms (BTC miner)",
+            "BITF": "Bitfarms (BTC miner)",
+            "IREN": "IREN Limited (BTC miner)",
+            "BMNR": "BitMine Immersion (BTC miner)",
+            "CIFR": "Cipher Mining (BTC miner)",
+            "HOOD": "Robinhood (crypto exchange)",
+            "CRCL": "Circle (USDC issuer)",
+            "GLXY": "Galaxy Digital (crypto financial)",
+            "SBET": "SharpLink Gaming (BTC treasury)",
+        }
+        if u in _EQUITY_PROXIES:
+            return (btc_cagr, f"BTC-USD 10yr (as {u} {_EQUITY_PROXIES[u]} proxy)")
         # Per-altcoin lookup — use the coin's own long-run CAGR when
         # yfinance has it. Fairer than the old BTC-fallback.
         if u in _ALTCOIN_YFINANCE_TICKER:
