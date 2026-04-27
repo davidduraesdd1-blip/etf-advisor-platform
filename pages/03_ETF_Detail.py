@@ -103,6 +103,50 @@ def main() -> None:
             ),
         )
 
+    # 2026-04-29 Sprint 2 commit 4: data freshness indicator. Reads the
+    # last cron pre-warm summary from data/portfolio_snapshot.json
+    # (written by core.scheduler.recalculate_all_portfolios + the new
+    # prewarm_etf_flow_cache step). Tells the FA at a glance how live
+    # the AUM/Flow/Vol tiles below actually are.
+    try:
+        from core.scheduler import load_latest_snapshot
+        from datetime import datetime as _dt, timezone as _tz
+        _snap = load_latest_snapshot() or {}
+        _flow_summary = _snap.get("flow_prewarm") or {}
+        if _flow_summary:
+            _warmed = _flow_summary.get("warmed_at_utc", "")
+            _n_total = int(_flow_summary.get("n_total", 0) or 0)
+            # Sum live (non-snapshot, non-none) sources for AUM as the
+            # representative "how many tickers got live data" stat.
+            _aum_dist = _flow_summary.get("aum") or {}
+            _n_live = sum(
+                c for s, c in _aum_dist.items()
+                if s and "snapshot" not in s and s not in ("none", "error")
+            )
+            _n_snap = sum(c for s, c in _aum_dist.items() if s and "snapshot" in s)
+            _age_str = "—"
+            try:
+                _w_dt = _dt.fromisoformat(_warmed.replace("Z", "+00:00"))
+                _delta_h = (_dt.now(_tz.utc) - _w_dt).total_seconds() / 3600.0
+                if _delta_h < 1:
+                    _age_str = f"{int(_delta_h * 60)}m ago"
+                elif _delta_h < 48:
+                    _age_str = f"{_delta_h:.1f}h ago"
+                else:
+                    _age_str = f"{int(_delta_h / 24)}d ago"
+            except Exception:
+                pass
+            st.markdown(
+                f'<div style="font-size:11px;color:var(--text-muted);'
+                f'margin:-8px 0 12px 0;font-family:var(--font-mono);">'
+                f'Data refreshed: {_age_str} · '
+                f'{_n_live}/{_n_total} tickers live · '
+                f'{_n_snap}/{_n_total} from snapshot</div>',
+                unsafe_allow_html=True,
+            )
+    except Exception:
+        pass   # freshness indicator is informational; never blocks render
+
     # Data-source panel intentionally omitted on research pages per FA
     # feedback. Tile-level `data_source_badge` calls still surface any
     # active fallback exactly where it affects the number. Full stack
