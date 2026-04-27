@@ -1,5 +1,5 @@
 {
-  "captured_at_utc": "2026-04-27T20:35:15.058622+00:00",
+  "captured_at_utc": "2026-04-27T23:49:43.000476+00:00",
   "method": "live multi-source fetch via integrations/etf_flow_data.py \u2014 AUM chain (yfinance \u2192 EDGAR N-PORT \u2192 ETF.com \u2192 issuer-site), Flow chain (cryptorank \u2192 SoSoValue \u2192 Farside \u2192 N-PORT-derived), Vol chain (yfinance 3M \u2192 10D \u2192 ETF.com \u2192 60D history mean)",
   "note": "Sprint 2 commit 2 bootstrap snapshot. Tickers without entries here will fall through to the live chain at render time. Schedule a refresh once yfinance + cryptorank rate limits cooperate.",
   "tickers": {
@@ -28,76 +28,76 @@
       "vol_source": "reference (bootstrap)"
     },
     "ARKB": {
-      "aum_usd": 2800000000,
+      "aum_usd": 2389618176.0,
+      "aum_source": "yfinance",
       "flow_30d_usd": null,
-      "avg_daily_vol": null,
-      "aum_source": "reference (bootstrap)",
       "flow_source": null,
-      "vol_source": null
+      "avg_daily_vol": 5864452.0,
+      "vol_source": "yfinance (3M avg)"
     },
     "BTCO": {
-      "aum_usd": 900000000,
+      "aum_usd": 455017056.0,
+      "aum_source": "yfinance",
       "flow_30d_usd": null,
-      "avg_daily_vol": null,
-      "aum_source": "reference (bootstrap)",
       "flow_source": null,
-      "vol_source": null
+      "avg_daily_vol": 140714.0,
+      "vol_source": "yfinance (3M avg)"
     },
     "EZBC": {
-      "aum_usd": 400000000,
+      "aum_usd": 427462624.0,
+      "aum_source": "yfinance",
       "flow_30d_usd": null,
-      "avg_daily_vol": null,
-      "aum_source": "reference (bootstrap)",
       "flow_source": null,
-      "vol_source": null
+      "avg_daily_vol": 232142.0,
+      "vol_source": "yfinance (3M avg)"
     },
     "BRRR": {
-      "aum_usd": 300000000,
+      "aum_usd": 427423392.0,
+      "aum_source": "yfinance",
       "flow_30d_usd": null,
-      "avg_daily_vol": null,
-      "aum_source": "reference (bootstrap)",
       "flow_source": null,
-      "vol_source": null
+      "avg_daily_vol": 317785.0,
+      "vol_source": "yfinance (3M avg)"
     },
     "HODL": {
-      "aum_usd": 800000000,
+      "aum_usd": 1153474688.0,
+      "aum_source": "yfinance",
       "flow_30d_usd": null,
-      "avg_daily_vol": null,
-      "aum_source": "reference (bootstrap)",
       "flow_source": null,
-      "vol_source": null
+      "avg_daily_vol": 2387857.0,
+      "vol_source": "yfinance (3M avg)"
     },
     "BTCW": {
       "aum_usd": 146697248.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 47911.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 47911.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BTC": {
       "aum_usd": 3502875648.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 4623534.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 4623534.0,
       "vol_source": "yfinance (3M avg)"
     },
     "GBTC": {
-      "aum_usd": 18000000000,
+      "aum_usd": 10487256064.0,
+      "aum_source": "yfinance",
       "flow_30d_usd": null,
-      "avg_daily_vol": null,
-      "aum_source": "reference (bootstrap)",
       "flow_source": null,
-      "vol_source": null
+      "avg_daily_vol": 4253514.0,
+      "vol_source": "yfinance (3M avg)"
     },
     "DEFI": {
-      "aum_usd": 180000000,
+      "aum_usd": 9220735.0,
+      "aum_source": "yfinance",
       "flow_30d_usd": null,
-      "avg_daily_vol": null,
-      "aum_source": "reference (bootstrap)",
       "flow_source": null,
-      "vol_source": null
+      "avg_daily_vol": 662.0,
+      "vol_source": "yfinance (3M avg)"
     },
     "ETHA": {
       "aum_usd": 9300000000,
@@ -117,402 +117,402 @@
     },
     "ETH": {
       "aum_usd": 1805017728.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 7191847.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 7191847.0,
       "vol_source": "yfinance (3M avg)"
     },
     "ETHE": {
-      "aum_usd": 4300000000,
+      "aum_usd": 1785199360.0,
+      "aum_source": "yfinance",
       "flow_30d_usd": null,
-      "avg_daily_vol": null,
-      "aum_source": "reference (bootstrap)",
       "flow_source": null,
-      "vol_source": null
+      "avg_daily_vol": 4974496.0,
+      "vol_source": "yfinance (3M avg)"
     },
     "ETHW": {
       "aum_usd": 218225920.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 1643973.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 1643973.0,
       "vol_source": "yfinance (3M avg)"
     },
     "CETH": {
       "aum_usd": 31232820.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 476490.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 476490.0,
       "vol_source": "yfinance (3M avg)"
     },
     "QETH": {
       "aum_usd": 18182028.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 100462.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 100462.0,
       "vol_source": "yfinance (3M avg)"
     },
     "EZET": {
       "aum_usd": 42135816.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 163568.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 163568.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BSOL": {
       "aum_usd": 570592704.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 2414090.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 2414090.0,
       "vol_source": "yfinance (3M avg)"
     },
     "FSOL": {
-      "aum_usd": null,
+      "aum_usd": 113949000.0,
+      "aum_source": "SEC EDGAR (facts)",
       "flow_30d_usd": null,
-      "avg_daily_vol": 328011.0,
-      "aum_source": null,
       "flow_source": null,
+      "avg_daily_vol": 328011.0,
       "vol_source": "yfinance (3M avg)"
     },
     "SSOL": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "QSOL": {
       "aum_usd": 5517633.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 28283.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 28283.0,
       "vol_source": "yfinance (3M avg)"
     },
     "GSOL": {
       "aum_usd": 105127840.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 1412403.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 1412403.0,
       "vol_source": "yfinance (3M avg)"
     },
     "XRPC": {
       "aum_usd": 264554192.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 164880.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 164880.0,
       "vol_source": "yfinance (3M avg)"
     },
     "XRPR": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 46822.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 46822.0,
       "vol_source": "yfinance (3M avg)"
     },
     "XRP": {
       "aum_usd": 261453072.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 625109.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 625109.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BXRP": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "LTCO": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "GLTC": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "DOJE": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 32044.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 32044.0,
       "vol_source": "yfinance (3M avg)"
     },
     "CDOG": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "HBR": {
       "aum_usd": 50037836.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 47332.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 47332.0,
       "vol_source": "yfinance (3M avg)"
     },
     "AVAX": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "ADAX": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BITO": {
       "aum_usd": 1742492928.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 103469285.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 103469285.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BTF": {
       "aum_usd": 15713726.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 14616.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 14616.0,
       "vol_source": "yfinance (3M avg)"
     },
     "EETH": {
       "aum_usd": 66415524.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 118229.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 118229.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BITX": {
       "aum_usd": 961273536.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 13566285.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 13566285.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BITU": {
       "aum_usd": 387191296.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 5592562.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 5592562.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BTCL": {
       "aum_usd": 26875204.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 142904.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 142904.0,
       "vol_source": "yfinance (3M avg)"
     },
     "ETHU": {
       "aum_usd": 867332672.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 7665996.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 7665996.0,
       "vol_source": "yfinance (3M avg)"
     },
     "ETHT": {
       "aum_usd": 206403424.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 2324732.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 2324732.0,
       "vol_source": "yfinance (3M avg)"
     },
     "SOLT": {
       "aum_usd": 135075088.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 779142.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 779142.0,
       "vol_source": "yfinance (3M avg)"
     },
     "XRPT": {
       "aum_usd": 67702392.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 231770.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 231770.0,
       "vol_source": "yfinance (3M avg)"
     },
     "MSTU": {
       "aum_usd": 354383616.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 38047178.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 38047178.0,
       "vol_source": "yfinance (3M avg)"
     },
     "MSTX": {
       "aum_usd": 206065872.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 6883859.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 6883859.0,
       "vol_source": "yfinance (3M avg)"
     },
     "CONL": {
       "aum_usd": 490758208.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 19212227.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 19212227.0,
       "vol_source": "yfinance (3M avg)"
     },
     "MARL": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "RIOX": {
       "aum_usd": 15546420.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 227411.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 227411.0,
       "vol_source": "yfinance (3M avg)"
     },
     "MSTY": {
       "aum_usd": 1053143104.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 1315696.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 1315696.0,
       "vol_source": "yfinance (3M avg)"
     },
     "CONY": {
       "aum_usd": 393266816.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 430922.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 430922.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BTCI": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 638250.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 638250.0,
       "vol_source": "yfinance (3M avg)"
     },
     "ETHI": {
       "aum_usd": 4297304.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 62602.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 62602.0,
       "vol_source": "yfinance (3M avg)"
     },
     "YBIT": {
       "aum_usd": 57333656.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 52867.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 52867.0,
       "vol_source": "yfinance (3M avg)"
     },
     "YETH": {
       "aum_usd": 69044584.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 146044.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 146044.0,
       "vol_source": "yfinance (3M avg)"
     },
     "IBIY": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "ETHY": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "MSFO": {
       "aum_usd": 88979200.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 144329.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 144329.0,
       "vol_source": "yfinance (3M avg)"
     },
     "COII": {
       "aum_usd": 2686940.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 7931.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 7931.0,
       "vol_source": "yfinance (3M avg)"
     },
     "MARO": {
       "aum_usd": 47645784.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 256449.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 256449.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BLOK": {
       "aum_usd": 925187392.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 372318.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 372318.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BITQ": {
       "aum_usd": 335773440.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 221618.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 221618.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BKCH": {
@@ -525,1170 +525,1170 @@
     },
     "DAPP": {
       "aum_usd": 274066528.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 754618.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 754618.0,
       "vol_source": "yfinance (3M avg)"
     },
     "LEGR": {
       "aum_usd": 115563664.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 8511.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 8511.0,
       "vol_source": "yfinance (3M avg)"
     },
     "SATO": {
       "aum_usd": 1213472.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 5785.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 5785.0,
       "vol_source": "yfinance (3M avg)"
     },
     "WGMI": {
       "aum_usd": 159870320.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 576975.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 576975.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BITS": {
       "aum_usd": 23575700.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 5545.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 5545.0,
       "vol_source": "yfinance (3M avg)"
     },
     "DTCR": {
       "aum_usd": 1196577024.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 802906.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 802906.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BITW": {
       "aum_usd": 678489216.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 121498.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 121498.0,
       "vol_source": "yfinance (3M avg)"
     },
     "EFBC": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "CBOJ": {
       "aum_usd": 23845892.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 9054.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 9054.0,
       "vol_source": "yfinance (3M avg)"
     },
     "CBXJ": {
       "aum_usd": 16719195.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 10616.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 10616.0,
       "vol_source": "yfinance (3M avg)"
     },
     "CBTJ": {
       "aum_usd": 20924492.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 12618.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 12618.0,
       "vol_source": "yfinance (3M avg)"
     },
     "CBOQ": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "CBOS": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "CBOO": {
       "aum_usd": 6095903.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 1373.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 1373.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BMAX": {
       "aum_usd": 5879346.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 730.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 730.0,
       "vol_source": "yfinance (3M avg)"
     },
     "IMST": {
       "aum_usd": 17828348.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 43144.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 43144.0,
       "vol_source": "yfinance (3M avg)"
     },
     "ETHV": {
       "aum_usd": 106575752.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 212968.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 212968.0,
       "vol_source": "yfinance (3M avg)"
     },
     "ESK": {
       "aum_usd": 1638358.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 1662.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 1662.0,
       "vol_source": "yfinance (3M avg)"
     },
     "SSK": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 128186.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 128186.0,
       "vol_source": "yfinance (3M avg)"
     },
     "OBTC": {
       "aum_usd": 64165532.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 10021.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 10021.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BTCZ": {
       "aum_usd": 26551100.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 18149106.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 18149106.0,
       "vol_source": "yfinance (3M avg)"
     },
     "ETU": {
       "aum_usd": 12743809.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 195840.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 195840.0,
       "vol_source": "yfinance (3M avg)"
     },
     "SOLX": {
       "aum_usd": 444438.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 9201.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 9201.0,
       "vol_source": "yfinance (3M avg)"
     },
     "XRPK": {
       "aum_usd": 318296.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 4039.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 4039.0,
       "vol_source": "yfinance (3M avg)"
     },
     "MSTZ": {
       "aum_usd": 105626616.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 19514111.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 19514111.0,
       "vol_source": "yfinance (3M avg)"
     },
     "CEPI": {
       "aum_usd": 80915232.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 39462.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 39462.0,
       "vol_source": "yfinance (3M avg)"
     },
     "MSII": {
       "aum_usd": 3063740.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 17126.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 17126.0,
       "vol_source": "yfinance (3M avg)"
     },
     "LFGY": {
       "aum_usd": 104910416.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 85522.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 85522.0,
       "vol_source": "yfinance (3M avg)"
     },
     "WNTR": {
       "aum_usd": 93780528.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 235590.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 235590.0,
       "vol_source": "yfinance (3M avg)"
     },
     "FIAT": {
       "aum_usd": 38979064.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 94345.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 94345.0,
       "vol_source": "yfinance (3M avg)"
     },
     "MSST": {
       "aum_usd": 3288582.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 3209.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 3209.0,
       "vol_source": "yfinance (3M avg)"
     },
     "CRCO": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 101757.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 101757.0,
       "vol_source": "yfinance (3M avg)"
     },
     "GDOG": {
       "aum_usd": 6760668.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 31229.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 31229.0,
       "vol_source": "yfinance (3M avg)"
     },
     "GXRP": {
       "aum_usd": 61517160.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 110795.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 110795.0,
       "vol_source": "yfinance (3M avg)"
     },
     "GSUI": {
       "aum_usd": 30409152.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 34411.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 34411.0,
       "vol_source": "yfinance (3M avg)"
     },
     "GLNK": {
       "aum_usd": 73084072.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 231854.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 231854.0,
       "vol_source": "yfinance (3M avg)"
     },
     "GADA": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "GDLC": {
       "aum_usd": 378997344.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 74978.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 74978.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BAAV": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BUNI": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BSUI": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BTRX": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BTAO": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BNRR": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BHYP": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BENA": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BSTK": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 5124.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 5124.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BITC": {
       "aum_usd": 15459205.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 5583.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 5583.0,
       "vol_source": "yfinance (3M avg)"
     },
     "OWNB": {
       "aum_usd": 17130580.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 11632.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 11632.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BITI": {
       "aum_usd": 166038992.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 2512296.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 2512296.0,
       "vol_source": "yfinance (3M avg)"
     },
     "EETU": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "CBQO": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "CBOA": {
       "aum_usd": 4864510.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 1724.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 1724.0,
       "vol_source": "yfinance (3M avg)"
     },
     "QBJL": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "COIW": {
       "aum_usd": 32883834.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 131480.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 131480.0,
       "vol_source": "yfinance (3M avg)"
     },
     "MSTU2": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "CONG": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "NCIQ": {
       "aum_usd": 98081992.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 39208.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 39208.0,
       "vol_source": "yfinance (3M avg)"
     },
     "ADAC": {
-      "aum_usd": null,
+      "aum_usd": 231646618.0,
+      "aum_source": "SEC EDGAR (facts)",
       "flow_30d_usd": null,
-      "avg_daily_vol": 10741.0,
-      "aum_source": null,
       "flow_source": null,
+      "avg_daily_vol": 10741.0,
       "vol_source": "yfinance (3M avg)"
     },
     "AVAC": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "SUIQ": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "PNGU": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "TOIN": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "TPOL": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "FSUI": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "MAXI": {
       "aum_usd": 29620420.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 36736.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 36736.0,
       "vol_source": "yfinance (3M avg)"
     },
     "SBIT": {
       "aum_usd": 206914976.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 1872327.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 1872327.0,
       "vol_source": "yfinance (3M avg)"
     },
     "SETH": {
       "aum_usd": 17804348.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 68675.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 68675.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BETE": {
       "aum_usd": 8716925.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 5793.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 5793.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BETH": {
       "aum_usd": 12314750.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 4962.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 4962.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BYBT": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "MAGS": {
       "aum_usd": 3495725056.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 4332998.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 4332998.0,
       "vol_source": "yfinance (3M avg)"
     },
     "CRPT": {
       "aum_usd": 88918632.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 88218.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 88218.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BTCY": {
-      "aum_usd": null,
+      "aum_usd": 5686495.0,
+      "aum_source": "SEC EDGAR (facts)",
       "flow_30d_usd": null,
-      "avg_daily_vol": 39757.0,
-      "aum_source": null,
       "flow_source": null,
+      "avg_daily_vol": 39757.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BTCG": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BAGG": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BZEC": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "TKAS": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "CXLM": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "GHBR": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "GFIL": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "GMCR": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "GBAT": {
       "aum_usd": 2396484.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 15929.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 15929.0,
       "vol_source": "yfinance (3M avg)"
     },
     "QQQY": {
       "aum_usd": 161928048.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 181375.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 181375.0,
       "vol_source": "yfinance (3M avg)"
     },
     "VSOL": {
       "aum_usd": 14725719.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 46729.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 46729.0,
       "vol_source": "yfinance (3M avg)"
     },
     "XSOL": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "VXRP": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "FXRP": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "QBJK": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "QBJA": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "CBOY": {
       "aum_usd": 4870660.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 798.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 798.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BSOLE": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BETHE": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "ISOL": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 34.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 34.0,
       "vol_source": "yfinance (3M avg)"
     },
     "IXRP": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "YBTC": {
       "aum_usd": 157056128.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 158847.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 158847.0,
       "vol_source": "yfinance (3M avg)"
     },
     "IRE": {
       "aum_usd": 192941808.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 5934395.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 5934395.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BTFL": {
       "aum_usd": 1249492.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 7875.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 7875.0,
       "vol_source": "yfinance (3M avg)"
     },
     "HOOX": {
       "aum_usd": 10498985.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 137338.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 137338.0,
       "vol_source": "yfinance (3M avg)"
     },
     "HOOZ": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 248063.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 248063.0,
       "vol_source": "yfinance (3M avg)"
     },
     "SMST": {
       "aum_usd": 42334364.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 400436.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 400436.0,
       "vol_source": "yfinance (3M avg)"
     },
     "MST": {
       "aum_usd": 19929436.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 81865.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 81865.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BMNZ": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 1919268.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 1919268.0,
       "vol_source": "yfinance (3M avg)"
     },
     "SPBC": {
       "aum_usd": 40568444.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 7419.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 7419.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BESO": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 75666.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 75666.0,
       "vol_source": "yfinance (3M avg)"
     },
     "SOLC": {
-      "aum_usd": null,
+      "aum_usd": 1926808.0,
+      "aum_source": "SEC EDGAR (facts)",
       "flow_30d_usd": null,
-      "avg_daily_vol": 2742.0,
-      "aum_source": null,
       "flow_source": null,
+      "avg_daily_vol": 2742.0,
       "vol_source": "yfinance (3M avg)"
     },
     "RIOX2": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BSCN": {
       "aum_usd": 1688802048.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 804144.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 804144.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BPOL": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BLNK": {
-      "aum_usd": null,
+      "aum_usd": 147453000.0,
+      "aum_source": "SEC EDGAR (facts)",
       "flow_30d_usd": null,
-      "avg_daily_vol": 2230539.0,
-      "aum_source": null,
       "flow_source": null,
+      "avg_daily_vol": 2230539.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BCFI": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "TLNK": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "TAVA": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "TLTC": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "TXLM": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "GAVA": {
-      "aum_usd": null,
+      "aum_usd": 5486904.0,
+      "aum_source": "issuer-site:grayscale",
       "flow_30d_usd": null,
-      "avg_daily_vol": 1864.0,
-      "aum_source": null,
       "flow_source": null,
+      "avg_daily_vol": 1864.0,
       "vol_source": "yfinance (3M avg)"
     },
     "GTRX": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "GTAO": {
       "aum_usd": 11746098.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 39862.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 39862.0,
       "vol_source": "yfinance (3M avg)"
     },
     "GAAVE": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "GUNI": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "GBAT2": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "GMANA": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "BMAX2": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "ATCL": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 25676.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 25676.0,
       "vol_source": "yfinance (3M avg)"
     },
     "ARKW": {
       "aum_usd": 1513208960.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 139683.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 139683.0,
       "vol_source": "yfinance (3M avg)"
     },
     "ARKF": {
       "aum_usd": 762445184.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 259537.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 259537.0,
       "vol_source": "yfinance (3M avg)"
     },
     "IDOG": {
       "aum_usd": 500666208.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 41511.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 41511.0,
       "vol_source": "yfinance (3M avg)"
     },
     "ILTC": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "FSOLE": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "FDOG": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "EZSO": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "EZXR": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "EZDG": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "VXRP2": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "VLTC": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "ETHD": {
       "aum_usd": 90173520.0,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 770834.0,
       "aum_source": "yfinance",
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 770834.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BITT": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "ETHL": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "DEFIQ": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "CBOM": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "CBOG": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "CBOD": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "FTHR": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     },
     "STKE": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 236181.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 236181.0,
       "vol_source": "yfinance (3M avg)"
     },
     "MSBT": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": 883007.0,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": 883007.0,
       "vol_source": "yfinance (3M avg)"
     },
     "MSSL": {
       "aum_usd": null,
-      "flow_30d_usd": null,
-      "avg_daily_vol": null,
       "aum_source": null,
+      "flow_30d_usd": null,
       "flow_source": null,
+      "avg_daily_vol": null,
       "vol_source": null
     }
   }
