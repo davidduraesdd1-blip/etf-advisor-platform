@@ -53,12 +53,24 @@ from ui.components import (
     data_source_badge,
     performance_summary_table,
     disclosure,
-    hypothetical_results_disclosure,
     kpi_tile,
     safe_page_link,
     section_header,
     tier_pill_selector,
 )
+
+# Defensive helper import (audit-round-1 hotfix for stale Streamlit Cloud
+# deploy). Falls back to a minimal renderer if the canonical helper
+# isn't present in the cached module.
+try:
+    from ui.components import hypothetical_results_disclosure
+except ImportError:  # pragma: no cover — stale-deploy fallback
+    def hypothetical_results_disclosure(body: str | None = None, *,
+                                         margin_top_px: int = 24) -> None:
+        st.info(
+            "**Hypothetical results.** Past performance does not "
+            "guarantee future results. " + (body or "")
+        )
 from ui.level_helpers import is_advisor, is_client, level_text
 from ui.sidebar import render_sidebar
 from ui.theme import apply_theme

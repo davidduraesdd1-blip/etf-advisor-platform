@@ -12,6 +12,13 @@ from __future__ import annotations
 
 import streamlit as st
 
+# 2026-04-26 hotfix: Streamlit Cloud's import-time crash on the new
+# `hypothetical_results_disclosure` symbol — defensive import that
+# falls back to a local minimal renderer if the helper isn't present
+# (e.g., Streamlit Cloud is mid-redeploy with a stale `.pyc` cache).
+# Once the deploy stabilizes, the import succeeds and the helper from
+# ui.components is used. Same pattern for extended_modules_banner.
+
 from config import (
     BRAND_NAME,
     BRAND_LOGO_PATH,
@@ -22,7 +29,20 @@ from config import (
 )
 from ui.theme import apply_theme
 from ui.sidebar import render_sidebar
-from ui.components import card, disclosure, hypothetical_results_disclosure, safe_page_link
+from ui.components import card, disclosure, safe_page_link
+
+# Defensive helper import — if Streamlit Cloud's deploy is on a stale
+# cached `ui/components.py` that lacks the audit-round-1 helpers, fall
+# back to an inline minimal version so the page still renders.
+try:
+    from ui.components import hypothetical_results_disclosure
+except ImportError:  # pragma: no cover — stale-deploy fallback
+    def hypothetical_results_disclosure(body: str | None = None, *,
+                                         margin_top_px: int = 24) -> None:
+        st.info(
+            "**Hypothetical results.** Past performance does not guarantee "
+            "future results. " + (body or "")
+        )
 
 
 # ─── Page config ──────────────────────────────────────────────────────────────

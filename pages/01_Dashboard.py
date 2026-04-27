@@ -19,10 +19,30 @@ from ui.components import (
     card,
     data_source_badge,
     disclosure,
-    extended_modules_banner,
-    hypothetical_results_disclosure,
     section_header,
 )
+
+# Defensive imports — if Streamlit Cloud is on a stale cached
+# `ui/components.py` that lacks audit-round-1 helpers, fall back to
+# inline minimal versions so the page still renders.
+try:
+    from ui.components import hypothetical_results_disclosure
+except ImportError:  # pragma: no cover — stale-deploy fallback
+    def hypothetical_results_disclosure(body: str | None = None, *,
+                                         margin_top_px: int = 24) -> None:
+        st.info(
+            "**Hypothetical results.** Past performance does not "
+            "guarantee future results. " + (body or "")
+        )
+
+try:
+    from ui.components import extended_modules_banner
+except ImportError:  # pragma: no cover — stale-deploy fallback
+    def extended_modules_banner(*, margin_top_px: int = 24) -> None:
+        st.info(
+            "**Extended coverage — preview release.** Execution not "
+            "yet enabled for this module."
+        )
 from ui.level_helpers import level_text
 from ui.sidebar import render_sidebar
 from ui.theme import apply_theme
