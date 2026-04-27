@@ -174,7 +174,10 @@ Morning block (A-F, blocking before deploy):
 - [ ] 9. Run `python tests/verify_deployment.py --env prod` after every push to `redesign/ui-2026-05` branch. Walk the 20-point checklist when the branch deploys to a test URL. *(**Pending** test-deploy URL pointing at `redesign/advisor-2026-05-fixes`.)*
 - [ ] 10. When all pages are done + user-approved: open a PR `redesign/advisor-2026-05` → `main`. Do NOT merge without explicit user approval. *(**Pending** user walkthrough at all 3 user levels for May 1 demo.)*
 
-### Acceptance criteria (all must be ✓ before merge to main)
+### Post-demo acceptance criteria (deferred from May 1)
+*(originally "Acceptance criteria (all must be ✓ before merge to main)";
+renamed 2026-04-26 audit-round-1 commit 8 — items below are not blocking
+the May 1 demo per CLAUDE.md §22, they are post-demo polish.)*
 
 - [x] Every page renders in the new design language
 - [ ] Dark + light mode pass visually on every page *(dark ✓; light not yet walked)*

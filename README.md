@@ -10,10 +10,21 @@ two-click basket execution across the crypto ETF universe.
 **Private repo** — demo phase. Not yet production-ready. See `CLAUDE.md`
 for governance and `docs/BUILD_PACKAGE.md` for the build plan.
 
-**Active branch:** `redesign/advisor-2026-05-fixes` — full advisor-family
-redesign + mockup-parity fixes pending Cowork's walkthrough before merge
-to `main`. Demo target: May 1 2026. See `MEMORY.md` for the per-sprint
-commit log and `pending_work.md` for the deferred backlog.
+**Active branch:** `main` (audit-round-1 + bonus scope merged 2026-04-26).
+Demo target: May 1 2026. See `MEMORY.md` for the per-sprint commit log
+and `pending_work.md` for the post-demo backlog.
+
+### Tags
+
+- `demo-ready-2026-04-26` — first demo-ready cascade.
+- `all-buckets-complete-2026-04-26` — deferred backlog closure (extended
+  modules, altcoin math fairness, scanner review queue).
+- `audit-round-1-2026-04-26` — Cowork audit-round-1 + user override
+  ("don't defer anything"): page wrap hardening, dataclass guard, SEC
+  Marketing Rule compliance, extended-modules verbatim banner, tone
+  polish, color token cleanup, doc-drift fixes, AUM tiebreaker, paper-
+  trading broker wiring with graceful fallback, legacy CSS collapse,
+  mobile media queries + ARIA. 261/261 tests passing.
 
 ## Design system
 

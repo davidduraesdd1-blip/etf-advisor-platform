@@ -13,7 +13,30 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from config import BENCHMARK_DEFAULT, BENCHMARK_LABEL, BRAND_NAME, SUPERGROK_BASE_URL, SUPERGROK_COIN_MAP
+from config import (
+    BENCHMARK_DEFAULT, BENCHMARK_LABEL, BRAND_NAME,
+    COLORS, SUPERGROK_BASE_URL, SUPERGROK_COIN_MAP,
+)
+
+# 2026-04-26 audit-round-1 commit 7: Plotly traces use the canonical
+# advisor accent (config.COLORS["primary"], single-sourced from
+# ui/design_system.py::ACCENTS) rather than legacy hardcoded hex codes.
+_ACCENT_HEX: str = COLORS["primary"]
+
+
+def _hex_to_rgba(hx: str, alpha: float) -> str:
+    """Convert "#RRGGBB" to "rgba(r,g,b,a)" — Plotly figures need rgba()
+    (color-mix() doesn't traverse Plotly's JSON figure spec)."""
+    h = hx.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+_ACCENT_RGBA_FAN = _hex_to_rgba(_ACCENT_HEX, 0.35)
+_ACCENT_RGBA_MEDIAN = _hex_to_rgba(_ACCENT_HEX, 1.0)
+_NEUTRAL_GREY = "#9ca3af"
 from core.etf_universe import load_universe_with_live_analytics
 from core.portfolio_engine import build_portfolio, run_monte_carlo
 from core.signal_adapter import composite_signal
@@ -24,6 +47,7 @@ from ui.components import (
     data_source_badge,
     performance_summary_table,
     disclosure,
+    hypothetical_results_disclosure,
     kpi_tile,
     safe_page_link,
     section_header,
@@ -435,9 +459,9 @@ def main() -> None:
             )
         else:
             _capture_caption_pieces.append(
-                f"🚩 Trading {abs(pd_pct):.2f}% "
+                f"Trading {abs(pd_pct):.2f}% "
                 f"{'premium to' if pd_pct > 0 else 'discount to'} NAV — material "
-                f"tracking dislocation. FA red-flag per industry screens."
+                f"tracking dislocation. Industry screens flag this for review."
             )
 
     if cap_info.get("up_capture_pct") is not None and cap_info.get("down_capture_pct") is not None:
@@ -550,7 +574,7 @@ def main() -> None:
                 df = df.sort_values("date")
                 fig = go.Figure(data=[go.Scatter(
                     x=df["date"], y=df["close"],
-                    mode="lines", line=dict(color="#0fa68a", width=2),
+                    mode="lines", line=dict(color=_ACCENT_HEX, width=2),
                     name="Close",
                 )])
                 fig.update_layout(
@@ -796,7 +820,7 @@ def main() -> None:
             for path in paths[: min(40, len(paths))]:
                 fig.add_trace(go.Scatter(
                     y=path, mode="lines",
-                    line=dict(width=1.1, color="rgba(0,212,170,0.35)"),
+                    line=dict(width=1.1, color=_ACCENT_RGBA_FAN),
                     showlegend=False, hoverinfo="skip",
                 ))
             if paths:
@@ -804,11 +828,11 @@ def main() -> None:
                 median_path = _np.median(paths_arr, axis=0).tolist()
                 fig.add_trace(go.Scatter(
                     y=median_path, mode="lines",
-                    line=dict(width=2.4, color="rgba(0,212,170,1.0)"),
+                    line=dict(width=2.4, color=_ACCENT_RGBA_MEDIAN),
                     name="Median path",
                     hovertemplate="Day %{x} · Median ≈ $%{y:,.0f}<extra></extra>",
                 ))
-            fig.add_hline(y=mc["initial_value_usd"], line_dash="dash", line_color="#9ca3af")
+            fig.add_hline(y=mc["initial_value_usd"], line_dash="dash", line_color=_NEUTRAL_GREY)
             fig.update_layout(
                 margin=dict(l=0, r=0, t=10, b=0),
                 paper_bgcolor="rgba(0,0,0,0)",
@@ -826,26 +850,15 @@ def main() -> None:
                     f"Paths: {mc['n_simulations']:,} · retained: {mc['paths_retained']} · seed: {mc['seed']}"
                 )
 
-    # ── 2026-04-25 redesign: mockup-style compliance callout (advisor-etf-DETAIL
-    # .html footer). Replaces the legacy disclosure() chip with the wider, more
-    # visible accent-stripe callout the mockup uses.
-    st.markdown(
-        '<div style="display:flex;gap:14px;align-items:flex-start;'
-        'padding:16px 20px;margin-top:24px;'
-        'background:color-mix(in srgb,var(--accent) 5%,var(--bg-1));'
-        'border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));'
-        'border-left:3px solid var(--accent);border-radius:8px;font-size:13px;">'
-        '<div style="width:22px;height:22px;border-radius:50%;'
-        'background:var(--accent-soft);color:var(--accent);'
-        'display:grid;place-items:center;font-weight:600;font-size:13px;flex-shrink:0;">i</div>'
-        '<div><strong style="color:var(--text-primary);">Hypothetical results. '
-        'Past performance does not guarantee future results.</strong> '
-        'Every performance display includes multiple time horizons, benchmark '
-        'comparison, and max drawdown per SEC Marketing Rule compliance. '
-        'Technical signals are model-based estimates, not forecasts. '
-        'See the Methodology page for assumptions and indicator definitions.'
-        '</div></div>',
-        unsafe_allow_html=True,
+    # ── Hypothetical-results callout — canonical wording per CLAUDE.md §22 item 5
+    hypothetical_results_disclosure(
+        body=(
+            "Every performance display includes multiple time horizons, "
+            "benchmark comparison, and max drawdown per SEC Marketing Rule "
+            "compliance. Technical signals are model-based estimates, not "
+            "forecasts. See the Methodology page for assumptions and "
+            "indicator definitions."
+        ),
     )
     safe_page_link("pages/98_Methodology.py", label="Read methodology →", icon="📋")
 

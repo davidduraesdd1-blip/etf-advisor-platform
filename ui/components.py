@@ -345,6 +345,91 @@ def safe_page_link(page: str, label: str, icon: str | None = None) -> None:
         st.caption(f"→ {label}")
 
 
+# ── Standardized "Hypothetical results" disclosure (CLAUDE.md §22 item 5) ──
+#
+# Every advisor-facing performance display (ETF Detail, Portfolio, Dashboard,
+# Home) must surface the SEC Marketing Rule disclaimer. Prior to round-1
+# audit, each page hand-rolled its own HTML — wording drifted across pages
+# and made compliance review harder. This helper is the single canonical
+# source.
+#
+# 2026-04-26 audit-round-1 commit 3/6.
+
+_HYP_RESULTS_HTML_TEMPLATE = (
+    '<div style="display:flex;gap:14px;align-items:flex-start;'
+    'padding:16px 20px;{margin_css}'
+    'background:color-mix(in srgb,var(--accent) 5%,var(--bg-1));'
+    'border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));'
+    'border-left:3px solid var(--accent);border-radius:8px;font-size:13px;">'
+    '<div style="width:22px;height:22px;border-radius:50%;'
+    'background:var(--accent-soft);color:var(--accent);'
+    'display:grid;place-items:center;font-weight:600;font-size:13px;flex-shrink:0;">i</div>'
+    '<div><strong style="color:var(--text-primary);">'
+    'Hypothetical results. Past performance does not guarantee future results.'
+    '</strong> {body}</div></div>'
+)
+
+_HYP_RESULTS_DEFAULT_BODY = (
+    "Every performance display includes multiple time horizons (1Y / 3Y / 5Y / "
+    "since-inception), benchmark comparison, and max drawdown per SEC "
+    "Marketing Rule compliance. All client profiles shown in demo mode are "
+    "fictional. See the Methodology page for assumptions, data sources, and "
+    "simplifications."
+)
+
+
+def hypothetical_results_disclosure(
+    body: str | None = None,
+    *,
+    margin_top_px: int = 24,
+) -> None:
+    """
+    Render the canonical "Hypothetical results" SEC-Marketing-Rule callout.
+
+    Identical wording across every page that consumes it (ETF Detail,
+    Portfolio, Dashboard, Home). The bold lead is fixed; pass ``body`` to
+    customize the trailing detail line per page (or omit for the default).
+    """
+    safe_body = body if body is not None else _HYP_RESULTS_DEFAULT_BODY
+    margin_css = f"margin-top:{margin_top_px}px;" if margin_top_px else ""
+    st.markdown(
+        _HYP_RESULTS_HTML_TEMPLATE.format(margin_css=margin_css, body=safe_body),
+        unsafe_allow_html=True,
+    )
+
+
+# ── Extended-modules preview banner (CLAUDE.md §22 item 4) ──
+#
+# CLAUDE.md §22 item 4 mandates verbatim wording for any extended-module
+# preview surface: "Extended coverage — preview release. Execution not yet
+# enabled for this module." This helper is the single render point so the
+# wording can't drift.
+
+def extended_modules_banner(*, margin_top_px: int = 24) -> None:
+    """
+    Verbatim CLAUDE.md §22 item 4 callout for extended-module preview
+    surfaces (RWA / DeFi cross-asset preview on the Dashboard, sibling-app
+    placeholders, etc.).
+    """
+    margin_css = f"margin-top:{margin_top_px}px;" if margin_top_px else ""
+    st.markdown(
+        '<div style="display:flex;gap:14px;align-items:flex-start;'
+        f'padding:14px 18px;{margin_css}'
+        'background:color-mix(in srgb,var(--info) 5%,var(--bg-1));'
+        'border:1px solid color-mix(in srgb,var(--info) 20%,var(--border));'
+        'border-left:3px solid var(--info);border-radius:8px;font-size:13px;'
+        'color:var(--text-secondary);">'
+        '<div style="width:22px;height:22px;border-radius:50%;'
+        'background:color-mix(in srgb,var(--info) 16%,transparent);'
+        'color:var(--info);display:grid;place-items:center;font-weight:600;'
+        'font-size:13px;flex-shrink:0;">!</div>'
+        '<div><strong style="color:var(--text-primary);">Extended coverage '
+        '— preview release.</strong> Execution not yet enabled for this '
+        'module.</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
 # ── DV-2 compliance helper (CLAUDE.md §22 item 5) ───────────────────────
 #
 # Every performance display must include: 1Y / 3Y / 5Y / since-inception

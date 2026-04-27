@@ -135,6 +135,108 @@ class TestGetActivePriceSourceContract:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 429 → Stooq fallback (audit-round-1 commit 5 — test #3)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestYfinance429FallsBackToStooq:
+    """
+    When yfinance returns HTTP 429 (rate limit) or empty data on a
+    known-history ticker repeatedly, the circuit breaker trips and the
+    source flips to Stooq. The next call must transparently route to
+    Stooq and return rows from there. This is the production hot path
+    Cowork's audit P1 flagged as untested.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _isolate(self, monkeypatch):
+        """
+        Reset module-level memos so prior tests don't leak cached rows
+        into this scenario. We need a clean slate for the failure path.
+        """
+        import integrations.data_feeds as df
+        df._yf_memo.clear()
+        df._last_close.clear()
+        reset_circuit_breaker()
+        yield
+        df._yf_memo.clear()
+        df._last_close.clear()
+        reset_circuit_breaker()
+
+    def test_yfinance_empty_then_stooq_serves(self, monkeypatch):
+        """
+        Simulate yfinance returning [] (the 429 / empty-data path) on
+        every call, while Stooq returns valid rows. After 3 yfinance
+        misses on a known ticker the breaker trips, so the FOURTH
+        get_etf_prices call routes to Stooq.
+        """
+        import integrations.data_feeds as df
+
+        known = "IBIT"   # in _KNOWN_HISTORY_TICKERS
+
+        def _empty_yf(*args, **kwargs):
+            return []
+
+        def _stooq_rows(ticker, period):
+            return [
+                {"date": "2026-04-20", "open": 50, "high": 52, "low": 49,
+                 "close": 51, "volume": 1_000_000},
+                {"date": "2026-04-21", "open": 51, "high": 53, "low": 50,
+                 "close": 52, "volume": 1_100_000},
+            ]
+
+        # Restore the real get_etf_prices for this test (conftest stubs
+        # it to _empty_prices; we want to exercise the fallback chain).
+        from tests.conftest import _empty_prices  # noqa: F401
+        # Save and restore the real implementation around the test.
+        real = df._fetch_yfinance.__wrapped__ if hasattr(df._fetch_yfinance, "__wrapped__") else df._fetch_yfinance
+        monkeypatch.setattr(df, "_fetch_yfinance", _empty_yf)
+        monkeypatch.setattr(df, "_fetch_stooq", _stooq_rows)
+        # Make sure DEMO_MODE_NO_FETCH doesn't short-circuit us out.
+        monkeypatch.delenv("DEMO_MODE_NO_FETCH", raising=False)
+
+        # Call the underlying single-ticker path directly (the public
+        # get_etf_prices is monkey-patched to _empty_prices in conftest).
+        for _ in range(YF_CIRCUIT_BREAKER_THRESHOLD):
+            df._fetch_single_ticker(known, "1y", "1d")
+        # Breaker should be tripped now.
+        assert get_active_price_source() == "stooq"
+
+        # Next call must serve from Stooq.
+        df._yf_memo.clear()
+        result = df._fetch_single_ticker(known, "1y", "1d")
+        assert result["source"] == "stooq"
+        assert len(result["prices"]) == 2
+        assert result["prices"][0]["close"] == 51
+
+    def test_unknown_ticker_failures_dont_trip_breaker(self, monkeypatch):
+        """
+        The circuit breaker only counts failures on known-history
+        tickers. A miss on a brand-new altcoin spot ETF (not yet
+        indexed by yfinance) is treated as a legitimate empty, not a
+        breaker failure. This prevents cold-boot self-trip.
+        """
+        import integrations.data_feeds as df
+
+        def _empty_yf(*args, **kwargs):
+            return []
+
+        monkeypatch.setattr(df, "_fetch_yfinance", _empty_yf)
+        monkeypatch.delenv("DEMO_MODE_NO_FETCH", raising=False)
+
+        new_ticker = "TOTALLY_NEW_NOT_IN_SEED_XYZ"
+        # 10× failures on this new ticker shouldn't trip — count goes to
+        # `new_etf_misses`, breaker stays at yfinance.
+        for _ in range(10):
+            df._fetch_single_ticker(new_ticker, "1y", "1d")
+
+        assert get_active_price_source() == "yfinance"
+        state = circuit_breaker_state()
+        assert state["new_etf_misses"] >= 10
+        # And no failures should be counted toward the trip threshold.
+        assert state["failure_count"] == 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # get_historical_cagr — live CAGR derivation used by Portfolio expected return
 # ═══════════════════════════════════════════════════════════════════════════
 

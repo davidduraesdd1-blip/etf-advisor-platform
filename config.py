@@ -79,11 +79,26 @@ ALPACA_BASE_URL: str = os.environ.get("ALPACA_BASE_URL", "https://paper-api.alpa
 SENTRY_DSN: str | None = os.environ.get("SENTRY_DSN")
 
 # ── Design tokens (CLAUDE.md §8) ──────────────────────────────────────────────
+# 2026-04-26 audit-round-1 commit 7: COLORS["primary"] imports the canonical
+# advisor accent from ui/design_system.py ACCENTS. Avoids the prior
+# duplicate-source hazard where config.py shipped legacy "#00d4aa" while
+# design_system.py shipped the family-aligned "#0fa68a".
+def _advisor_accent() -> str:
+    """Single-source the advisor accent. Falls back if design_system.py
+    is unavailable at config-import time (e.g., partial pip install)."""
+    try:
+        from ui.design_system import ACCENTS
+        return ACCENTS["etf-advisor-platform"]["accent"]
+    except Exception:
+        return "#0fa68a"   # advisor-teal default
+
+
 COLORS: dict[str, str] = {
-    "primary": "#00d4aa",   # teal
+    "primary": _advisor_accent(),    # advisor-teal — canonical via design_system
     "success": "#22c55e",   # green (brand; used on dark backgrounds)
     "danger": "#ef4444",    # red (brand; used on dark backgrounds)
     "warning": "#f59e0b",   # amber
+    "info":    "#3b82f6",   # blue (used by extended-modules banner)
     "dark_bg": "#0d0e14",
     "dark_card": "#111827",
     "light_bg": "#f1f5f9",
@@ -96,6 +111,16 @@ COLORS: dict[str, str] = {
     "danger_on_light":  "#b91c1c",
     "warning_on_light": "#b45309",
 }
+
+# 2026-04-26 audit-round-1 commit 7: avatar gradient palette extracted
+# from pages/01_Dashboard.py:_avatar_gradient. The "rebalance-needed"
+# warning gradient is the first slot; the per-client cycle picks from
+# slots [1..N] keyed on client id hash.
+AVATAR_PALETTE: tuple[tuple[str, str], ...] = (
+    ("#f59e0b", "#ef4444"),    # warning → danger (drift / rebalance-needed)
+    ("#22c55e", "#06b6d4"),    # success → cyan (default group A)
+    ("#3b82f6", "#8b5cf6"),    # blue → violet (default group B)
+)
 
 # Typography clamp() floors — never cross these minimums.
 TYPE_SCALE: dict[str, str] = {

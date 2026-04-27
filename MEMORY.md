@@ -4,6 +4,114 @@ Session continuity log. Newest entries on top. See master-template §16.
 
 ---
 
+## 2026-04-26 — Audit-round-1 + bonus scope shipped (overnight session)
+
+**Tag `audit-round-1-2026-04-26`** shipped on `main` after the post-bucket
+demo-ready landing. Cowork's 9 P0 + 4 P1 audit findings + the user's
+"don't defer anything" expansion all closed in this pass.
+
+### Audit-round-1 commits (8) — all green
+
+  1. **fix(pages):** import-time hardening on every page file. Each of
+     the 5 pages (`app.py` + `pages/01..03,99`) wraps its body in
+     `def main()` with an `if __name__ == "__main__": main()` guard.
+     Importing via `importlib.import_module` no longer crashes on
+     `st.set_page_config` outside a Streamlit context. New helper
+     `ui/page_runtime.py::safe_streamlit_import` carries the
+     ModuleNotFoundError-retry pattern for hot-reload teardown.
+  2. **fix(state):** `core/data_source_state.py` `@dataclass` guard.
+     `Optional[X]` → `X | None` (Python 3.10+ syntax) drops the
+     `from typing import Optional` import dependency that races
+     `@dataclass` evaluation under partial sys.modules teardown.
+     50× re-import loop test confirms.
+  3. **feat(detail):** ETF Detail SEC Marketing Rule compliance —
+     `performance_summary_table` (1Y/3Y/5Y/since-inception + benchmark
+     + max drawdown) wired below KPIs; canonical
+     `hypothetical_results_disclosure()` helper renders the disclaimer;
+     `safe_page_link` to Methodology. AppTest covers every render.
+  4. **feat(banner):** Verbatim CLAUDE.md §22 item 4 banner via new
+     `extended_modules_banner()` helper. Wired onto Dashboard's
+     cross-asset preview (RWA + DeFi sleeves) so all extended-module
+     surfaces speak the same compliance language.
+  5. **test:** 3 new test files — `test_import_hot_reload.py` (10×
+     re-import loop on every page + 50× reload of data_source_state),
+     `test_etf_review_queue.py` (full Bucket 3 coverage — enrich,
+     add_pending dedup, approve, reject, additions sidecar, garbage-
+     JSON robustness), `test_data_feeds.py` extended with
+     `TestYfinance429FallsBackToStooq`. Total 261/261 passing.
+  6. **fix(tone):** removed 🚩 + reworded "red flag" on premium-to-NAV
+     callout; removed 🛡 from fiduciary-filter caption; standardized
+     all hypothetical-results wording through `hypothetical_results_disclosure()`.
+  7. **fix(color):** `config.COLORS["primary"]` imports the canonical
+     advisor accent from `ui/design_system.py::ACCENTS`. Plotly hex
+     codes in `pages/02_Portfolio.py` + `pages/03_ETF_Detail.py`
+     replaced by `_ACCENT_HEX` / `_ACCENT_RGBA_FAN` /
+     `_ACCENT_RGBA_MEDIAN` derived from the design-system token.
+     Avatar gradients on `pages/01_Dashboard.py` extracted to
+     `config.AVATAR_PALETTE`.
+  8. **docs:** MEMORY.md prepended with this entry; pending_work.md
+     "Acceptance criteria" → "Post-demo acceptance criteria (deferred
+     from May 1)" + new "Post-demo backlog" section; CLAUDE.md
+     "Friday-deadline" → "May 1 hard demo deadline" (lines 8 + 302
+     + 325); README.md tag link.
+
+### Bonus scope (user override — "don't defer anything")
+
+  - **AUM tiebreaker** (`core/portfolio_engine.py::_select_etfs_for_category`):
+    expense_ratio asc, then AUM desc (larger first), then issuer
+    diversity, then ticker. AUM resolves through 24-hr-memo'd
+    `_get_aum_usd` (yfinance Ticker.info["totalAssets"] live → hardcoded
+    `_AUM_REFERENCE_STUB_USD` for major spots → None). DEMO_MODE_NO_FETCH
+    short-circuits the live path so AppTest renders stay deterministic.
+  - **Real broker wiring**: `integrations/broker_alpaca_paper.py` ships
+    `submit_basket_via(provider, …)` provider-router consumed by
+    `pages/02_Portfolio.py` Execute Basket modal. Routes
+    `mock|alpaca_paper|alpaca` with graceful fallback when alpaca-py
+    isn't installed or keys missing — fallback recorded in
+    `response["broker"] = "alpaca_paper_fallback_to_mock"` for audit.
+    Settings page surfaces credential state next to the provider
+    selectbox.
+  - **AUM auto-fetch**: same module above (`_get_aum_usd`).
+  - **Legacy `:root` CSS collapse** (`ui/theme.py`): legacy
+    `--primary/--bg/--card/--text/--muted` now alias the design-system
+    tokens (`--accent`, `--bg-0/1`, `--text-primary/muted`). Single
+    source of truth.
+  - **Mobile media queries + ARIA**: `@media (max-width: 768px)` block
+    in `ui/theme.py` collapses 4-up KPI strips to 2-up, tightens card
+    padding, scales hero typography. ARIA / focus-visible outlines
+    added; `.sr-only` helper class shipped.
+  - **Component dedup**: `ui/design_system.py` exports
+    `kpi_tile_html / signal_badge_html / data_source_badge_html /
+    compliance_callout_html` aliases so callers can disambiguate the
+    HTML-string-returning helpers from `ui/components.py`'s Streamlit-
+    direct equivalents.
+
+### Math fairness re-verified (audit-round-2 reading)
+
+  - Per-altcoin CAGR fix from Bucket 2 (2026-04-26 morning) confirmed
+    in place in `integrations/data_feeds.py::get_forward_return_estimate`
+    `category == "altcoin_spot"` branch. Falls through to BTC × 0.70
+    only when yfinance has no per-coin history; basis string explicit.
+  - Cornish-Fisher S/K previously recalibrated to crypto midpoints
+    (S=−0.7 / K=8.0) per Maillard 2012 + Shahzad et al. 2022. MDD
+    factor f is now Sharpe-dependent (`np.interp` over [-0.5..1.5] →
+    [3.2..1.9]) per Magdon-Ismail 2004 Table 1. Both apply uniformly
+    across all tiers including alt-heavy Tier 4/5.
+  - Issuer-tier nudge audit reaffirmed clean — Tier C list is purely
+    structural (legacy high-fee + futures-based + 40-Act swaps), no
+    alt-coin bias.
+
+### Test count + pace
+
+  Pre-round-1: 228 passing.
+  Post-round-1: 261 passing (+33). Suite runs in 25s.
+
+### Tag
+
+  `audit-round-1-2026-04-26` on main + remote.
+
+---
+
 ## 2026-04-26 — Demo-ready (advisor/client taxonomy + mockup parity)
 
 **Cascade complete.** Tag `demo-ready-2026-04-26` shipped on

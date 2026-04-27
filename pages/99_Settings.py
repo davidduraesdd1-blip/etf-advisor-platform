@@ -11,6 +11,7 @@ from __future__ import annotations
 import streamlit as st
 
 from config import (
+    ALPACA_BASE_URL as ALPACA_BASE_URL_DISPLAY,
     BRAND_NAME,
     BROKER_PROVIDER,
     DEMO_MODE,
@@ -67,17 +68,40 @@ def main() -> None:
 
     with card("Broker routing"):
         options = ["mock", "alpaca_paper", "alpaca"]
-        current_idx = options.index(BROKER_PROVIDER) if BROKER_PROVIDER in options else 0
+        # Session override wins over config.BROKER_PROVIDER. Lets the FA flip
+        # to alpaca_paper for a single demo without a config.py edit.
+        active_provider = st.session_state.get("broker_provider_override", BROKER_PROVIDER)
+        current_idx = options.index(active_provider) if active_provider in options else 0
         selected = st.selectbox(
             "Provider",
             options=options,
             index=current_idx,
             help="Changing this here is session-only. To change persistently, edit config.py.",
         )
-        if selected != BROKER_PROVIDER:
-            st.info(
-                "Session-level override only. `alpaca_paper` and `alpaca` are "
-                "not yet wired — Day-4+ work. `mock` is the functional option today."
+        # Persist the choice so submit_basket_via routes to the chosen broker.
+        st.session_state["broker_provider_override"] = selected
+        if selected == "alpaca_paper":
+            from config import ALPACA_API_KEY, ALPACA_API_SECRET
+            if not ALPACA_API_KEY or not ALPACA_API_SECRET:
+                st.info(
+                    "Alpaca paper-trading routing is wired (audit-round-1). "
+                    "Set `ALPACA_API_KEY` + `ALPACA_API_SECRET` in `.env` and "
+                    "restart Streamlit to enable real paper-trading order "
+                    "submission. Until then, basket-execute falls back to "
+                    "the mock broker — fallback is recorded in the response "
+                    "payload's `broker` field for audit."
+                )
+            else:
+                st.success(
+                    "Alpaca paper-trading credentials detected. Basket-execute "
+                    "will submit real paper orders to alpaca paper endpoint "
+                    f"({ALPACA_BASE_URL_DISPLAY})."
+                )
+        elif selected == "alpaca":
+            st.warning(
+                "Live Alpaca routing requires explicit user activation per "
+                "CLAUDE.md §11 (Web3 Level B). For now, this routes to the "
+                "paper endpoint with a `_pending_live_approval` audit flag."
             )
 
 

@@ -1,11 +1,11 @@
 # Claude Code — Master Agreement
 # ETF ADVISOR PLATFORM
-# Last updated: 2026-04-23
+# Last updated: 2026-04-26 (audit-round-1 + overnight round-2)
 # Inherits from: ../master-template/CLAUDE_master_template.md
 
 > This file overrides or extends the master template where noted.
 > This project is the most detailed of the four apps — it has a
-> Friday-deadline demo and several demo-specific constraints in
+> May 1 hard demo deadline and several demo-specific constraints in
 > Section 22.
 
 ---
@@ -299,7 +299,7 @@ demonstrates the vision; defer the 20% that only matters at scale.
 
 ## SECTION 22 — PROJECT-SPECIFIC DEMO CONSTRAINTS
 
-For the Friday-soft-deadline demo:
+For the May 1 hard demo deadline:
 
 1. Demo mode flag: `DEMO_MODE = True` in config.py seeds 3 realistic client
    profiles and prebuilt portfolios. Allows the app to demo without live
@@ -322,7 +322,7 @@ For the Friday-soft-deadline demo:
    horizons, benchmark comparison (default: 60/40 blended index + BTC), max
    drawdown, "Hypothetical results" disclaimer, link to methodology page.
 
-6. Methodology page (`pages/98_methodology.py`) exists by Friday with
+6. Methodology page (`pages/98_methodology.py`) exists by May 1 with
    placeholder copy. Replaced with full content post-demo.
 
 ---

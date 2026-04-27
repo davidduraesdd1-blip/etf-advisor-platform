@@ -231,7 +231,13 @@ def _build_css(app: AppId, fam: str, accent: dict, scale: dict, theme: str) -> s
     """
 
 
-# ── Component helpers (Streamlit-compatible) ─────────────────────────
+# ── Component helpers (HTML-string returning) ────────────────────────
+#
+# 2026-04-26 audit-round-1 bonus 7: these helpers RETURN HTML strings.
+# The Streamlit-direct equivalents live in ui/components.py and CALL
+# st.markdown / st.metric. Naming kept here for backward-compat with
+# the common/ template; aliases below export the *_html variants for
+# callers who want the distinction explicit.
 
 def kpi_tile(label: str, value: str, delta: str | None = None,
              delta_direction: Literal["up", "down", "neutral"] = "neutral") -> str:
@@ -307,6 +313,17 @@ def compliance_callout(title: str, body: str, link_label: str | None = None, lin
       </div>
     </div>
     """
+
+
+# ── Disambiguating aliases (audit-round-1 bonus 7) ───────────────────
+# Encourage callers to use the *_html names so it's obvious they're
+# getting an HTML-string back, not a Streamlit-direct render. The
+# Streamlit-direct ``signal_badge`` and ``kpi_tile`` continue to live
+# in ui/components.py.
+kpi_tile_html = kpi_tile
+signal_badge_html = signal_badge
+data_source_badge_html = data_source_badge
+compliance_callout_html = compliance_callout
 
 
 # ── Test helper ──────────────────────────────────────────────────────

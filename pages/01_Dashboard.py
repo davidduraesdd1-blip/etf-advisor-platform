@@ -9,7 +9,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from config import BRAND_NAME, DEMO_MODE, EXTENDED_MODULES_ENABLED
+from config import AVATAR_PALETTE, BRAND_NAME, DEMO_MODE, EXTENDED_MODULES_ENABLED
 from core.audit_log import seed_demo_entries
 from core.demo_clients import DEMO_CLIENTS
 from core.etf_universe import load_universe_with_live_analytics
@@ -19,6 +19,8 @@ from ui.components import (
     card,
     data_source_badge,
     disclosure,
+    extended_modules_banner,
+    hypothetical_results_disclosure,
     section_header,
 )
 from ui.level_helpers import level_text
@@ -286,16 +288,21 @@ def main() -> None:
 
 
     def _avatar_gradient(c: dict) -> str:
-        """Stable per-client avatar gradient. Drift-flagged clients get a warning
-        gradient so they stand out at a glance per the mockup."""
+        """Stable per-client avatar gradient. Drift-flagged clients get the
+        warning gradient (slot 0) so they stand out at a glance per the mockup.
+        Other clients cycle through AVATAR_PALETTE slots [1..N-1] keyed on
+        client id hash. Centralized in config.AVATAR_PALETTE per audit-round-1
+        commit 7 — no more inline hex codes here."""
         if c["rebalance_needed"]:
-            return "linear-gradient(135deg,#f59e0b,#ef4444)"
-        h = sum(ord(ch) for ch in c["id"]) % 3
-        return [
-            "linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#3b82f6))",
-            "linear-gradient(135deg,#22c55e,#06b6d4)",
-            "linear-gradient(135deg,#3b82f6,#8b5cf6)",
-        ][h]
+            stops = AVATAR_PALETTE[0]
+            return f"linear-gradient(135deg,{stops[0]},{stops[1]})"
+        # Cycle through non-warning slots (1..N-1)
+        non_warning = AVATAR_PALETTE[1:]
+        if not non_warning:
+            return "linear-gradient(135deg,var(--accent),var(--accent))"
+        h = sum(ord(ch) for ch in c["id"]) % len(non_warning)
+        stops = non_warning[h]
+        return f"linear-gradient(135deg,{stops[0]},{stops[1]})"
 
 
     def _last_review_str(iso_str: str) -> str:
@@ -670,13 +677,20 @@ def main() -> None:
                 '</div>'
             )
 
+        # Verbatim CLAUDE.md §22 item 4 banner — extended-module preview
+        # surfaces (RWA / DeFi cross-asset preview) carry the canonical wording.
+        extended_modules_banner(margin_top_px=0)
         st.markdown(
-            '<div class="ds-card" style="margin-bottom:14px;background:color-mix(in srgb,var(--info) 5%,var(--bg-1));border-left:3px solid var(--info);">'
-            '<div style="font-family:var(--font-display);font-weight:500;font-size:16px;color:var(--text-primary);">'
+            '<div class="ds-card" style="margin-bottom:14px;'
+            'background:color-mix(in srgb,var(--info) 5%,var(--bg-1));'
+            'border-left:3px solid var(--info);margin-top:14px;">'
+            '<div style="font-family:var(--font-display);font-weight:500;'
+            'font-size:16px;color:var(--text-primary);">'
             'Cross-asset preview · ETF + RWA + DeFi'
             '</div>'
             '<div style="font-size:12.5px;color:var(--text-muted);margin-top:4px;">'
-            'Preview only. RWA + DeFi sleeves live in sibling apps; numbers below are illustrative carve-outs against the same demo-client AUM.'
+            'RWA + DeFi sleeves live in sibling apps; numbers below are illustrative '
+            'carve-outs against the same demo-client AUM.'
             '</div>'
             '</div>',
             unsafe_allow_html=True,
@@ -696,21 +710,12 @@ def main() -> None:
         )
         st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
 
-    # ── Hypothetical-results callout (compliance disclaimer) ────────────────────
-    st.markdown(
-        '<div style="display:flex;gap:14px;align-items:flex-start;'
-        'padding:16px 20px;margin-top:24px;'
-        'background:color-mix(in srgb,var(--accent) 5%,var(--bg-1));'
-        'border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));'
-        'border-left:3px solid var(--accent);border-radius:8px;font-size:13px;">'
-        '<div style="width:22px;height:22px;border-radius:50%;'
-        'background:var(--accent-soft);color:var(--accent);'
-        'display:grid;place-items:center;font-weight:600;font-size:13px;flex-shrink:0;">i</div>'
-        '<div><strong style="color:var(--text-primary);">Hypothetical results.</strong> '
-        'All client profiles shown are fictional demo personas. Past performance does not guarantee '
-        'future results. See the Methodology page for full disclosures and assumptions.</div>'
-        '</div>',
-        unsafe_allow_html=True,
+    # ── Hypothetical-results callout — canonical wording per CLAUDE.md §22 item 5
+    hypothetical_results_disclosure(
+        body=(
+            "All client profiles shown are fictional demo personas. See the "
+            "Methodology page for full disclosures and assumptions."
+        ),
     )
 
 

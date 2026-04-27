@@ -43,9 +43,17 @@ import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# 2026-04-26 audit-round-1 commit 2 — Python 3.10+ `X | None` syntax
+# replaces the legacy `Optional[X]` import. `from __future__ import
+# annotations` already makes annotations lazy strings, but the dataclass
+# decorator and a few inline returns previously needed `Optional` resolved
+# at module-import time. During Streamlit hot-reload, sys.modules can be
+# in a partially-torn-down state where `from typing import Optional` races
+# the `@dataclass` evaluation and raises NameError. Native `X | None`
+# avoids the import dependency entirely.
 
 
 class DataSourceState(str, Enum):
@@ -136,7 +144,7 @@ class _CategoryInfo:
     source: str = ""
     last_update_ts: float = 0.0   # monotonic of last successful fetch/cache touch
     last_attempt_ts: float = 0.0
-    cache_age_seconds_at_mark: Optional[int] = None
+    cache_age_seconds_at_mark: int | None = None
     note: str = ""
 
 
@@ -232,7 +240,7 @@ def get_source(category: str) -> str:
         return _info(category).source
 
 
-def get_age_minutes(category: str) -> Optional[int]:
+def get_age_minutes(category: str) -> int | None:
     """
     Minutes since last successful update (or last cache mark, whichever
     is more recent). None if the category was never touched.

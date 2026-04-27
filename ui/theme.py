@@ -62,21 +62,18 @@ def toggle_theme() -> None:
 
 
 def _css_for_theme(theme: str) -> str:
+    # 2026-04-26 audit-round-1 bonus 3: the legacy --primary/--card/--bg/
+    # --text/--muted/--border tokens now ALIAS the design-system tokens
+    # injected by ui/design_system.py::inject_theme. Existing `.eap-*`
+    # rules + inline styles consuming these legacy names keep working;
+    # they pick up the family-aligned advisor palette without duplicate
+    # source. The light/dark badge variants stay since the DS doesn't
+    # ship light-mode-aware badge text colors yet.
     if theme == "light":
-        bg = COLORS["light_bg"]
-        card = COLORS["light_card"]
-        text = "#0f172a"
-        muted = "#475569"
-        border = "#e2e8f0"
         badge_success = COLORS["success_on_light"]
         badge_danger = COLORS["danger_on_light"]
         badge_warning = COLORS["warning_on_light"]
     else:
-        bg = COLORS["dark_bg"]
-        card = COLORS["dark_card"]
-        text = "#e5e7eb"
-        muted = "#9ca3af"
-        border = "#1f2937"
         badge_success = COLORS["success"]
         badge_danger = COLORS["danger"]
         badge_warning = COLORS["warning"]
@@ -85,19 +82,66 @@ def _css_for_theme(theme: str) -> str:
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
+      /* Legacy alias layer — collapse 1:1 onto the design-system tokens
+         from ui/design_system.py. Single source of truth for color.
+         The --badge-* variants stay distinct because they're light-mode
+         dimmed for WCAG AA on tinted backgrounds. */
       :root {{
-        --primary: {COLORS["primary"]};
-        --success: {COLORS["success"]};
-        --danger:  {COLORS["danger"]};
-        --warning: {COLORS["warning"]};
-        --bg:      {bg};
-        --card:    {card};
-        --text:    {text};
-        --muted:   {muted};
-        --border:  {border};
+        --primary: var(--accent);
+        --bg:      var(--bg-0);
+        --card:    var(--bg-1);
+        --text:    var(--text-primary);
+        --muted:   var(--text-muted);
+        /* --border, --success, --danger, --warning, --info already shipped
+           by design_system.py — no alias needed here. */
         --badge-success: {badge_success};
         --badge-danger:  {badge_danger};
         --badge-warning: {badge_warning};
+      }}
+
+      /* ── Mobile responsive (CLAUDE.md §8 — 768px breakpoint) ── */
+      @media (max-width: 768px) {{
+        /* Tighten card padding so KPI strips don't overflow horizontally. */
+        .ds-card, .eap-card {{
+          padding: 14px 16px;
+        }}
+        /* 4-up KPI strips collapse to 2-up on phones. */
+        .ds-strip {{
+          grid-template-columns: repeat(2, 1fr) !important;
+        }}
+        /* Page-level grid columns collapse to single column. */
+        [data-testid="stHorizontalBlock"] {{
+          flex-wrap: wrap !important;
+        }}
+        /* Ensure tap targets stay ≥ 44px even when buttons crowd. */
+        .stButton > button {{
+          min-height: 44px;
+          font-size: 14px;
+        }}
+        /* Hero card text scales down on phone. */
+        .ds-page-title, h1 {{
+          font-size: clamp(20px, 5vw, 28px) !important;
+        }}
+      }}
+
+      /* ── ARIA / accessibility helpers ── */
+      [data-testid="stSidebarNav"] [aria-current="page"] a {{
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }}
+      .stButton > button:focus-visible {{
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }}
+      /* Screen-reader-only helper class consumed via st.markdown HTML when
+         a visual cue lacks text (e.g., color-only signal stripes are
+         already shape-coded but we add aria-label fallbacks below). */
+      .sr-only {{
+        position: absolute !important;
+        width: 1px !important; height: 1px !important;
+        padding: 0 !important; margin: -1px !important;
+        overflow: hidden !important; clip: rect(0,0,0,0) !important;
+        white-space: nowrap !important; border: 0 !important;
       }}
 
       html, body, [data-testid="stAppViewContainer"] {{

@@ -22,7 +22,7 @@ from config import (
 )
 from ui.theme import apply_theme
 from ui.sidebar import render_sidebar
-from ui.components import card, disclosure, safe_page_link
+from ui.components import card, disclosure, hypothetical_results_disclosure, safe_page_link
 
 
 # ─── Page config ──────────────────────────────────────────────────────────────
@@ -126,21 +126,12 @@ def _render_home() -> None:
               page="pages/03_ETF_Detail.py",
               label="Open ETF detail →")
 
-    # Hypothetical-results callout matching the other 4 ported pages.
-    st.markdown(
-        '<div style="display:flex;gap:14px;align-items:flex-start;'
-        'padding:16px 20px;margin-top:24px;'
-        'background:color-mix(in srgb,var(--accent) 5%,var(--bg-1));'
-        'border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));'
-        'border-left:3px solid var(--accent);border-radius:8px;font-size:13px;">'
-        '<div style="width:22px;height:22px;border-radius:50%;'
-        'background:var(--accent-soft);color:var(--accent);'
-        'display:grid;place-items:center;font-weight:600;font-size:13px;flex-shrink:0;">i</div>'
-        '<div><strong style="color:var(--text-primary);">Hypothetical results.</strong> '
-        'Past performance does not guarantee future results. All client profiles '
-        'shown in demo mode are fictional. See the Methodology page for '
-        'assumptions.</div></div>',
-        unsafe_allow_html=True,
+    # Hypothetical-results callout — canonical wording per CLAUDE.md §22 item 5.
+    hypothetical_results_disclosure(
+        body=(
+            "All client profiles shown in demo mode are fictional. See the "
+            "Methodology page for assumptions, data sources, and simplifications."
+        ),
     )
 
 

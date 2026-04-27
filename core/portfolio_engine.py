@@ -428,6 +428,73 @@ def _build_covariance_matrix(holdings: list[dict]) -> np.ndarray:
     return cov
 
 
+# 2026-04-26 audit-round-1 bonus 1+5: per-ETF AUM lookup. Used as a
+# liquidity tiebreaker inside _select_etfs_for_category — when two ETFs
+# in the same category share the same expense ratio, prefer the larger
+# fund (smaller bid/ask, less rebalance market impact, lower closure risk).
+#
+# Source priority on first lookup:
+#   1. Live yfinance Ticker.info["totalAssets"] — auto-fetch with 24h memo.
+#   2. Hardcoded reference-snapshot fallback (the same stub
+#      pages/03_ETF_Detail uses) for the major BTC + ETH spots, so the
+#      tiebreaker still functions when yfinance is in fallback / DEMO_MODE.
+#   3. None → fund treated as "smaller than any priced peer" so it loses
+#      ties; never blocks selection by itself.
+#
+# Stub values mirror cryptorank.io / SoSoValue / issuer fact sheets as of
+# 2026-04. Major spot ETFs only — niche / new funds rely on the live path.
+_AUM_REFERENCE_STUB_USD: dict[str, float] = {
+    "IBIT": 62_400_000_000, "FBTC":  20_100_000_000,
+    "BITB":  3_200_000_000, "ARKB":   2_800_000_000,
+    "BTCO":    900_000_000, "EZBC":     400_000_000,
+    "BRRR":    300_000_000, "HODL":     800_000_000,
+    "GBTC": 18_000_000_000, "DEFI":     180_000_000,
+    "ETHA":  9_300_000_000, "FETH":   1_050_000_000,
+    "ETHE":  4_300_000_000, "BKCH":     180_000_000,
+}
+
+_AUM_LIVE_MEMO: dict[str, tuple[float | None, float]] = {}
+_AUM_MEMO_TTL_SEC: int = 24 * 3600
+
+
+def _get_aum_usd(ticker: str) -> float | None:
+    """
+    Best-effort AUM in USD for a ticker. Returns None when both the live
+    yfinance path and the hardcoded stub are empty — caller treats None
+    as "smallest in tie group" so the tiebreaker degrades gracefully.
+
+    Live fetch is opt-in: under DEMO_MODE_NO_FETCH=1 (test harness +
+    deterministic-render mode) we skip the network and only consult the
+    stub, so AppTest renders stay fast.
+    """
+    import os
+    import time as _time
+
+    tkr = (ticker or "").upper()
+    if not tkr:
+        return None
+
+    # Live path — yfinance Ticker.info["totalAssets"]; 24h memo.
+    if os.environ.get("DEMO_MODE_NO_FETCH") != "1":
+        cached = _AUM_LIVE_MEMO.get(tkr)
+        if cached is not None:
+            val, ts = cached
+            if _time.monotonic() - ts < _AUM_MEMO_TTL_SEC:
+                return val if val is not None else _AUM_REFERENCE_STUB_USD.get(tkr)
+        try:
+            import yfinance as yf  # type: ignore
+            info = yf.Ticker(tkr).info or {}
+            aum = info.get("totalAssets")
+            if aum is not None and float(aum) > 0:
+                _AUM_LIVE_MEMO[tkr] = (float(aum), _time.monotonic())
+                return float(aum)
+            _AUM_LIVE_MEMO[tkr] = (None, _time.monotonic())
+        except Exception:  # pragma: no cover — defensive
+            _AUM_LIVE_MEMO[tkr] = (None, _time.monotonic())
+
+    return _AUM_REFERENCE_STUB_USD.get(tkr)
+
+
 def _select_etfs_for_category(
     category: str,
     universe: list[dict],
@@ -435,13 +502,20 @@ def _select_etfs_for_category(
 ) -> list[dict]:
     """
     Select up to MAX_ETFS_PER_CATEGORY ETFs from a category.
-    Prefers lowest expense ratio; breaks ties by issuer diversity.
+    Prefers lowest expense ratio; breaks ties by AUM (larger first), then
+    issuer diversity, then ticker for deterministic ordering.
 
     `compliance_filter_on=True` (default) applies the fiduciary-
     appropriate restrictions — blocks single-stock covered-call
     wrappers (MSTY/CONY/MSFO/etc.) even when the tier allocates to
     the income_covered_call category. Leveraged is blocked at the
     category level upstream of this function.
+
+    2026-04-26 audit-round-1 bonus 1: AUM tiebreaker added between
+    expense-ratio sort and the issuer-diversity pass. When two funds
+    have the same fee (e.g., BlackRock + Bitwise BTC spots both at
+    25 bps), the larger fund wins the slot — fairer liquidity proxy
+    than coin-flip-equivalent ties.
     """
     from core.risk_tiers import category_allowed
 
@@ -453,10 +527,17 @@ def _select_etfs_for_category(
     if not in_cat:
         return []
 
-    # Deterministic sort: by expense_ratio asc (missing → large), then ticker
-    def _key(u: dict) -> tuple[float, str]:
+    # Deterministic sort: by expense_ratio asc (missing → large), then by
+    # AUM desc (larger first — None treated as 0 so it loses ties), then
+    # ticker for tertiary determinism.
+    def _key(u: dict) -> tuple[float, float, str]:
         er = u.get("expense_ratio_bps")
-        return (float(er) if er is not None else 9999.0, str(u.get("ticker", "")))
+        aum = _get_aum_usd(u.get("ticker", ""))
+        return (
+            float(er) if er is not None else 9999.0,
+            -(float(aum) if aum is not None else 0.0),   # negate for desc
+            str(u.get("ticker", "")),
+        )
 
     in_cat.sort(key=_key)
 

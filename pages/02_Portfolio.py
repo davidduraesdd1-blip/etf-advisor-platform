@@ -17,19 +17,43 @@ from config import (
     BENCHMARK_DEFAULT,
     BENCHMARK_LABEL,
     BRAND_NAME,
+    COLORS,
     DEMO_MODE,
     PORTFOLIO_TIERS,
 )
+
+# 2026-04-26 audit-round-1 commit 7: Plotly traces consume the design-system
+# accent token rather than the legacy "#00d4aa" hardcode. _ACCENT_HEX picks
+# up the canonical advisor-teal via config.COLORS["primary"], which itself
+# reads from ui/design_system.py::ACCENTS. Single source of truth.
+_ACCENT_HEX: str = COLORS["primary"]
+
+
+def _hex_to_rgba(hx: str, alpha: float) -> str:
+    """Convert a #RRGGBB hex string into an `rgba(r,g,b,a)` literal —
+    Plotly figures need rgba() (CSS color-mix() doesn't work in JSON
+    figures). Used for the Monte-Carlo path-fan transparency overlays."""
+    h = hx.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+_ACCENT_RGBA_FAN = _hex_to_rgba(_ACCENT_HEX, 0.35)
+_ACCENT_RGBA_MEDIAN = _hex_to_rgba(_ACCENT_HEX, 1.0)
+_NEUTRAL_GREY = "#9ca3af"  # Plotly hline annotation; matches ui/theme.py muted
 from core.demo_clients import DEMO_CLIENTS, get_client
 from core.etf_universe import load_universe_with_live_analytics
 from core.portfolio_engine import build_portfolio, run_monte_carlo
-from integrations.broker_mock import submit_basket
+from integrations.broker_alpaca_paper import submit_basket_via
 from integrations.data_feeds import get_etf_prices, get_last_close
 from ui.components import (
     card,
     data_source_badge,
     performance_summary_table,
     disclosure,
+    hypothetical_results_disclosure,
     kpi_tile,
     safe_page_link,
     section_header,
@@ -245,7 +269,7 @@ def main() -> None:
     # leveraged sleeve even though the tier allocation specifies one.
     if _compliance_filter:
         st.caption(
-            "🛡 **Fiduciary-appropriate filter ON** — leveraged and single-stock "
+            "**Fiduciary-appropriate filter ON** — leveraged and single-stock "
             "covered-call wrappers excluded from this basket. "
             "Toggle in Settings for aggressive-sleeve-approved IPS clients."
         )
@@ -373,7 +397,7 @@ def main() -> None:
             fig = go.Figure(data=[go.Bar(
                 x=grouped["category"],
                 y=grouped["weight_pct"],
-                marker_color="#00d4aa",
+                marker_color=_ACCENT_HEX,
                 text=[f"{w:.1f}%" for w in grouped["weight_pct"]],
                 textposition="outside",
             )])
@@ -593,7 +617,7 @@ def main() -> None:
                     fig.add_trace(go.Scatter(
                         y=path,
                         mode="lines",
-                        line=dict(width=1.1, color="rgba(0,212,170,0.35)"),
+                        line=dict(width=1.1, color=_ACCENT_RGBA_FAN),
                         showlegend=False,
                         hoverinfo="skip",
                     ))
@@ -605,14 +629,14 @@ def main() -> None:
                     fig.add_trace(go.Scatter(
                         y=median_path,
                         mode="lines",
-                        line=dict(width=2.4, color="rgba(0,212,170,1.0)"),
+                        line=dict(width=2.4, color=_ACCENT_RGBA_MEDIAN),
                         name="Median path",
                         hovertemplate="Day %{x} · Median ≈ $%{y:,.0f}<extra></extra>",
                     ))
                 fig.add_hline(
                     y=mc["initial_value_usd"],
                     line_dash="dash",
-                    line_color="#9ca3af",
+                    line_color=_NEUTRAL_GREY,
                     annotation_text="Initial value",
                     annotation_position="top left",
                 )
@@ -759,7 +783,15 @@ def main() -> None:
                 executable = [o for o in orders_draft if o["mid_price"] > 0]
                 skipped = [o for o in orders_draft if o["mid_price"] <= 0]
 
-                result = submit_basket(executable, client_id=client["id"], dry_run=False)
+                # Provider chosen via Settings → Broker routing (session-state
+                # override) or config.BROKER_PROVIDER fallback. submit_basket_via
+                # routes to broker_mock.submit_basket / broker_alpaca_paper.submit_basket;
+                # graceful fallback if alpaca-py isn't installed or keys missing.
+                from config import BROKER_PROVIDER as _CFG_BROKER
+                _provider = st.session_state.get("broker_provider_override", _CFG_BROKER)
+                result = submit_basket_via(
+                    _provider, executable, client_id=client["id"], dry_run=False,
+                )
                 # Surface skipped orders in the result so the post-modal toast +
                 # audit log can mention them.
                 result["summary"]["n_skipped_no_price"] = len(skipped)
@@ -890,24 +922,8 @@ def main() -> None:
             unsafe_allow_html=True,
         )
 
-    # ── Hypothetical-results callout (compliance disclaimer) ────────────────────
-    st.markdown(
-        '<div style="display:flex;gap:14px;align-items:flex-start;'
-        'padding:16px 20px;margin-top:20px;'
-        'background:color-mix(in srgb,var(--accent) 5%,var(--bg-1));'
-        'border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));'
-        'border-left:3px solid var(--accent);border-radius:8px;font-size:13px;">'
-        '<div style="width:22px;height:22px;border-radius:50%;'
-        'background:var(--accent-soft);color:var(--accent);'
-        'display:grid;place-items:center;font-weight:600;font-size:13px;flex-shrink:0;">i</div>'
-        '<div><div style="font-weight:500;color:var(--text-primary);margin-bottom:2px;">'
-        'Hypothetical results. Past performance does not guarantee future results.</div>'
-        'All client profiles shown in demo mode are fictional. Every performance display '
-        'includes multiple time horizons, benchmark comparison, and max drawdown per '
-        'SEC Marketing Rule compliance. See the Methodology page for the full set of '
-        'assumptions, data sources, and simplifications.</div></div>',
-        unsafe_allow_html=True,
-    )
+    # ── Hypothetical-results callout — canonical wording per CLAUDE.md §22 item 5
+    hypothetical_results_disclosure(margin_top_px=20)
 
     if st.session_state.get("confirm_execute"):
         _render_confirm_modal()
