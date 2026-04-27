@@ -220,7 +220,15 @@ def get_etf_aum(ticker: str) -> tuple[Optional[float], Optional[str]]:
     except Exception as exc:
         logger.info("yfinance AUM fetch failed for %s: %s", tkr, exc)
 
-    # Step 2: SEC EDGAR N-PORT total_net_assets
+    # Step 2: SEC EDGAR — two-pronged attack.
+    #
+    # 2a) N-PORT via integrations.edgar_nport for the curated list of
+    #     SUPPORTED_TICKERS (spot trusts + futures funds that publish
+    #     full holdings). Highest-quality TNA when applicable.
+    # 2b) XBRL company-facts via integrations.edgar_facts for ANY
+    #     ticker whose registrant is in the SEC ticker index. Lighter
+    #     fetch (50-500 KB JSON vs full N-PORT XML), broader coverage
+    #     than the curated list. Sprint 2.6 commit 4 long-tail resolver.
     try:
         from integrations.edgar_nport import get_etf_composition, SUPPORTED_TICKERS
         if tkr in SUPPORTED_TICKERS:
@@ -231,6 +239,15 @@ def get_etf_aum(ticker: str) -> tuple[Optional[float], Optional[str]]:
                 return (float(tna), "SEC EDGAR")
     except Exception as exc:
         logger.info("EDGAR N-PORT AUM fetch failed for %s: %s", tkr, exc)
+
+    try:
+        from integrations.edgar_facts import get_etf_aum_via_facts
+        v = get_etf_aum_via_facts(tkr)
+        if v is not None and v > 0:
+            _cache_put(tkr, "aum", float(v), "SEC EDGAR (facts)")
+            return (float(v), "SEC EDGAR (facts)")
+    except Exception as exc:
+        logger.info("EDGAR companyfacts AUM fetch failed for %s: %s", tkr, exc)
 
     # Step 3: ETF.com public page scrape
     v = _scrape_etfcom_aum(tkr)
