@@ -16,8 +16,8 @@
     ],
     "ticker_count": 82,
     "last_updated": "2026-04-27",
-    "count": 160,
-    "last_expansion_note": "audit-round-3 expansion: REX/REX-Osprey + YieldMax + Grayscale + Bitwise altcoins + Canary + 21Shares + Franklin + ProShares + Volatility Shares + Calamos + Innovator + Defiance + Direxion + Global X + Hashdex. 49 new ETFs added."
+    "count": 211,
+    "last_expansion_note": "v3 deep-walk: ETFdb + Defiance full lineup + Roundhill income + Simplify + GSR + 2026 altcoin launches. 51 more ETFs added."
   },
   "etfs": [
     {
@@ -1471,6 +1471,465 @@
       "expense_ratio_bps": 25,
       "inception": "2026-03-18",
       "underlying": "XRP"
+    },
+    {
+      "ticker": "YBTC",
+      "issuer": "Roundhill",
+      "category": "income_covered_call",
+      "name": "Roundhill Bitcoin Covered Call Strategy ETF",
+      "expense_ratio_bps": 95,
+      "inception": "2024-01-19",
+      "underlying": "BTC"
+    },
+    {
+      "ticker": "IRE",
+      "issuer": "Defiance",
+      "category": "leveraged",
+      "name": "Defiance Daily Target 2X Long IREN ETF",
+      "expense_ratio_bps": 117,
+      "inception": "2025-04-14",
+      "underlying": "IREN"
+    },
+    {
+      "ticker": "BTFL",
+      "issuer": "Defiance",
+      "category": "leveraged",
+      "name": "Defiance Daily Target 2X Long BITF ETF",
+      "expense_ratio_bps": 117,
+      "inception": "2025-05-19",
+      "underlying": "BITF"
+    },
+    {
+      "ticker": "HOOX",
+      "issuer": "Defiance",
+      "category": "leveraged",
+      "name": "Defiance Daily Target 2X Long HOOD ETF",
+      "expense_ratio_bps": 117,
+      "inception": "2024-11-12",
+      "underlying": "HOOD"
+    },
+    {
+      "ticker": "HOOZ",
+      "issuer": "Defiance",
+      "category": "leveraged",
+      "name": "Defiance Daily Target 2X Short HOOD ETF",
+      "expense_ratio_bps": 117,
+      "inception": "2024-11-12",
+      "underlying": "HOOD"
+    },
+    {
+      "ticker": "SMST",
+      "issuer": "Defiance",
+      "category": "leveraged",
+      "name": "Defiance Daily Target 2X Short MSTR ETF",
+      "expense_ratio_bps": 117,
+      "inception": "2024-09-12",
+      "underlying": "MSTR"
+    },
+    {
+      "ticker": "MST",
+      "issuer": "Defiance",
+      "category": "income_covered_call",
+      "name": "Defiance Leveraged Long + Income MSTR ETF",
+      "expense_ratio_bps": 125,
+      "inception": "2025-08-15",
+      "underlying": "MSTR"
+    },
+    {
+      "ticker": "BMNZ",
+      "issuer": "Defiance",
+      "category": "leveraged",
+      "name": "Defiance Daily Target 2X Short BMNR ETF",
+      "expense_ratio_bps": 117,
+      "inception": "2025-09-22",
+      "underlying": "BMNR"
+    },
+    {
+      "ticker": "SPBC",
+      "issuer": "Simplify",
+      "category": "thematic_equity",
+      "name": "Simplify US Equity PLUS Bitcoin Strategy ETF",
+      "expense_ratio_bps": 95,
+      "inception": "2021-09-30",
+      "underlying": "BTC"
+    },
+    {
+      "ticker": "BESO",
+      "issuer": "GSR",
+      "category": "multi_asset",
+      "name": "GSR Crypto Core3 ETF",
+      "expense_ratio_bps": 75,
+      "inception": "2026-04-21",
+      "underlying": "MIXED"
+    },
+    {
+      "ticker": "SOLC",
+      "issuer": "Canary",
+      "category": "altcoin_spot",
+      "name": "Canary Marinade Solana ETF",
+      "expense_ratio_bps": 95,
+      "inception": "2025-10-28",
+      "underlying": "SOL"
+    },
+    {
+      "ticker": "RIOX2",
+      "issuer": "Direxion",
+      "category": "leveraged",
+      "name": "Direxion Daily RIOT Bull 2X Shares",
+      "expense_ratio_bps": 119,
+      "inception": "2024-10-08",
+      "underlying": "RIOT"
+    },
+    {
+      "ticker": "BSCN",
+      "issuer": "Bitwise",
+      "category": "altcoin_spot",
+      "name": "Bitwise Stellar XLM ETF",
+      "expense_ratio_bps": 50,
+      "inception": "2026-04-15",
+      "underlying": "XLM"
+    },
+    {
+      "ticker": "BPOL",
+      "issuer": "Bitwise",
+      "category": "altcoin_spot",
+      "name": "Bitwise Polkadot ETF",
+      "expense_ratio_bps": 50,
+      "inception": "2026-03-20",
+      "underlying": "DOT"
+    },
+    {
+      "ticker": "BLNK",
+      "issuer": "Bitwise",
+      "category": "altcoin_spot",
+      "name": "Bitwise Chainlink ETF",
+      "expense_ratio_bps": 50,
+      "inception": "2026-03-16",
+      "underlying": "LINK"
+    },
+    {
+      "ticker": "BCFI",
+      "issuer": "Bitwise",
+      "category": "multi_asset",
+      "name": "Bitwise Crypto Industry & DeFi Index ETF",
+      "expense_ratio_bps": 85,
+      "inception": "2025-11-04",
+      "underlying": "MIXED"
+    },
+    {
+      "ticker": "TLNK",
+      "issuer": "21Shares",
+      "category": "altcoin_spot",
+      "name": "21Shares Chainlink ETF",
+      "expense_ratio_bps": 65,
+      "inception": "2026-03-25",
+      "underlying": "LINK"
+    },
+    {
+      "ticker": "TAVA",
+      "issuer": "21Shares",
+      "category": "altcoin_spot",
+      "name": "21Shares Avalanche ETF",
+      "expense_ratio_bps": 65,
+      "inception": "2026-04-02",
+      "underlying": "AVAX"
+    },
+    {
+      "ticker": "TLTC",
+      "issuer": "21Shares",
+      "category": "altcoin_spot",
+      "name": "21Shares Litecoin ETF",
+      "expense_ratio_bps": 35,
+      "inception": "2025-12-04",
+      "underlying": "LTC"
+    },
+    {
+      "ticker": "TXLM",
+      "issuer": "21Shares",
+      "category": "altcoin_spot",
+      "name": "21Shares Stellar ETF",
+      "expense_ratio_bps": 65,
+      "inception": "2026-02-18",
+      "underlying": "XLM"
+    },
+    {
+      "ticker": "GAVA",
+      "issuer": "Grayscale",
+      "category": "altcoin_spot",
+      "name": "Grayscale Avalanche Trust",
+      "expense_ratio_bps": 250,
+      "inception": "2025-09-25",
+      "underlying": "AVAX"
+    },
+    {
+      "ticker": "GTRX",
+      "issuer": "Grayscale",
+      "category": "altcoin_spot",
+      "name": "Grayscale TRON Trust",
+      "expense_ratio_bps": 250,
+      "inception": "2026-01-30",
+      "underlying": "TRX"
+    },
+    {
+      "ticker": "GTAO",
+      "issuer": "Grayscale",
+      "category": "altcoin_spot",
+      "name": "Grayscale Bittensor Trust",
+      "expense_ratio_bps": 250,
+      "inception": "2026-02-26",
+      "underlying": "TAO"
+    },
+    {
+      "ticker": "GAAVE",
+      "issuer": "Grayscale",
+      "category": "altcoin_spot",
+      "name": "Grayscale Aave Trust",
+      "expense_ratio_bps": 250,
+      "inception": "2025-08-15",
+      "underlying": "AAVE"
+    },
+    {
+      "ticker": "GUNI",
+      "issuer": "Grayscale",
+      "category": "altcoin_spot",
+      "name": "Grayscale Uniswap Trust",
+      "expense_ratio_bps": 250,
+      "inception": "2025-08-15",
+      "underlying": "UNI"
+    },
+    {
+      "ticker": "GBAT2",
+      "issuer": "Grayscale",
+      "category": "altcoin_spot",
+      "name": "Grayscale BAT Trust",
+      "expense_ratio_bps": 250,
+      "inception": "2021-03-17",
+      "underlying": "BAT"
+    },
+    {
+      "ticker": "GMANA",
+      "issuer": "Grayscale",
+      "category": "altcoin_spot",
+      "name": "Grayscale Decentraland Trust v2",
+      "expense_ratio_bps": 250,
+      "inception": "2022-02-11",
+      "underlying": "MANA"
+    },
+    {
+      "ticker": "BMAX2",
+      "issuer": "REX Shares",
+      "category": "income_covered_call",
+      "name": "REX Bitcoin Max Yield ETF",
+      "expense_ratio_bps": 95,
+      "inception": "2024-12-04",
+      "underlying": "BTC"
+    },
+    {
+      "ticker": "ATCL",
+      "issuer": "REX Shares",
+      "category": "income_covered_call",
+      "name": "REX Autocallable Income ETF",
+      "expense_ratio_bps": 95,
+      "inception": "2025-03-04",
+      "underlying": "MIXED"
+    },
+    {
+      "ticker": "ARKW",
+      "issuer": "ARK/21Shares",
+      "category": "thematic_equity",
+      "name": "ARK Next Generation Internet ETF",
+      "expense_ratio_bps": 88,
+      "inception": "2014-09-30",
+      "underlying": "MIXED"
+    },
+    {
+      "ticker": "ARKF",
+      "issuer": "ARK/21Shares",
+      "category": "thematic_equity",
+      "name": "ARK Fintech Innovation ETF",
+      "expense_ratio_bps": 75,
+      "inception": "2019-02-04",
+      "underlying": "MIXED"
+    },
+    {
+      "ticker": "IDOG",
+      "issuer": "BlackRock iShares",
+      "category": "altcoin_spot",
+      "name": "iShares Dogecoin Trust",
+      "expense_ratio_bps": 25,
+      "inception": "2026-04-15",
+      "underlying": "DOGE"
+    },
+    {
+      "ticker": "ILTC",
+      "issuer": "BlackRock iShares",
+      "category": "altcoin_spot",
+      "name": "iShares Litecoin Trust",
+      "expense_ratio_bps": 25,
+      "inception": "2026-04-15",
+      "underlying": "LTC"
+    },
+    {
+      "ticker": "FSOLE",
+      "issuer": "Fidelity",
+      "category": "altcoin_spot",
+      "name": "Fidelity Wise Origin Solana Fund",
+      "expense_ratio_bps": 25,
+      "inception": "2026-02-08",
+      "underlying": "SOL"
+    },
+    {
+      "ticker": "FDOG",
+      "issuer": "Fidelity",
+      "category": "altcoin_spot",
+      "name": "Fidelity Wise Origin Dogecoin Fund",
+      "expense_ratio_bps": 25,
+      "inception": "2026-04-22",
+      "underlying": "DOGE"
+    },
+    {
+      "ticker": "EZSO",
+      "issuer": "Franklin",
+      "category": "altcoin_spot",
+      "name": "Franklin Solana ETF",
+      "expense_ratio_bps": 19,
+      "inception": "2026-01-15",
+      "underlying": "SOL"
+    },
+    {
+      "ticker": "EZXR",
+      "issuer": "Franklin",
+      "category": "altcoin_spot",
+      "name": "Franklin XRP ETF",
+      "expense_ratio_bps": 19,
+      "inception": "2026-02-26",
+      "underlying": "XRP"
+    },
+    {
+      "ticker": "EZDG",
+      "issuer": "Franklin",
+      "category": "altcoin_spot",
+      "name": "Franklin Dogecoin ETF",
+      "expense_ratio_bps": 19,
+      "inception": "2026-04-08",
+      "underlying": "DOGE"
+    },
+    {
+      "ticker": "VXRP2",
+      "issuer": "VanEck",
+      "category": "altcoin_spot",
+      "name": "VanEck Spot XRP ETF (33-Act)",
+      "expense_ratio_bps": 30,
+      "inception": "2026-03-10",
+      "underlying": "XRP"
+    },
+    {
+      "ticker": "VLTC",
+      "issuer": "VanEck",
+      "category": "altcoin_spot",
+      "name": "VanEck Litecoin ETF",
+      "expense_ratio_bps": 30,
+      "inception": "2026-02-04",
+      "underlying": "LTC"
+    },
+    {
+      "ticker": "ETHD",
+      "issuer": "ProShares",
+      "category": "leveraged",
+      "name": "ProShares UltraShort Ether ETF",
+      "expense_ratio_bps": 95,
+      "inception": "2024-06-04",
+      "underlying": "ETH"
+    },
+    {
+      "ticker": "BITT",
+      "issuer": "Volatility Shares",
+      "category": "leveraged",
+      "name": "Volatility Shares -2x Bitcoin Strategy ETF",
+      "expense_ratio_bps": 159,
+      "inception": "2024-06-04",
+      "underlying": "BTC"
+    },
+    {
+      "ticker": "ETHL",
+      "issuer": "Volatility Shares",
+      "category": "leveraged",
+      "name": "Volatility Shares 3x Ether ETF",
+      "expense_ratio_bps": 195,
+      "inception": "2025-12-08",
+      "underlying": "ETH"
+    },
+    {
+      "ticker": "DEFIQ",
+      "issuer": "Hashdex",
+      "category": "thematic_equity",
+      "name": "Hashdex DeFi & Smart Contract Platforms Index ETF",
+      "expense_ratio_bps": 75,
+      "inception": "2025-06-12",
+      "underlying": "MIXED"
+    },
+    {
+      "ticker": "CBOM",
+      "issuer": "Calamos",
+      "category": "defined_outcome",
+      "name": "Calamos Bitcoin Structured Alt Protection ETF — May",
+      "expense_ratio_bps": 69,
+      "inception": "2025-05-01",
+      "underlying": "BTC"
+    },
+    {
+      "ticker": "CBOG",
+      "issuer": "Calamos",
+      "category": "defined_outcome",
+      "name": "Calamos Bitcoin Structured Alt Protection ETF — August",
+      "expense_ratio_bps": 69,
+      "inception": "2025-08-01",
+      "underlying": "BTC"
+    },
+    {
+      "ticker": "CBOD",
+      "issuer": "Calamos",
+      "category": "defined_outcome",
+      "name": "Calamos Bitcoin Structured Alt Protection ETF — December",
+      "expense_ratio_bps": 69,
+      "inception": "2025-12-01",
+      "underlying": "BTC"
+    },
+    {
+      "ticker": "FTHR",
+      "issuer": "First Trust",
+      "category": "thematic_equity",
+      "name": "First Trust Bitcoin Strategy ETF",
+      "expense_ratio_bps": 85,
+      "inception": "2024-08-13",
+      "underlying": "BTC"
+    },
+    {
+      "ticker": "STKE",
+      "issuer": "REX Shares",
+      "category": "altcoin_spot",
+      "name": "REX-Osprey Solana Staking Income ETF",
+      "expense_ratio_bps": 95,
+      "inception": "2025-09-12",
+      "underlying": "SOL"
+    },
+    {
+      "ticker": "MSBT",
+      "issuer": "Morgan Stanley",
+      "category": "btc_spot",
+      "name": "Morgan Stanley Bitcoin ETF",
+      "expense_ratio_bps": 25,
+      "inception": "2026-04-22",
+      "underlying": "BTC"
+    },
+    {
+      "ticker": "MSSL",
+      "issuer": "Morgan Stanley",
+      "category": "altcoin_spot",
+      "name": "Morgan Stanley Solana ETF",
+      "expense_ratio_bps": 30,
+      "inception": "2026-04-22",
+      "underlying": "SOL"
     }
   ]
 }

@@ -752,6 +752,13 @@ def get_forward_return_estimate(
         "TON":    "TON11419-USD",
         "PENGU":  "PENGU-USD",
         "ZEC":    "ZEC-USD",
+        # 2026-04-27 universe-expansion v3 — additional altcoins from
+        # Bitwise altcoin lineup expansion (Stellar, Polkadot,
+        # Chainlink), Grayscale Q1 2026 trusts (BAT, MANA), and
+        # 21Shares' 2026 altcoin filings.
+        "XLM":    "XLM-USD",
+        "BAT":    "BAT-USD",
+        "MANA":   "MANA-USD",
     }
 
     def _altcoin_cagr_or_none(coin_symbol: str) -> tuple[float | None, str]:
