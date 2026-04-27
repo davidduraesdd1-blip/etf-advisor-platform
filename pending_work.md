@@ -223,6 +223,17 @@ Items intentionally NOT in scope for the May 1 demo. Pick up after.
 - [x] **Cold-boot perf root cause.**  *(2026-04-28 hotfix on main:
       19.5s -> 2.45s fresh / 1.47s persisted via three-state circuit
       breaker with disk persistence. Production target ≤8s ✓.)*
+- [x] **AUM live wire-up to SEC EDGAR + cryptorank.io / SoSoValue.**
+      *(2026-04-29 Sprint 2 on main: multi-source live chains for
+      AUM (yfinance → EDGAR N-PORT → ETF.com → issuer-site), 30D Flow
+      (cryptorank → SoSoValue → Farside → N-PORT-derived), and Avg Vol
+      (yfinance 3M → 10D → ETF.com → 60D history). Production-snapshot
+      safety net at core/etf_flow_production.json. Cron pre-warm +
+      freshness indicator. See docs/etf_flow_data_chain.md.)*
+- [ ] **Per-issuer scrape extractors for issuers 7+** (currently only
+      top 6 issuers have scaffold extractor entries — bespoke DOM
+      parsers per issuer; VanEck / 21Shares / Hashdex / Canary /
+      Roundhill / Defiance / Direxion / etc. all post-demo).
 - [ ] **Replace CF with NIG / POT / GH tail model at extreme moments —
       eliminates need for feasibility clip on alt-heavy baskets.**
       *(2026-04-28 hotfix #2 landed the feasibility clip + boundary

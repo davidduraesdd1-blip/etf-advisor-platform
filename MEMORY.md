@@ -4,6 +4,61 @@ Session continuity log. Newest entries on top. See master-template §16.
 
 ---
 
+## 2026-04-29 — Sprint 2: ETF Detail everything-live data (no-fallback)
+
+Cowork directive: "everything real and live, no hardcoded fallback
+values." Sprint 2 lands on `main` per the post-Sprint-1 freeze lift.
+Replaces the hardcoded `_AUM_REFERENCE_STUB_USD` + `_ETF_REFERENCE_STUB`
+blocks with multi-source live chains for AUM / 30D net flow / avg daily
+volume across all 211 universe tickers.
+
+### What landed (5 commits)
+
+  1. **integrations/etf_flow_data.py** — multi-source live chains.
+     `get_etf_aum`, `get_etf_30d_net_flow`, `get_etf_avg_daily_volume`
+     each return `(value, source_name)` tuples, never raise. Per
+     CLAUDE.md §10 fallback-chain pattern; key-gated cryptorank step
+     skipped without raising when CRYPTORANK_API_KEY unset. Runtime
+     cache `data/etf_flow_cache.json` with 24h TTL + no-poison-cache
+     for None values. 20 new tests.
+  2. **core/etf_flow_production.json** (NEW, COMMITTED) — production
+     safety-net snapshot. Bootstrap content carries the 14 major spot
+     ETFs from the prior reference values (source-tagged
+     "reference (bootstrap)" so the UI is honest about provenance).
+     Remaining 197 tickers have null entries; live chain or nightly
+     cron pre-warm fills them at render time.
+     **scripts/refresh_etf_flow_production.py** — patient capture
+     script (5-attempt backoff, 30s cooldown, resume-from-progress)
+     for operator-driven refreshes.
+  3. **pages/03_ETF_Detail.py** — AUM / 30D Flow / Avg Vol tiles
+     wired through the live multi-source chain. Each tile shows a
+     small "via <source>" badge below the value. 30D Flow tile uses
+     semantic green/red based on sign. Em-dash footnote appears
+     ONLY when all three tiles return None. Hardcoded
+     `_ETF_REFERENCE_STUB` block REMOVED.
+  4. **core/scheduler.py** — `prewarm_etf_flow_cache(universe)` walks
+     all 211 tickers and pre-populates the cache; writes per-source
+     distribution to `portfolio_snapshot.json::flow_prewarm`. The
+     cron's `recalculate_all_portfolios` calls it automatically.
+     ETF Detail page header reads the summary and surfaces a
+     freshness indicator: "Data refreshed: 23m ago · 187/211 tickers
+     live · 24/211 from snapshot". 5 new tests.
+  5. **docs/etf_flow_data_chain.md** (NEW) — full chain spec, source
+     registry, refresh cadence, operator runbook. MEMORY entry +
+     pending_work mark for "AUM live wire-up".
+
+### Test count
+
+  327 (Sprint-1 baseline) → 332 commit 4 → final after this commit.
+  + 20 in test_etf_flow_data.py
+  +  5 in test_scheduler_flow_warming.py
+
+### Tag
+
+`audit-round-4-etf-detail-live-2026-04-29` on main.
+
+---
+
 ## 2026-04-28 — Hotfix #2: CF feasibility clip + boundary disclosure
 
 Cowork flagged a math-display problem in the post-no-fallback numbers:
