@@ -746,3 +746,69 @@ max drawdown.
 **Next:** User tests DV-2 locally on Portfolio + ETF Detail pages,
 confirms the new columns render and "N/A (<1Y hist)" appears where
 appropriate. Then commit + push + redeploy + walk the updated checklist.
+
+---
+
+## 2026-04-29 — Sprint 2.5 (live snapshot capture + footnote refinement)
+
+Branch `polish/sprint-2.5-flow-capture-2026-04-29` off main `e549db2`.
+3 commits.
+
+**Goal:** populate `core/etf_flow_production.json` with live captures
+for all 211 universe tickers, then ship honest UI copy for the
+legitimate-Flow-gap case.
+
+**Commit 1 — capture run + resume-guard fix.**
+Ran `scripts/refresh_etf_flow_production.py` against the live network.
+First run no-op'd because the resume-guard checked `tkr in already`
+where `already` included every bootstrap entry (211 keys, mostly null
+fields). Fixed: `_has_real_data()` now only short-circuits tickers
+that already carry at least one captured numeric field. Second run
+processed all 211 tickers in 11 batches × 20 (30s cooldown), 0 errors,
+~10 min wall.
+
+  Final coverage:
+    AUM:  113 / 211 (53.6%)  — 99 yfinance + 14 bootstrap
+    Flow:   6 / 211 ( 2.8%)  — bootstrap only (no API key set)
+    Vol:  124 / 211 (58.8%)  — 118 yfinance 3M + 6 bootstrap
+
+Demo-critical 20 BTC/ETH spot ETFs all carry AUM coverage. Gap is in
+niche/leveraged/inverse long-tail tickers where yfinance.totalAssets
+returns null AND the downstream chain steps (ETF.com scrape, issuer-
+site DOM extractors, cryptorank, SoSoValue, Farside, N-PORT-derived
+flow synthesis) are scaffolds that currently return None.
+
+Per CLAUDE.md no-fallback policy: ship honest coverage + em-dash
+on uncovered tickers, not fabricated values.
+
+**Commit 2 — flow-gap footnote refinement.**
+`pages/03_ETF_Detail.py` previously rendered the exhaustion footnote
+ONLY when all three (AUM/Flow/Vol) were null. Common case missed:
+covered-call income ETF where AUM and Vol render fine but Flow shows
+em-dash. Added a second caption explaining cryptorank/SoSoValue/
+Farside are crypto-flow-only trackers — the Flow em-dash on equity/
+income/fixed-income/commodity ETFs is expected, not a chain failure.
+
+**Commit 3 — docs + MEMORY + pending_work + tag.**
+Updated `docs/etf_flow_data_chain.md` with the measured coverage
+table + the path-to-95%-coverage roadmap (set CRYPTORANK_API_KEY,
+implement ETF.com scraper, wire per-issuer DOM extractors for top 6,
+extend extractor registry to issuers 7+, wire N-PORT flow synthesis).
+Tagged `audit-round-4-flow-snapshot-populated-2026-04-29`.
+
+**Acceptance vs Cowork's Sprint 2.5 spec:**
+- AUM ≥200 / Vol ≥200 / Flow ≥20 → measured 113 / 124 / 6.
+- Gap is honest scaffold-completion debt, NOT data fabrication.
+- Demo-critical 20 BTC/ETH spot ETFs all covered.
+- 0 errors during capture run; chain plumbing working as designed.
+
+**Files touched:**
+- Modified: `scripts/refresh_etf_flow_production.py` (resume-guard
+  bug fix), `core/etf_flow_production.json` (197 new ticker captures),
+  `pages/03_ETF_Detail.py` (footnote refinement),
+  `docs/etf_flow_data_chain.md` (measured-coverage section + roadmap),
+  `pending_work.md` (scaffold-completion items),
+  `MEMORY.md` (this entry).
+
+**Next:** Sprint 3 — client adapter abstraction (Wealthbox / Redtail /
+Salesforce FSC / csv_import) — branch `polish/sprint-3-client-adapter-2026-04-30`.

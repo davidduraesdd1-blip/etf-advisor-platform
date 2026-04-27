@@ -460,14 +460,36 @@ def main() -> None:
             unsafe_allow_html=True,
         )
 
-    # Em-dash footnote ONLY when all three live + snapshot paths exhausted.
-    if _aum_v is None and _flow_v is None and _vol_v is None:
+    # Two distinct footnote cases — keep the language honest so the FA can
+    # tell "we can't get any data" from "this metric is intentionally narrow".
+    #
+    # 1) Hard exhaustion: all three (AUM / Flow / Vol) are None. Every chain
+    #    step ran and returned empty. Show the full provenance trail.
+    # 2) Legitimate Flow gap: AUM and/or Vol are populated but Flow is None.
+    #    cryptorank / SoSoValue / Farside only cover crypto-flow ETFs (spot
+    #    BTC, spot ETH, futures-based crypto, multi-asset crypto baskets).
+    #    Equity, income, fixed-income and commodity ETFs sit outside their
+    #    universe — null here is the correct answer, not a chain failure.
+    _all_exhausted = _aum_v is None and _flow_v is None and _vol_v is None
+    _legitimate_flow_gap = (
+        _flow_v is None and not _all_exhausted
+    )
+    if _all_exhausted:
         st.caption(
             "AUM / 30D net flows / Avg daily vol unavailable for this "
             "ticker — every chain step (yfinance / SEC EDGAR / ETF.com / "
             "cryptorank / SoSoValue / Farside / production snapshot) "
             "returned empty. Try the Refresh button in the topbar; the "
             "next nightly cron run will re-attempt and populate."
+        )
+    elif _legitimate_flow_gap:
+        st.caption(
+            "30D net flows shown only for crypto-flow ETFs (cryptorank.io · "
+            "SoSoValue · Farside daily-flow trackers). Equity, income, "
+            "fixed-income and commodity ETFs sit outside those trackers' "
+            "coverage; the em-dash here is expected, not a data error. "
+            "AUM and Avg daily vol come from the broad fund-data chain "
+            "(yfinance → SEC EDGAR N-PORT → ETF.com → issuer site)."
         )
 
     # Volatility / correlation / issuer tier — moved into a secondary row

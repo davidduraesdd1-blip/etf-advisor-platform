@@ -1,7 +1,67 @@
 # ETF flow data chain — full specification
 
-Polish round 5, Sprint 2 (2026-04-29). Cowork directive: "everything
-real and live, no hardcoded fallback values."
+Polish round 5, Sprint 2 (2026-04-29) + Sprint 2.5 (2026-04-29).
+Cowork directive: "everything real and live, no hardcoded fallback
+values."
+
+## Measured coverage (Sprint 2.5 capture run, 2026-04-29)
+
+After the live capture run across all 211 universe tickers
+(`scripts/refresh_etf_flow_production.py`, 11 batches × 20 tickers,
+30s inter-batch cooldown, ~10 min wall):
+
+| Field | Coverage | Sources active |
+|---|---|---|
+| AUM           | 113 / 211 (53.6%) | 99 yfinance + 14 bootstrap |
+| 30D net flow  |   6 / 211 ( 2.8%) | 6 bootstrap (chain steps below) |
+| Avg daily vol | 124 / 211 (58.8%) | 118 yfinance 3M + 6 bootstrap |
+| Errors        |   0 / 211         | clean run                    |
+
+Demo-critical 20 BTC/ETH spot ETFs (IBIT/FBTC/BITB/ARKB/BTCO/EZBC/
+BRRR/HODL/BTCW/BTC/GBTC/DEFI/ETHA/FETH/ETH/ETHE/ETHW/CETH/QETH/EZET)
+all carry AUM coverage from bootstrap or yfinance. Long-tail gap is
+concentrated in niche / leveraged / inverse ETFs that yfinance's
+`totalAssets` field returns null for (e.g., MSSL, FTHR, VLTC).
+
+### Why coverage is below the 95% target
+
+The downstream chain steps are scaffolds that currently return None:
+
+- **AUM step 3** — ETF.com page scrape: scaffold (returns None)
+- **AUM step 4** — issuer-site DOM extractors: scaffold for top 6
+  issuers, no entries for issuers 7+ (VanEck, 21Shares, Hashdex,
+  Canary, Roundhill, Defiance, Direxion, etc.)
+- **Flow step 1** — cryptorank.io: key-gated, requires
+  `CRYPTORANK_API_KEY`. Capture run was unkeyed → step skipped.
+- **Flow step 2** — SoSoValue scrape: scaffold (returns None)
+- **Flow step 3** — Farside CSV: scaffold (returns None)
+- **Flow step 4** — N-PORT-derived synthesis: scaffold (returns None)
+- **Vol step 3** — ETF.com page scrape: scaffold (returns None)
+
+The scaffolds are deliberate — Sprint 2 wired the chain *plumbing*
+(cache → live → snapshot → em-dash) so the no-fallback policy is
+fully enforced today. Filling in each scaffold is per-source bespoke
+work (DOM-parser per issuer, scrape resilience, CSV format drift
+detection) that was scoped post-demo.
+
+### Path to ≥95% coverage
+
+1. **Set `CRYPTORANK_API_KEY` on Streamlit Cloud Secrets** — unblocks
+   step 1 of the Flow chain for ~25 crypto-flow ETFs.
+2. **Implement ETF.com scraper** — single regex sweep over the public
+   ETF.com page per ticker. ~80 niche ETFs would gain AUM + Vol.
+3. **Implement per-issuer DOM extractors for top 6 issuers** —
+   BlackRock iShares, Bitwise, Grayscale, ProShares, Fidelity,
+   Franklin. Adds another ~40 tickers.
+4. **Add issuer-extractor entries for issuers 7+** — VanEck, 21Shares,
+   Hashdex, Canary, Roundhill, Defiance, Direxion. Adds another ~30.
+5. **Wire N-PORT-derived flow synthesis** — (AUM_today − AUM_30d_ago)
+   minus return attribution. Real data, not synthetic, but requires
+   30-day AUM history which only exists once snapshot files compound.
+
+Items 1-2 alone would push AUM to ~85% and Vol to ~85%. Items 1-4
+together are the realistic path to ≥95% AUM/Vol. Item 5 is the only
+realistic path to ≥20% Flow coverage outside crypto-flow ETFs.
 
 This document specifies the multi-source live chains for the three
 ETF reference-data fields surfaced on the ETF Detail page:
