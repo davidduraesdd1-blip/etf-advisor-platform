@@ -15,18 +15,21 @@ openpyxl>=3.1.2
 # 2026-04-26 audit-round-1: real broker wiring. Optional at runtime —
 # integrations/broker_alpaca_paper.py falls back to mock if missing.
 alpaca-py>=0.30.0
-# 2026-05-01 Sprint 2.7: Playwright-based AUM extractors for issuers
-# whose product pages are JS-rendered (Franklin Templeton) or whose
-# static-HTML route fails. The runtime probe in
-# `integrations.issuer_extractors_playwright.is_playwright_available()`
-# returns False if the python module OR the chromium binary is absent —
-# in which case the chain silently falls through. NO blocking import
-# at app cold-start. CLAUDE.md §10 (no-fallback), §11 (env-scoped).
+# 2026-05-01 Sprint 2.7: Playwright-based AUM extractors for JS-rendered
+# issuer pages (Franklin Templeton).
 #
-# IMPORTANT: Streamlit Cloud needs `python -m playwright install
-# chromium` to run AFTER pip install resolves this dep. Either:
-#   (a) include `setup.sh` with `python -m playwright install chromium`
-#       in repo root (Streamlit Cloud auto-runs setup.sh post-pip), or
-#   (b) document the manual step in Settings → Advanced → Runtime cmd.
-# packages.txt sibling file lists the apt deps chromium needs.
-playwright>=1.42
+# DEPLOY-INFRA NOTE (2026-04-30 audit-fix): `playwright` is INTENTIONALLY
+# commented out for Streamlit Cloud — their pip-install step fails on
+# this wheel + chromium combination on the Community Cloud free tier.
+#
+# The chain is fully resilient: integrations.issuer_extractors_playwright
+# runtime-probes `is_playwright_available()` and silently no-ops if the
+# module is missing. Without Playwright we lose AUM lift on the 3
+# Franklin Templeton tickers (which render em-dash per no-fallback
+# policy) — but the app does NOT crash on cold-start.
+#
+# Re-enable for local dev / self-hosted runners by uncommenting and
+# running `python -m playwright install chromium` in the venv. Tracked
+# for Streamlit-Cloud re-enable in pending_work.md when their Playwright
+# support story stabilizes.
+# playwright>=1.42

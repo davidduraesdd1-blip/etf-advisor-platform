@@ -349,3 +349,24 @@ Items intentionally NOT in scope for the May 1 demo. Pick up after.
       pulls clients from CRM but doesn't push portfolio updates,
       rebalance flags, or audit-log entries back. Bidirectional
       sync is a separate, larger sprint.
+
+- [ ] **Playwright on Streamlit Cloud — re-enable when their support
+      story stabilizes.** *(2026-04-30 audit-fix on main: rolled back
+      `playwright>=1.42` from requirements.txt + chromium apt-deps from
+      packages.txt + setup.sh hook because Streamlit Cloud's pip-install
+      step failed on the wheel + chromium combination on Community
+      Cloud free tier.)* The Sprint 2.7 Playwright module
+      (`integrations/issuer_extractors_playwright.py`) remains in the
+      repo, gated by the runtime `is_playwright_available()` probe —
+      module returns `(None, None)` when Playwright is missing and the
+      chain falls through cleanly. To re-enable:
+      1. Uncomment `playwright>=1.42` in `requirements.txt`.
+      2. Re-add chromium apt-deps to `packages.txt`.
+      3. Re-create `setup.sh` running `python -m playwright install
+         chromium`.
+      4. Verify Streamlit Cloud cold-start under 90s (chromium adds
+         ~30s to first-call latency; amortized via module-level
+         _PW_CONTEXT_STATE singleton).
+      Cost of NOT enabling: lose AUM lift on 3 Franklin Templeton
+      tickers (EZBC / EZET / EZPZ) which render em-dash per
+      no-fallback policy. Trade-off acceptable for demo stability.
