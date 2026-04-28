@@ -447,6 +447,17 @@ def cornish_fisher_cvar(
             "(no-fallback policy 2026-04-28). Source via "
             "_get_cf_params(category) or _weighted_cf_params(holdings)."
         )
+    # Audit-fix (2026-04-30): same defensive bound as cornish_fisher_var
+    # for consistency. CVaR's numeric integration is mathematically
+    # valid over a wider range than VaR's discrete z-table, but a caller
+    # passing 0.05 (instead of 0.95) would silently compute the WRONG
+    # tail. Reject anything outside a sensible quantile band.
+    if not (0.5 < float(confidence) < 0.999):
+        raise ValueError(
+            f"cornish_fisher_cvar: confidence={confidence!r} out of "
+            f"sensible band (0.5, 0.999). Pass a tail-quantile like "
+            f"0.95 or 0.99."
+        )
     S = max(-_CF_SKEW_CAP, min(_CF_SKEW_CAP, float(skew)))
     K = max(0.0, min(_CF_KURT_CAP, float(excess_kurt)))
 
