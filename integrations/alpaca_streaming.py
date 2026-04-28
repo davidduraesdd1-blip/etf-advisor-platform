@@ -73,6 +73,20 @@ _LAST_EVENT_AT: Optional[str] = None   # ISO timestamp
 _STREAM_ERROR: Optional[str] = None    # last error string for Settings UI
 _RECONNECT_ATTEMPTS: int = 0
 
+# Audit-fix (HIGH): in-memory cache + debounced disk persist. The prior
+# implementation read JSON from disk on every WebSocket event (200+ disk
+# reads/sec on a fast-fill 50-name basket). Now: events update the
+# in-memory dict under _LOCK; a background flusher writes to disk every
+# _CACHE_FLUSH_SEC OR when the dict changes by more than _CACHE_DIRTY_BUMP
+# entries. _LOCK is held over the full read-modify-write so two events
+# arriving simultaneously can't corrupt the cache (TOCTOU fix).
+_CACHE: dict[str, dict] = {}           # in-memory mirror of _CACHE_PATH
+_CACHE_DIRTY: bool = False
+_CACHE_LOADED: bool = False
+_CACHE_LAST_FLUSH_TS: float = 0.0
+_CACHE_FLUSH_SEC: float = 1.5          # debounce window
+_CACHE_DIRTY_BUMP: int = 25            # force-flush after N changes
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -103,49 +117,91 @@ def _atomic_write_json(path: Path, payload: dict) -> None:
     tmp.replace(path)
 
 
-def _read_cache() -> dict:
-    if not _CACHE_PATH.exists():
-        return {}
+def _load_cache_if_needed() -> None:
+    """Lazy-load the on-disk cache into _CACHE on first access. Holds
+    _LOCK so concurrent first-callers can't double-load."""
+    global _CACHE_LOADED
+    with _LOCK:
+        if _CACHE_LOADED:
+            return
+        if _CACHE_PATH.exists():
+            try:
+                payload = json.loads(_CACHE_PATH.read_text() or "{}")
+                if isinstance(payload, dict):
+                    _CACHE.update(payload)
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("alpaca_streaming: corrupt cache ignored (%s)", exc)
+        _CACHE_LOADED = True
+
+
+def _flush_cache_if_dirty(force: bool = False) -> None:
+    """Persist _CACHE to disk if it's been modified since last flush
+    AND (force OR debounce window elapsed). Caller may or may not hold
+    _LOCK — we re-acquire for the snapshot+write."""
+    global _CACHE_DIRTY, _CACHE_LAST_FLUSH_TS
+    with _LOCK:
+        if not _CACHE_DIRTY:
+            return
+        elapsed = time.time() - _CACHE_LAST_FLUSH_TS
+        if not force and elapsed < _CACHE_FLUSH_SEC:
+            return
+        snapshot = dict(_CACHE)   # shallow copy under lock — safe to write outside
+        _CACHE_DIRTY = False
+        _CACHE_LAST_FLUSH_TS = time.time()
     try:
-        return json.loads(_CACHE_PATH.read_text() or "{}")
-    except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("alpaca_streaming: corrupt cache ignored (%s)", exc)
-        return {}
+        _atomic_write_json(_CACHE_PATH, snapshot)
+    except OSError as exc:
+        logger.warning("alpaca_streaming: cache write failed (%s)", exc)
 
 
 def _persist_status(client_order_id: str, status: dict) -> None:
-    cache = _read_cache()
-    cache[client_order_id] = status
-    # Trim to most-recent 200 entries to keep file small.
-    if len(cache) > 200:
-        ordered = sorted(
-            cache.items(),
-            key=lambda kv: kv[1].get("last_update_iso", ""),
-            reverse=True,
-        )
-        cache = dict(ordered[:200])
-    try:
-        _atomic_write_json(_CACHE_PATH, cache)
-    except OSError as exc:
-        logger.warning("alpaca_streaming: cache write failed (%s)", exc)
+    """Update in-memory _CACHE under _LOCK, mark dirty, then maybe flush.
+    No disk I/O on the hot path unless the debounce window has elapsed."""
+    global _CACHE_DIRTY
+    _load_cache_if_needed()
+    with _LOCK:
+        _CACHE[client_order_id] = status
+        # Trim to most-recent 200 entries to keep file small.
+        if len(_CACHE) > 200:
+            ordered = sorted(
+                _CACHE.items(),
+                key=lambda kv: kv[1].get("last_update_iso", ""),
+                reverse=True,
+            )
+            _CACHE.clear()
+            _CACHE.update(dict(ordered[:200]))
+        _CACHE_DIRTY = True
+        # Force-flush every N updates so we never lose more than N entries
+        # to a hard process kill.
+        force = len(_CACHE) % _CACHE_DIRTY_BUMP == 0
+    _flush_cache_if_dirty(force=force)
 
 
 def get_last_status(client_order_id: str) -> Optional[dict]:
     """Return last-known status for `client_order_id`, or None.
 
-    Reads from disk cache so the value survives Streamlit cold-restart.
+    Reads from in-memory cache (loaded once from disk so the value
+    survives Streamlit cold-restart). No per-call disk I/O.
     """
-    return _read_cache().get(client_order_id)
+    _load_cache_if_needed()
+    with _LOCK:
+        return dict(_CACHE.get(client_order_id)) if client_order_id in _CACHE else None
 
 
 def snapshot_recent(limit: int = 10) -> list[dict]:
     """Return the `limit` most-recent orders as `{client_order_id, ...}`
     list, newest first. Used by the Portfolio "Recent submissions"
     expander."""
-    cache = _read_cache()
-    rows = [{"client_order_id": k, **v} for k, v in cache.items()]
+    _load_cache_if_needed()
+    with _LOCK:
+        rows = [{"client_order_id": k, **v} for k, v in _CACHE.items()]
     rows.sort(key=lambda r: r.get("last_update_iso", ""), reverse=True)
     return rows[:limit]
+
+
+def _flush_cache_to_disk() -> None:
+    """Public flush entry — called from atexit + stop_order_stream()."""
+    _flush_cache_if_dirty(force=True)
 
 
 def register_order_callback(
@@ -251,15 +307,19 @@ def _stream_loop() -> None:
     """Daemon-thread entry point. Runs the TradingStream; on disconnect
     or error, sleeps per the backoff table and reconnects until
     _STOP_EVENT is set."""
-    global _STREAM, _STREAM_ERROR, _RECONNECT_ATTEMPTS
+    global _STREAM, _STREAM_ERROR, _RECONNECT_ATTEMPTS, _THREAD
     assert _STOP_EVENT is not None
     while not _STOP_EVENT.is_set():
         stream = _build_stream()
         if stream is None:
             # Not configured / SDK missing — exit cleanly. The Settings
             # row will reflect "not configured" via is_streaming().
+            # Audit-fix: clear _THREAD on early exit so the next
+            # start_order_stream() call doesn't reference a stale dead
+            # thread. The reconnect path naturally clears state on STOP.
             with _LOCK:
                 _STREAM_ERROR = "alpaca-py SDK or credentials unavailable"
+                _THREAD = None
             return
         with _LOCK:
             _STREAM = stream
@@ -351,13 +411,13 @@ def is_streaming() -> bool:
 
 def get_stream_health() -> dict:
     """Snapshot for the Settings status row."""
+    _load_cache_if_needed()
     with _LOCK:
-        cache = _read_cache()
         return {
             "configured":         is_configured(),
             "streaming":          is_streaming(),
             "last_event_iso":     _LAST_EVENT_AT,
-            "tracked_orders":     len(cache),
+            "tracked_orders":     len(_CACHE),
             "reconnect_attempts": _RECONNECT_ATTEMPTS,
             "last_error":         _STREAM_ERROR,
         }
@@ -371,3 +431,13 @@ def _test_inject_event(payload: dict) -> None:
     """Synthetic-event hook for unit tests. Equivalent to receiving
     a single trade-update from the WebSocket."""
     _dispatch(payload)
+
+
+# ── Process exit hook ────────────────────────────────────────────────────────
+# Audit-fix: ensure any pending in-memory cache writes are persisted to disk
+# on graceful interpreter shutdown. Streamlit Cloud restarts wouldn't lose
+# data anyway (the JSON file survives) but a hard kill mid-debounce would
+# drop the most-recent ~1.5s of events. atexit covers SIGINT / SIGTERM /
+# Streamlit's normal shutdown path.
+import atexit as _atexit
+_atexit.register(_flush_cache_to_disk)

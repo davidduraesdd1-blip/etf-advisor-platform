@@ -580,12 +580,24 @@ def main() -> None:
             pass
         if not _activity_items:
             # Demo fallback — every advisor wants to SEE recent activity even
-            # before the audit log is seeded.
+            # before the audit log is seeded. Audit-fix: guard for adapters
+            # returning <3 clients (CSV / Wealthbox / Redtail can return any
+            # count). Build the activity from whatever client subset is
+            # available; fall back to generic items for empty slots.
+            def _name(idx: int) -> str:
+                if 0 <= idx < len(DEMO_CLIENTS):
+                    full = DEMO_CLIENTS[idx].get("name", "") or ""
+                    return full.split()[0] if full else "Client"
+                return "Client"
+            def _drift(idx: int) -> float:
+                if 0 <= idx < len(DEMO_CLIENTS):
+                    return float(DEMO_CLIENTS[idx].get("drift_pct", 0.0) or 0.0)
+                return 0.0
             _activity_items = [
-                ("Apr 22 14:30", f"Rebalanced {DEMO_CLIENTS[2]['name'].split()[0]} basket · sleeve trimmed back to target", "exec"),
+                ("Apr 22 14:30", f"Rebalanced {_name(2)} basket · sleeve trimmed back to target", "exec"),
                 ("Apr 20 11:12", "Scanner flagged 4 new ETFs from EDGAR · added to universe watchlist", "note"),
-                ("Apr 18 09:48", f"{DEMO_CLIENTS[0]['name'].split()[0]} · quarterly review complete · no change needed", "rev"),
-                ("Apr 15 15:02", f"{DEMO_CLIENTS[1]['name'].split()[0]} · drift alert triggered · {DEMO_CLIENTS[1]['drift_pct']:.1f}σ over target", "note"),
+                ("Apr 18 09:48", f"{_name(0)} · quarterly review complete · no change needed", "rev"),
+                ("Apr 15 15:02", f"{_name(1)} · drift alert triggered · {_drift(1):.1f}σ over target", "note"),
                 ("Apr 10 10:20", "Methodology page updated · SEC Marketing Rule v3 compliance", "note"),
             ]
         _tag_styles = {

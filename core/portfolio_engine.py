@@ -66,6 +66,14 @@ VAR_CONFIDENCE: tuple[float, ...] = (0.95, 0.99)
 DEFAULT_SEED: int = 42                   # determinism lock per Mod 4 / Risk 6
 
 # ── FRED risk-free rate cache (module-scoped, 2-hour TTL) ────────────────────
+# Audit-fix (MEDIUM): thread-safety lock. Sprint 4's Alpaca daemon thread
+# can call into portfolio_engine paths simultaneously with Streamlit's
+# rerun threads — without the lock, the read-modify-write of the cache
+# dict could corrupt the in-flight rate. The TTL pattern was likely
+# benign in practice (last-writer-wins is OK semantically) but the lock
+# eliminates the race entirely.
+import threading as _rfr_threading
+_rfr_lock = _rfr_threading.Lock()
 _rfr_cache: dict[str, Any] = {"rate": None, "ts": 0.0}
 _RFR_CACHE_TTL: int = 3600 * 2
 _FRED_CSV_URL: str = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS3MO"
@@ -86,15 +94,20 @@ def get_live_risk_free_rate() -> float:
     RISK_FREE_RATE_FALLBACK (4.25%) on any error.
     """
     now = time.time()
-    if _rfr_cache["rate"] is not None and now - _rfr_cache["ts"] < _RFR_CACHE_TTL:
-        age_seconds = int(now - _rfr_cache["ts"])
+    # Audit-fix: read snapshot under lock so a concurrent writer can't
+    # tear the (rate, ts) tuple.
+    with _rfr_lock:
+        cached_rate = _rfr_cache["rate"]
+        cached_ts = _rfr_cache["ts"]
+    if cached_rate is not None and now - cached_ts < _RFR_CACHE_TTL:
+        age_seconds = int(now - cached_ts)
         # Still fresh — classify as LIVE if last successful fetch was from FRED
         # primary; CACHED if cache is older than 15 min so UI can show the age.
         if age_seconds < 900:
-            return float(_rfr_cache["rate"])
+            return float(cached_rate)
         mark_cache_hit("risk_free_rate", age_seconds=age_seconds,
                        note="FRED cache still valid; next refresh on TTL expiry.")
-        return float(_rfr_cache["rate"])
+        return float(cached_rate)
 
     try:
         import requests
@@ -118,8 +131,9 @@ def get_live_risk_free_rate() -> float:
             except ValueError:
                 continue
             if 0 < val < 20:
-                _rfr_cache["rate"] = val
-                _rfr_cache["ts"] = now
+                with _rfr_lock:
+                    _rfr_cache["rate"] = val
+                    _rfr_cache["ts"] = now
                 register_fetch_attempt("risk_free_rate", "fred", success=True)
                 return val
     except Exception as exc:
@@ -127,8 +141,9 @@ def get_live_risk_free_rate() -> float:
         register_fetch_attempt("risk_free_rate", "fred", success=False,
                                note=f"FRED fetch error: {type(exc).__name__}")
 
-    _rfr_cache["rate"] = RISK_FREE_RATE_FALLBACK
-    _rfr_cache["ts"] = now
+    with _rfr_lock:
+        _rfr_cache["rate"] = RISK_FREE_RATE_FALLBACK
+        _rfr_cache["ts"] = now
     mark_static_fallback("risk_free_rate",
                          note=f"FRED unavailable — using static {RISK_FREE_RATE_FALLBACK}% fallback.")
     return RISK_FREE_RATE_FALLBACK
@@ -382,7 +397,17 @@ def cornish_fisher_var(
     S = max(-_CF_SKEW_CAP, min(_CF_SKEW_CAP, float(skew)))
     K = max(0.0, min(_CF_KURT_CAP, float(excess_kurt)))
 
-    z_alpha = -{0.90: 1.282, 0.95: 1.645, 0.99: 2.326}.get(confidence, 1.645)
+    # Audit-fix (LOW): raise on unrecognized confidence rather than
+    # silently default to 95%. Caller bug shouldn't quietly produce
+    # "wrong but plausible" risk numbers.
+    _Z_TABLE = {0.90: 1.282, 0.95: 1.645, 0.99: 2.326}
+    if confidence not in _Z_TABLE:
+        raise ValueError(
+            f"cornish_fisher_var: confidence={confidence!r} not in "
+            f"supported set {sorted(_Z_TABLE.keys())}. "
+            f"Caller must pass one of the standard quantiles."
+        )
+    z_alpha = -_Z_TABLE[confidence]
     z_cf = (
         z_alpha
         + (z_alpha ** 2 - 1) / 6 * S
@@ -649,30 +674,26 @@ def _build_covariance_matrix(holdings: list[dict]) -> np.ndarray:
     return cov
 
 
-# 2026-04-26 audit-round-1 bonus 1+5: per-ETF AUM lookup. Used as a
-# liquidity tiebreaker inside _select_etfs_for_category — when two ETFs
-# in the same category share the same expense ratio, prefer the larger
-# fund (smaller bid/ask, less rebalance market impact, lower closure risk).
+# 2026-04-26 audit-round-1 bonus 1+5 (audit-fix 2026-04-30): per-ETF AUM
+# lookup used as a liquidity tiebreaker inside _select_etfs_for_category.
+# When two ETFs in the same category share the same expense ratio, prefer
+# the larger fund (smaller bid/ask, less rebalance market impact, lower
+# closure risk).
 #
-# Source priority on first lookup:
-#   1. Live yfinance Ticker.info["totalAssets"] — auto-fetch with 24h memo.
-#   2. Hardcoded reference-snapshot fallback (the same stub
-#      pages/03_ETF_Detail uses) for the major BTC + ETH spots, so the
-#      tiebreaker still functions when yfinance is in fallback / DEMO_MODE.
-#   3. None → fund treated as "smaller than any priced peer" so it loses
-#      ties; never blocks selection by itself.
+# Source: routed through `integrations.etf_flow_data.get_etf_aum()` —
+# the canonical no-fallback chain (yfinance → SEC EDGAR N-PORT → EDGAR
+# XBRL companyfacts → ETF.com → issuer-site → production-snapshot).
+# None → fund treated as "smaller than any priced peer" so it loses ties;
+# never blocks selection.
 #
-# Stub values mirror cryptorank.io / SoSoValue / issuer fact sheets as of
-# 2026-04. Major spot ETFs only — niche / new funds rely on the live path.
-_AUM_REFERENCE_STUB_USD: dict[str, float] = {
-    "IBIT": 62_400_000_000, "FBTC":  20_100_000_000,
-    "BITB":  3_200_000_000, "ARKB":   2_800_000_000,
-    "BTCO":    900_000_000, "EZBC":     400_000_000,
-    "BRRR":    300_000_000, "HODL":     800_000_000,
-    "GBTC": 18_000_000_000, "DEFI":     180_000_000,
-    "ETHA":  9_300_000_000, "FETH":   1_050_000_000,
-    "ETHE":  4_300_000_000, "BKCH":     180_000_000,
-}
+# Audit-fix (HIGH, 2026-04-30): the prior `_AUM_REFERENCE_STUB_USD` dict
+# (14 hardcoded values for major spot ETFs) violated CLAUDE.md §22's
+# no-fallback policy — the values silently aged and quietly biased
+# selection over time. Removed. The chain's production-snapshot step
+# (`core/etf_flow_production.json`, refreshed by the nightly capture
+# script) plays the same "still works when yfinance is down" role
+# without the staleness-rot risk: when the snapshot ages past usefulness,
+# the entry returns None and the tiebreaker degrades gracefully.
 
 _AUM_LIVE_MEMO: dict[str, tuple[float | None, float]] = {}
 _AUM_MEMO_TTL_SEC: int = 24 * 3600
@@ -680,13 +701,17 @@ _AUM_MEMO_TTL_SEC: int = 24 * 3600
 
 def _get_aum_usd(ticker: str) -> float | None:
     """
-    Best-effort AUM in USD for a ticker. Returns None when both the live
-    yfinance path and the hardcoded stub are empty — caller treats None
-    as "smallest in tie group" so the tiebreaker degrades gracefully.
+    Best-effort AUM in USD for a ticker. Returns None when the chain
+    exhausts — caller treats None as "smallest in tie group" so the
+    tiebreaker degrades gracefully.
 
-    Live fetch is opt-in: under DEMO_MODE_NO_FETCH=1 (test harness +
-    deterministic-render mode) we skip the network and only consult the
-    stub, so AppTest renders stay fast.
+    Routes through `integrations.etf_flow_data.get_etf_aum()` which
+    handles the full no-fallback chain (yfinance → EDGAR → ETF.com →
+    issuer-site → production-snapshot). 24h memo on the result so the
+    portfolio-build hot path doesn't re-traverse the chain per call.
+
+    DEMO_MODE_NO_FETCH=1 (test harness) makes the chain consult only
+    the production-snapshot — fast + deterministic for AppTest.
     """
     import os
     import time as _time
@@ -695,25 +720,32 @@ def _get_aum_usd(ticker: str) -> float | None:
     if not tkr:
         return None
 
-    # Live path — yfinance Ticker.info["totalAssets"]; 24h memo.
-    if os.environ.get("DEMO_MODE_NO_FETCH") != "1":
-        cached = _AUM_LIVE_MEMO.get(tkr)
-        if cached is not None:
-            val, ts = cached
-            if _time.monotonic() - ts < _AUM_MEMO_TTL_SEC:
-                return val if val is not None else _AUM_REFERENCE_STUB_USD.get(tkr)
-        try:
-            import yfinance as yf  # type: ignore
-            info = yf.Ticker(tkr).info or {}
-            aum = info.get("totalAssets")
-            if aum is not None and float(aum) > 0:
-                _AUM_LIVE_MEMO[tkr] = (float(aum), _time.monotonic())
-                return float(aum)
-            _AUM_LIVE_MEMO[tkr] = (None, _time.monotonic())
-        except Exception:  # pragma: no cover — defensive
-            _AUM_LIVE_MEMO[tkr] = (None, _time.monotonic())
+    cached = _AUM_LIVE_MEMO.get(tkr)
+    if cached is not None:
+        val, ts = cached
+        if _time.monotonic() - ts < _AUM_MEMO_TTL_SEC:
+            return val
 
-    return _AUM_REFERENCE_STUB_USD.get(tkr)
+    try:
+        from integrations.etf_flow_data import get_etf_aum
+        v, _src = get_etf_aum(tkr)
+        # Guard against test-time mocks returning surrogate types
+        if v is None:
+            _AUM_LIVE_MEMO[tkr] = (None, _time.monotonic())
+            return None
+        try:
+            v_float = float(v)
+        except (TypeError, ValueError):
+            _AUM_LIVE_MEMO[tkr] = (None, _time.monotonic())
+            return None
+        if v_float > 0:
+            _AUM_LIVE_MEMO[tkr] = (v_float, _time.monotonic())
+            return v_float
+        _AUM_LIVE_MEMO[tkr] = (None, _time.monotonic())
+        return None
+    except Exception:  # pragma: no cover — defensive; chain must never raise
+        _AUM_LIVE_MEMO[tkr] = (None, _time.monotonic())
+        return None
 
 
 def _select_etfs_for_category(
@@ -1348,8 +1380,18 @@ def run_monte_carlo(
 
     prob_loss = float(np.mean(final_values < initial_value) * 100)
     prob_10pct = float(np.mean(final_values > initial_value * 1.10) * 100)
-    path_min = np.min(cumulative, axis=1)
-    avg_drawdown = float(np.mean((1 - path_min) * 100))
+    # Audit-fix (MEDIUM): true running-max drawdown per path. The prior
+    # `1 - path_min` formulation reports trough vs starting value, NOT
+    # classical max-drawdown (trough vs running peak). Paths that go up
+    # then down were under-reporting drawdown.
+    #
+    # For each path: at every step, drawdown_t = (running_max_t -
+    # cumulative_t) / running_max_t. Max drawdown for the path is the
+    # max of that array. Average across paths is the mean of those.
+    running_max = np.maximum.accumulate(cumulative, axis=1)
+    drawdowns = (running_max - cumulative) / running_max
+    per_path_max_dd = np.max(drawdowns, axis=1)
+    avg_drawdown = float(np.mean(per_path_max_dd) * 100)
 
     # Retain only the first `paths_retain` paths for UI — deterministic slice
     # (not a random choice) so the determinism-lock test is bit-exact.

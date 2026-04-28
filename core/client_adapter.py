@@ -44,6 +44,14 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Audit-fix (LOW): single source of truth for the "advisor hasn't set
+# this client's tier yet" sentinel. CRM-imported clients ship with this
+# value because CRMs don't natively store advisor-platform risk-tier
+# concepts. Used by adapter modules (read) and by core.scheduler /
+# pages.02_Portfolio (compare) to guard against passing it to
+# build_portfolio.
+UNASSIGNED_TIER: str = "(unassigned)"
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Wire format
@@ -67,7 +75,7 @@ class ClientRecord:
     name:                  str
     label:                 str = ""
     age:                   Optional[int] = None
-    assigned_tier:         str = "(unassigned)"
+    assigned_tier:         str = UNASSIGNED_TIER
     total_portfolio_usd:   float = 0.0
     crypto_allocation_pct: float = 0.0
     last_rebalance_iso:    Optional[str] = None

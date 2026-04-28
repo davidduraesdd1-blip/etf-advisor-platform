@@ -232,7 +232,7 @@ def main() -> None:
 
     # ── 2026-04-25 redesign: mockup-style hero card per advisor-etf-DETAIL.html ─
     # Hero card shows ticker (mono accent) / name (serif h1) / issuer line on the
-    # left; latest price + 24h/1Y change on the right. Pulls from existing data
+    # left; latest price + 1D/1Y change on the right. Pulls from existing data
     # (etf dict + close_series + get_last_close fallback).
 
     _latest_close = close_series[-1] if close_series else None
@@ -245,10 +245,10 @@ def main() -> None:
         except Exception:
             pass
 
-    _chg_24h_pct: float | None = None
+    _chg_1d_pct: float | None = None
     _chg_1y_pct: float | None = None
     if len(close_series) >= 2 and close_series[-2]:
-        _chg_24h_pct = (close_series[-1] / close_series[-2] - 1.0) * 100.0
+        _chg_1d_pct = (close_series[-1] / close_series[-2] - 1.0) * 100.0
     if len(close_series) >= 252 and close_series[-252]:
         _chg_1y_pct = (close_series[-1] / close_series[-252] - 1.0) * 100.0
     elif len(close_series) >= 2 and close_series[0]:
@@ -281,7 +281,7 @@ def main() -> None:
         f'line-height:1.15;color:var(--accent);letter-spacing:-0.01em;">'
         f'{("$" + format(_latest_close, ",.2f")) if _latest_close is not None else "—"}</div>'
         f'<div style="font-size:13px;font-family:var(--font-mono);margin-top:6px;'
-        f'color:var(--text-muted);">{_fmt_chg(_chg_24h_pct, "24h")} &nbsp;·&nbsp; '
+        f'color:var(--text-muted);">{_fmt_chg(_chg_1d_pct, "1D")} &nbsp;·&nbsp; '
         f'{_fmt_chg(_chg_1y_pct, "1Y")}</div>'
         '</div>'
         '</div>',

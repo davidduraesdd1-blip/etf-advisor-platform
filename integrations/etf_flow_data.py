@@ -554,16 +554,37 @@ def _scrape_sosovalue_flow(ticker: str) -> Optional[float]:
 
 
 def _fetch_farside_flow(ticker: str) -> Optional[float]:
-    """Farside Investors CSV — covers BTC spot (farside.co.uk/btc) and
+    """Farside Investors — covers BTC spot (farside.co.uk/btc) and
     ETH spot (farside.co.uk/eth). Returns the trailing-30-day sum for
-    the requested ticker, or None if the ticker isn't tracked."""
+    the requested ticker, or None if the ticker isn't tracked.
+
+    Audit-fix (MEDIUM, 2026-04-30): the prior regex-over-full-page
+    approach could mis-pair a ticker in row N with a "Total" 50 rows
+    later when partial-month data shifted layout. Now we parse the
+    table HTML deterministically: locate the ticker's column-header
+    index, then read the matching cell from the row whose first cell
+    contains "Total" (case-insensitive). Falls back gracefully on any
+    structural change.
+
+    Unit detection (MEDIUM): Farside mixes $M for per-ticker columns
+    with $bn for the page-total row. The ticker-column rule is
+    consistent ($M), so the *1e6 multiplier is safe at the per-ticker
+    granularity we read. The all-funds total is not extracted here.
+    """
     try:
         import re
         import requests
-        # Farside hosts BTC + ETH dashboards as HTML pages with embedded
-        # tables; CSV download may require navigating from the page.
-        # We hit both pages and extract the ticker's column total.
-        for path, scope in (("btc", "btc_spot"), ("eth", "eth_spot")):
+        # Optional bs4 — if unavailable, we still have the regex
+        # last-resort below.
+        try:
+            from bs4 import BeautifulSoup     # type: ignore
+            _HAS_BS4 = True
+        except ImportError:
+            _HAS_BS4 = False
+            BeautifulSoup = None              # type: ignore
+
+        tk = ticker.upper()
+        for path, _scope in (("btc", "btc_spot"), ("eth", "eth_spot")):
             time.sleep(0.05)
             resp = requests.get(
                 f"https://farside.co.uk/{path}/",
@@ -572,24 +593,75 @@ def _fetch_farside_flow(ticker: str) -> Optional[float]:
             )
             if resp.status_code != 200:
                 continue
-            # Look for the ticker's column header + the "Total" row at bottom.
-            if ticker.upper() not in resp.text:
+            if tk not in resp.text:
                 continue
-            # Best-effort extraction; Farside's table-row pattern.
+
+            # Path 1 (preferred): bs4 deterministic table parse.
+            if _HAS_BS4:
+                try:
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    for table in soup.find_all("table"):
+                        # Find the column index whose header text == ticker.
+                        headers_row = table.find("tr")
+                        if headers_row is None:
+                            continue
+                        headers = [
+                            (h.get_text(strip=True) or "").upper()
+                            for h in headers_row.find_all(["th", "td"])
+                        ]
+                        if tk not in headers:
+                            continue
+                        col_idx = headers.index(tk)
+                        # Walk rows to find the "Total" row.
+                        for row in table.find_all("tr"):
+                            cells = row.find_all(["th", "td"])
+                            if not cells:
+                                continue
+                            label = (cells[0].get_text(strip=True) or "").lower()
+                            if "total" not in label:
+                                continue
+                            if col_idx >= len(cells):
+                                continue
+                            raw = (cells[col_idx].get_text(strip=True) or "")
+                            v = _farside_parse_cell(raw)
+                            if v is not None:
+                                # Per-ticker columns are consistently $M.
+                                return v * 1e6
+                except Exception:
+                    pass   # fall through to regex
+            # Path 2 (last resort): bounded-context regex. Caps the
+            # window between ticker header and Total to reduce
+            # cross-row mismatches.
             m = re.search(
-                rf"{ticker.upper()}.*?Total[^<]*<[^>]*>[\s$]*([\d,.()-]+)",
-                resp.text, flags=re.DOTALL,
+                rf"{tk}\b.{{0,5000}}?Total[^<]*<[^>]*>\s*\$?\s*([\d,.()-]+)",
+                resp.text, flags=re.DOTALL | re.IGNORECASE,
             )
-            if not m:
-                continue
-            raw = m.group(1).replace(",", "").replace("(", "-").replace(")", "")
-            try:
-                return float(raw) * 1e6   # Farside displays in $M
-            except ValueError:
-                continue
+            if m:
+                raw = m.group(1)
+                v = _farside_parse_cell(raw)
+                if v is not None:
+                    return v * 1e6
         return None
     except Exception as exc:
         logger.info("Farside fetch failed for %s: %s", ticker, exc)
+        return None
+
+
+def _farside_parse_cell(raw: str) -> Optional[float]:
+    """Parse a Farside table cell value to float. Handles $, commas,
+    and parentheses-as-negative ('(1,234)' → -1234). Returns None on
+    parse failure."""
+    s = (raw or "").strip()
+    if not s or s in ("-", "—", "–"):
+        return None
+    s = s.replace("$", "").replace(",", "")
+    is_neg = s.startswith("(") and s.endswith(")")
+    if is_neg:
+        s = s[1:-1]
+    try:
+        v = float(s)
+        return -v if is_neg else v
+    except ValueError:
         return None
 
 

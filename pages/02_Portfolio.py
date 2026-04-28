@@ -162,7 +162,19 @@ def main() -> None:
     # ═══════════════════════════════════════════════════════════════════════════
 
     tier_names = list(PORTFOLIO_TIERS.keys())
-    default_tier_idx = tier_names.index(client["assigned_tier"])
+    # Audit-fix: CRM-imported clients ship with assigned_tier="(unassigned)"
+    # which isn't in tier_names. Default to the middle tier (Moderate) so
+    # the FA can pick the real tier rather than crash.
+    _client_tier = client.get("assigned_tier", "(unassigned)")
+    if _client_tier in tier_names:
+        default_tier_idx = tier_names.index(_client_tier)
+    else:
+        default_tier_idx = len(tier_names) // 2   # Moderate-ish midpoint
+        st.info(
+            f"This client has no assigned tier yet (`{_client_tier}`). "
+            f"Pick one below to build their portfolio — the change "
+            f"saves to session state."
+        )
     tier_name = tier_pill_selector(tier_names, default_index=default_tier_idx, key="tier_pill_portfolio")
 
     tier_meta = PORTFOLIO_TIERS[tier_name]
@@ -996,8 +1008,8 @@ def main() -> None:
             f'<div style="font-size:18px;font-family:var(--font-mono);font-weight:500;'
             f'line-height:1.15;margin-top:4px;color:var(--text-primary);">{_last_reviewed_str}</div>'
             f'<div style="font-size:12px;color:var(--text-muted);margin-top:4px;'
-            f'font-family:var(--font-mono);">drift {client["drift_pct"]:.1f}σ · '
-            f'{"rebal needed" if client["rebalance_needed"] else "on target"}</div>'
+            f'font-family:var(--font-mono);">drift {float(client.get("drift_pct", 0.0) or 0.0):.1f}σ · '
+            f'{"rebal needed" if client.get("rebalance_needed") else "on target"}</div>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -1034,21 +1046,25 @@ def main() -> None:
 
     if _recent:
         with st.expander(f"Recent submissions ({len(_recent)})", expanded=False):
+            # Audit-fix (HIGH): shape encoding pairs with semantics per
+            # CLAUDE.md §8 ("never rely on color alone"). Each status maps
+            # to (color, shape, label). Filled=▲ up, Rejected=▼ down,
+            # Canceled/Expired=■ neutral square, Pending/Accepted=● dot.
             _PILL_COLORS = {
-                "submitted":     ("#f59e0b", "Submitted"),
-                "new":           ("#f59e0b", "New"),
-                "pending_new":   ("#f59e0b", "Pending"),
-                "accepted":      ("#3b82f6", "Accepted"),
-                "partial_fill":  ("#3b82f6", "Partial"),
-                "fill":          ("#22c55e", "Filled"),
-                "filled":        ("#22c55e", "Filled"),
-                "rejected":      ("#ef4444", "Rejected"),
-                "canceled":      ("#9ca3af", "Canceled"),
-                "expired":       ("#9ca3af", "Expired"),
+                "submitted":     ("#f59e0b", "●", "Submitted"),
+                "new":           ("#f59e0b", "●", "New"),
+                "pending_new":   ("#f59e0b", "●", "Pending"),
+                "accepted":      ("#3b82f6", "●", "Accepted"),
+                "partial_fill":  ("#3b82f6", "▲", "Partial"),
+                "fill":          ("#22c55e", "▲", "Filled"),
+                "filled":        ("#22c55e", "▲", "Filled"),
+                "rejected":      ("#ef4444", "▼", "Rejected"),
+                "canceled":      ("#9ca3af", "■", "Canceled"),
+                "expired":       ("#9ca3af", "■", "Expired"),
             }
             for row in _recent:
                 _status = str(row.get("status", "")).lower()
-                _color, _label = _PILL_COLORS.get(_status, ("#9ca3af", _status or "—"))
+                _color, _shape, _label = _PILL_COLORS.get(_status, ("#9ca3af", "■", _status or "—"))
                 _coid = row.get("client_order_id", "—")
                 _sym = row.get("symbol") or "—"
                 _side = (row.get("side") or "").upper()
@@ -1065,7 +1081,7 @@ def main() -> None:
                     f'<span style="display:inline-block;padding:2px 10px;'
                     f'border-radius:10px;background:{_color};color:#fff;'
                     f'font-size:11px;font-weight:600;min-width:70px;'
-                    f'text-align:center;">▲ {_label}</span>'
+                    f'text-align:center;">{_shape} {_label}</span>'
                     f'<span style="color:var(--text-primary);">{_sym}</span>'
                     f'<span style="color:var(--text-secondary);">{_side}</span>'
                     f'<span style="color:var(--text-muted);">{_qp}</span>'
@@ -1076,9 +1092,10 @@ def main() -> None:
                 )
             st.caption(
                 "Live updates via Alpaca trade-update WebSocket. Status "
-                "pill colors: amber=submitted/new, blue=accepted/partial, "
-                "green=filled, red=rejected, grey=canceled. Pair color "
-                "with the ▲ shape (CLAUDE.md §8 — never color-only)."
+                "pills pair color + shape per CLAUDE.md §8 (color-blind "
+                "safe): ▲ filled, ▼ rejected, ■ canceled/expired, "
+                "● pending/accepted. Color reinforces: amber=pending, "
+                "blue=accepted, green=filled, red=rejected, grey=ended."
             )
 
 

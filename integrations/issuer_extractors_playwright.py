@@ -393,3 +393,12 @@ def extract_issuer_aum_pw(
         extract_bitwise_aum_pw:  "bitwise",
     }.get(fn, "unknown")
     return (v, f"issuer-site:{label_key} (playwright)")
+
+
+# ── Process exit hook ────────────────────────────────────────────────────────
+# Audit-fix: chromium + playwright subprocess lifetimes are tied to this
+# module's `_PW_CONTEXT_STATE`. Without atexit, a Streamlit Cloud worker
+# eviction would orphan the chromium child process. Register graceful
+# teardown so the OS reclaims subprocess resources cleanly.
+import atexit as _atexit
+_atexit.register(_close_browser)

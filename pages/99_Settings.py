@@ -8,6 +8,8 @@ daily_scanner run, per Day-3 item B).
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import streamlit as st
 
 from config import (
@@ -148,12 +150,21 @@ def main() -> None:
         try:
             from integrations import alpaca_streaming as _streaming
             _health = _streaming.get_stream_health()
+            _stream_err: Optional[str] = None
         except Exception as exc:
+            # Audit-fix (LOW): per CLAUDE.md §8, never expose Python
+            # tracebacks to users. Settings is operator-scope so we still
+            # surface the diagnostic, but behind an "Advanced diagnostics"
+            # expander with a plain-English summary first.
+            _stream_err = f"{type(exc).__name__}: {exc}"
             st.error(
-                "Streaming module failed to import — "
-                f"`{type(exc).__name__}: {exc}`. "
-                "Check `requirements.txt` includes `alpaca-py>=0.30.0`."
+                "Streaming module failed to import — check that "
+                "`alpaca-py>=0.30.0` is in `requirements.txt` and "
+                "the deploy bundle. Open the Advanced diagnostics "
+                "expander below for the underlying error."
             )
+            with st.expander("Advanced diagnostics — streaming import failure"):
+                st.code(_stream_err, language="text")
             _health = None
 
         if _health is not None:
@@ -266,7 +277,7 @@ def main() -> None:
             except Exception as exc:
                 ok = False
             badge = "✓ configured" if ok else "○ not configured"
-            color = "var(--color-success)" if ok else "var(--text-muted)"
+            color = "var(--success)" if ok else "var(--text-muted)"
             is_active = (name == active.provider_name())
             active_marker = " · ACTIVE" if is_active else ""
             st.markdown(

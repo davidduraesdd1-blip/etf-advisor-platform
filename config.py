@@ -61,7 +61,11 @@ DEMO_MODE: bool = True
 
 # BROKER_PROVIDER: "mock" confirms orders without hitting any API.
 # Post-demo: "alpaca_paper" for sandbox, "alpaca" for live.
-BROKER_PROVIDER: str = "mock"
+# Audit-fix (MEDIUM, 2026-04-30): now reads from env var first so the
+# Settings UI's documented BROKER_PROVIDER override actually flips
+# routing without code changes. Session-state override (set on Settings
+# page) takes precedence over both env and the default below.
+BROKER_PROVIDER: str = os.environ.get("BROKER_PROVIDER", "mock").strip().lower() or "mock"
 
 # ── Data source routing (CLAUDE.md §10) ───────────────────────────────────────
 # One-line flips to upgrade to paid tiers. Actual key values come from env.
@@ -76,6 +80,12 @@ FINNHUB_API_KEY: str | None = os.environ.get("FINNHUB_API_KEY")
 ALPACA_API_KEY: str | None = os.environ.get("ALPACA_API_KEY")
 ALPACA_API_SECRET: str | None = os.environ.get("ALPACA_API_SECRET")
 ALPACA_BASE_URL: str = os.environ.get("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+# Audit-fix (LOW): SENTRY_DSN is documented as optional error-telemetry
+# wiring, but the repo doesn't initialize sentry_sdk anywhere. Keep the
+# env-read so a post-demo enable-via-env doesn't need a code change, but
+# remove the dead `_sdk.init()` callsite illusion. When the demo wraps
+# and we activate Sentry, a single `if SENTRY_DSN: sentry_sdk.init(...)`
+# at app boot flips it on.
 SENTRY_DSN: str | None = os.environ.get("SENTRY_DSN")
 
 # ── Design tokens (CLAUDE.md §8) ──────────────────────────────────────────────

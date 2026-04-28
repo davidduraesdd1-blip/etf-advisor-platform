@@ -203,7 +203,10 @@ def extract_proshares_aum(ticker: str) -> Optional[float]:
             if not m:
                 continue
             v = float(m.group(1).replace(",", ""))
-            if v < 1e5 or v > 1e12:
+            # Audit-fix (LOW): standardize sanity bound to 1e6..1e12 to
+            # match the rest of the chain (Grayscale, Playwright, EDGAR).
+            # The prior 1e5 lower bound was inconsistent.
+            if v < 1e6 or v > 1e12:
                 continue
             return v
         return None
