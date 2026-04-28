@@ -279,3 +279,30 @@ Items intentionally NOT in scope for the May 1 demo. Pick up after.
       cold-boot exceeding 10s when yfinance is unreachable) is still
       worth understanding. Could be a perf optimization opportunity
       for real users hitting the live deploy on a yfinance-down day.
+
+- [x] **Client adapter abstraction.** *(2026-04-30 Sprint 3 on main:
+      pluggable ClientAdapter ABC + 5 live implementations
+      (demo / csv_import / wealthbox / redtail / salesforce_fsc).
+      Each CRM adapter performs real HTTP calls when keyed; falls
+      back to demo when unconfigured. Settings panel surfaces
+      adapter status. 25 new tests, 388/388 passing.
+      See docs/client_adapter_chain.md.)*
+
+- [ ] **Salesforce FSC OAuth refresh background job.** Sprint 3's
+      Salesforce adapter assumes the operator maintains a fresh
+      SALESFORCE_FSC_ACCESS_TOKEN env var (tokens expire ~2 hours).
+      Production-readiness needs a background OAuth 2.0 client-
+      credentials refresh process. Out of demo scope.
+
+- [ ] **CRM-side custom fields for assigned_tier + portfolio_value.**
+      Sprint 3's CRM adapters leave assigned_tier="(unassigned)" and
+      total_portfolio_usd=0 because CRMs don't natively store these.
+      Advisors set them via the platform's Onboarding flow post-
+      import. Post-demo: define a CRM custom-field convention
+      (e.g., Wealthbox custom field "Crypto Tier") so import
+      brings these values through directly.
+
+- [ ] **CRM bidirectional sync.** Sprint 3 is read-only — platform
+      pulls clients from CRM but doesn't push portfolio updates,
+      rebalance flags, or audit-log entries back. Bidirectional
+      sync is a separate, larger sprint.

@@ -910,3 +910,83 @@ ready to absorb 2.7's Playwright additions.
 **Next:** Sprint 2.7 (Playwright for Bitwise/Fidelity/Franklin/ETF.com
 + cryptorank endpoint URL fix) OR Sprint 3 (client adapter abstraction)
 per Cowork's call.
+
+---
+
+## 2026-04-30 — Sprint 3 (client adapter abstraction — 5 live adapters)
+
+Branch `polish/sprint-3-client-adapter-2026-04-30` off main `1ea6514`.
+2 commits on the branch (David's "fully live as much as possible"
+amendment scoped commits 1-6 into a single foundational commit + a
+wire-in commit). Cowork's plan called for 7 commits.
+
+**Goal:** make the client-data source pluggable so the platform
+reads from Wealthbox / Redtail / Salesforce FSC / CSV-import without
+UI rewrites. Demo clients become one implementation of a common
+ClientAdapter interface.
+
+**Commit 1 (`206a997`) — ABC + 5 live adapters in one foundational commit:**
+- New `core/client_adapter.py`: ClientRecord dataclass + ClientAdapter
+  ABC + register_adapter / get_adapter / get_active_adapter /
+  get_active_clients / get_active_client factory helpers
+- New `core/client_adapters/` package with all 5 implementations:
+  - DemoClientAdapter (wraps DEMO_CLIENTS)
+  - CSVImportClientAdapter (live, reads data/clients_import.csv,
+    gitignored)
+  - WealthboxClientAdapter (live HTTP — api.crmworkspace.com/v1
+    + ACCESS_TOKEN header)
+  - RedtailClientAdapter (live HTTP — api.redtailtechnology.com/crm/v1,
+    supports both per-app-key auth AND USERKEY+USERNAME+PASSWORD basic)
+  - SalesforceFSCClientAdapter (live HTTP —
+    <instance>/services/data/v60.0/, bearer token, SOQL on Account
+    where RecordType=Client)
+- Each CRM adapter has 5-min in-memory cache, paginated fetch, 401/429
+  graceful handling, configurable safety bounds (max 5,000 contacts).
+- Privacy by default: real client data never touches the repo.
+
+**Commit 2 (`<NEXT>`) — wire-in + Settings panel + tests + docs + tag:**
+- core/scheduler.py: client list flows through get_active_clients()
+  with import-incomplete guard (skips $0-portfolio clients)
+- pages/01_Dashboard.py: rebinds DEMO_CLIENTS = get_active_clients()
+  at top of main() each rerun (env-var changes take effect immediately)
+- pages/02_Portfolio.py: client selector reads from active adapter;
+  warning banner if list empty
+- pages/99_Settings.py: new "Client data source" panel showing active
+  provider + per-adapter configured status + how-to-switch expander
+  with provider-specific env-var instructions
+- tests/test_client_adapter.py: 25 new tests covering registry,
+  factory fall-through, all 5 adapters (configured/unconfigured,
+  fetch+map happy paths, 401 graceful, cache TTL)
+- docs/client_adapter_chain.md: full spec — architecture, per-adapter
+  config, fall-through ladder, privacy guarantees, how to add a 6th
+- .gitignore: data/clients_import.csv + data/clients_import_*.csv
+- All 388 tests pass (was 363 pre-3).
+
+**Key decisions:**
+- Adapter calls return [] (not raise) on any non-fatal upstream error
+  — that's what enables the factory's clean fall-through-to-demo.
+- `assigned_tier` / `total_portfolio_usd` / `crypto_allocation_pct`
+  default to "(unassigned)" / 0.0 / 0.0 for CRM-imported clients
+  because CRMs don't natively store advisor-platform concepts.
+  Advisor enters them via Onboarding flow post-import.
+- scheduler.py's import-incomplete guard skips $0-portfolio clients
+  rather than feeding them to build_portfolio (which would crash
+  on a $0 sleeve allocation).
+
+**Wire-in pattern:** existing call-sites that iterate DEMO_CLIENTS
+as `[{...}]` keep working unchanged because get_active_clients()
+returns dataclass.to_dict() output. The `DEMO_CLIENTS = ...` rebind
+in Dashboard's main() is per-rerun, so toggling
+CLIENT_ADAPTER_PROVIDER on the Settings page (or in Streamlit Cloud
+Secrets) takes effect immediately without app restart.
+
+**Files touched:**
+- New: `core/client_adapter.py`, `core/client_adapters/{__init__,
+  demo,csv_import,wealthbox,redtail,salesforce_fsc}_adapter.py`,
+  `tests/test_client_adapter.py`, `docs/client_adapter_chain.md`
+- Modified: `core/scheduler.py`, `pages/01_Dashboard.py`,
+  `pages/02_Portfolio.py`, `pages/99_Settings.py`, `.gitignore`,
+  `MEMORY.md`, `pending_work.md`
+
+**Next:** Sprint 4 (Alpaca streaming) — David's queue. Or Sprint 2.7
+(Playwright + Cryptorank endpoint fix) for the AUM/Flow coverage gap.

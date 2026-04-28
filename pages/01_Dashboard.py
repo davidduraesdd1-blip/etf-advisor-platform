@@ -11,7 +11,13 @@ import streamlit as st
 
 from config import AVATAR_PALETTE, BRAND_NAME, DEMO_MODE, EXTENDED_MODULES_ENABLED
 from core.audit_log import seed_demo_entries
-from core.demo_clients import DEMO_CLIENTS
+# Sprint 3: client list now flows through the active adapter (demo /
+# wealthbox / redtail / salesforce_fsc / csv_import). The legacy name
+# DEMO_CLIENTS is rebound at the top of main() each rerun so the
+# existing dict-indexing code stays unchanged AND env-var changes
+# (e.g., toggling CLIENT_ADAPTER_PROVIDER on the Settings page) take
+# effect on the next rerun.
+from core.client_adapter import get_active_clients
 from core.etf_universe import load_universe_with_live_analytics
 from core.portfolio_engine import build_portfolio
 from integrations.data_feeds import get_etf_prices
@@ -52,6 +58,10 @@ def main() -> None:
     st.set_page_config(page_title=f"Dashboard — {BRAND_NAME}", layout="wide")
     apply_theme()
     render_sidebar()
+
+    # Sprint 3: rebind DEMO_CLIENTS to the active adapter's records each
+    # rerun, so changing CLIENT_ADAPTER_PROVIDER takes effect immediately.
+    DEMO_CLIENTS = get_active_clients()
 
     # ── 2026-05 redesign: advisor-family top bar + page header ──
     try:

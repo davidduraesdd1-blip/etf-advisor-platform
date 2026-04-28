@@ -43,7 +43,9 @@ def _hex_to_rgba(hx: str, alpha: float) -> str:
 _ACCENT_RGBA_FAN = _hex_to_rgba(_ACCENT_HEX, 0.35)
 _ACCENT_RGBA_MEDIAN = _hex_to_rgba(_ACCENT_HEX, 1.0)
 _NEUTRAL_GREY = "#9ca3af"  # Plotly hline annotation; matches ui/theme.py muted
-from core.demo_clients import DEMO_CLIENTS, get_client
+# Sprint 3: client list flows through the active adapter.
+from core.client_adapter import get_active_client as get_client
+from core.client_adapter import get_active_clients
 from core.etf_universe import load_universe_with_live_analytics
 from core.portfolio_engine import build_portfolio, run_monte_carlo
 from integrations.broker_alpaca_paper import submit_basket_via
@@ -128,8 +130,16 @@ def main() -> None:
     # (data_source_badge on each KPI) still surfaces any active fallback
     # exactly where it affects the number the FA is reading.
 
+    # Sprint 3: client list from the active adapter, not hardcoded demo.
+    DEMO_CLIENTS = get_active_clients()
+    if not DEMO_CLIENTS:
+        st.warning(
+            "No clients available from the active data source. "
+            "Check Settings → Client data source for adapter status."
+        )
+        return
     default_id = st.session_state.get("active_client_id", DEMO_CLIENTS[0]["id"])
-    options = {f"{c['name']} — {c['label']}": c["id"] for c in DEMO_CLIENTS}
+    options = {f"{c['name']} — {c.get('label','')}": c["id"] for c in DEMO_CLIENTS}
     # Map current id back to label for default selection
     current_label = next(
         (label for label, cid in options.items() if cid == default_id),
