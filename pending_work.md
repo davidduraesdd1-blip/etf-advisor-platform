@@ -230,30 +230,49 @@ Items intentionally NOT in scope for the May 1 demo. Pick up after.
       (yfinance 3M → 10D → ETF.com → 60D history). Production-snapshot
       safety net at core/etf_flow_production.json. Cron pre-warm +
       freshness indicator. See docs/etf_flow_data_chain.md.)*
-- [ ] **Sprint 2.6 coverage gap — 119/211 AUM (56.4%) is 31 below the
-      ≥150 acceptance gate.** *(2026-04-30 Sprint 2.6 on main: smoke-
-      test confirmed 4 buildable static-HTML extractors, EDGAR facts
-      resolver wired, capture re-run lifted +6 AUM and +8 Vol but
-      structural correlation between yfinance failure and issuer-site
-      failure caps the static-HTML path here.)* Per Cowork amendment 3
-      contingency, path forward = Sprint 2.7 with Playwright:
-      1. **Sprint 2.7a — fix Cryptorank endpoint URL** (cheap single-
-         commit fix). The current `/v1/etfs/<ticker>/flows` URL is
-         speculative; their actual API is at `/v0/...` per dev portal.
-         David has a key on Basic/Free tier. Endpoint fix unblocks
-         ~25 crypto-flow ETFs immediately.
-      2. **Sprint 2.7b — Playwright for Bitwise / Fidelity / Franklin
-         Templeton / ETF.com.** Deferred because static `requests` can't
-         render their SPAs / WAF-blocked pages. Adds 17+3+4+? ≈ ~24-30
-         tickers if Playwright works on Streamlit Cloud (verify cold-
-         start under 60s after Playwright bundle adds ~200 MB to deploy).
-      3. **Sprint 2.7c — issuer extractors for VanEck / 21Shares /
-         Hashdex / Canary / Roundhill / Defiance / Direxion / Calamos.**
-         Some may be static-HTML reachable; smoke-test each first.
-      4. **Sprint 2.7d — parent-CIK + per-series resolver for SEC**
-         (so BITO/BITQ/GFIL etc. that file under ProShares Trust II
-         et al. get covered via the XBRL chain).
-      See docs/etf_flow_data_chain.md "Why coverage stops at 119/211".
+- [~] **Sprint 2.6 coverage gap — 119/211 AUM.** *(2026-05-01 Sprint
+      2.7 on branch `polish/sprint-2.7-playwright-cryptorank-2026-05-01`
+      — branch + tag pushed, NOT merged to main.)* Sprint 2.7 closed
+      the four-issuer subgoal:
+      1. ✓ **2.7a — Cryptorank endpoint URL fix.** Speculative
+         `v1/etfs/...` corrected to actual `v2/funds/etf`. Documented
+         dead-end: free tier returns 403 ("Endpoint is not available
+         in your tariff plan"). Activates automatically on tier upgrade.
+      2. ✓ **2.7b — Playwright + per-fund-domain probes.**
+         * Bitwise: discovered static-HTML path (per-fund domains
+           `<ticker>etf.com`). 8 of 26 tickers reachable WITHOUT
+           Playwright. JSON pattern `"netAssets":<float>`.
+         * Franklin Templeton: Playwright works. 3 of 4 tickers
+           reachable (EZBC=$491.45M, EZET=$46.65M, EZPZ=$11.69M).
+         * Fidelity: DOCUMENTED DEAD-END. Playwright also fails
+           with ERR_HTTP2_PROTOCOL_ERROR from datacenter IPs.
+         * ETF.com: DOCUMENTED DEAD-END. Cloudflare turnstile
+           defeats both static AND Playwright.
+      3. _STILL PENDING_ **2.7c — issuer extractors for VanEck /
+         21Shares / Hashdex / Canary / Roundhill / Defiance /
+         Direxion / Calamos.** Long tail; smoke-test each first.
+         Out of Sprint 2.7 scope; post-demo work.
+      4. _STILL PENDING_ **2.7d — parent-CIK + per-series resolver
+         for SEC** (so BITO/BITQ/GFIL etc. that file under
+         ProShares Trust II et al. get covered via the XBRL chain).
+         Out of Sprint 2.7 scope.
+
+- [ ] **Fidelity AUM via residential proxies (post-demo, paid).**
+      Sprint 2.7 documented Fidelity datacenter-IP block. Both
+      static HTTP and Playwright fail with ERR_HTTP2_PROTOCOL_ERROR.
+      ~3 universe Fidelity tickers (FBTC, FETH, etc.) stay
+      em-dashed until residential-proxy infra is wired.
+
+- [ ] **ETF.com AUM via paid scrape infra (post-demo).**
+      Sprint 2.7 documented Cloudflare turnstile block. Either
+      paid residential-proxy + browser-fingerprinting OR the
+      official ETF.com paid API. Post-demo work.
+
+- [ ] **Cryptorank ETF flow endpoint — paid tier upgrade.**
+      Sprint 2.7 confirmed `/v2/funds/etf` exists but is gated to
+      Basic/Pro/Enterprise tiers. Pricing demo-request only. The
+      code already calls the correct endpoint — tier upgrade
+      activates immediately, no code change required.
 
 - [x] **Sprint 2.5 coverage gap.** *(2026-04-29 Sprint 2.5 on main:
       capture wrote 113 AUM / 124 Vol / 6 Flow with 0 errors. Sprint 2.6

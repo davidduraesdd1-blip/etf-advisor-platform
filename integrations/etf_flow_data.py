@@ -22,9 +22,13 @@ empty/error):
 
     AUM:
       1. yfinance Ticker.info["totalAssets"]
-      2. SEC EDGAR N-PORT total_net_assets (via integrations.edgar_nport)
+      2. SEC EDGAR (N-PORT total_net_assets, then companyfacts XBRL)
       3. ETF.com public-page scrape
-      4. Issuer-site extractor (top 6 issuers only)
+      4. Issuer-site extractor, STATIC HTML
+         (BlackRock screener / Grayscale / ProShares / Bitwise — Sprint 2.7)
+      5. Issuer-site extractor, PLAYWRIGHT
+         (Franklin Templeton — Sprint 2.7; silently no-ops if Playwright
+          or chromium unavailable)
 
     30D net flow:
       1. cryptorank.io ETF-flow endpoint (key-gated; CRYPTORANK_API_KEY)
@@ -255,11 +259,21 @@ def get_etf_aum(ticker: str) -> tuple[Optional[float], Optional[str]]:
         _cache_put(tkr, "aum", v, "ETF.com")
         return (v, "ETF.com")
 
-    # Step 4: issuer-site scraper (top 6 issuers)
+    # Step 4: issuer-site scraper, static HTML (top 6 issuers).
+    # Sprint 2.7 added Bitwise here via per-fund-domain pattern.
     v, src = _scrape_issuer_aum(tkr)
     if v is not None:
         _cache_put(tkr, "aum", v, src or "issuer-site")
         return (v, src or "issuer-site")
+
+    # Step 5: issuer-site scraper, Playwright (Sprint 2.7).
+    # Handles JS-rendered issuer pages (Franklin Templeton). Silently
+    # no-ops if Playwright isn't installed or chromium isn't on disk
+    # (e.g. Streamlit Cloud cold-start before setup.sh completes).
+    v, src = _scrape_issuer_aum_playwright(tkr)
+    if v is not None:
+        _cache_put(tkr, "aum", v, src or "issuer-site (playwright)")
+        return (v, src or "issuer-site (playwright)")
 
     # All live steps failed — fall back to production snapshot.
     return _production_snapshot_get(tkr, "aum_usd")
@@ -297,17 +311,21 @@ def _scrape_etfcom_aum(ticker: str) -> Optional[float]:
 
 def _scrape_issuer_aum(ticker: str) -> tuple[Optional[float], Optional[str]]:
     """
-    Issuer-site scraper for the top 6 issuers. Reads the ETF's
-    `issuer` field from the universe and dispatches to the per-issuer
+    Issuer-site scraper, STATIC HTML path. Reads the ETF's `issuer`
+    field from the universe and dispatches to the per-issuer
     extractor in `integrations.issuer_extractors`. Returns
     (aum, source_name) or (None, None).
 
-    Sprint 2.6 commit 1-3: BlackRock iShares (JSON screener),
-    Grayscale (etfs.grayscale.com), ProShares (dual-path strategic /
-    leveraged-and-inverse) extractors are now wired live. Bitwise /
-    Fidelity / Franklin Templeton remain stubbed pending Sprint 2.7
-    Playwright work — see scripts/smoke_test_extractors.py for the
-    detected JS-render / SPA / WAF-block reasons.
+    Sprint 2.6 commit 1-3 wired BlackRock iShares (JSON screener),
+    Grayscale (etfs.grayscale.com), and ProShares (dual-path).
+    Sprint 2.7 added Bitwise via per-fund-domain pattern (e.g.
+    bitbetf.com) — the canonical bitwiseinvestments.com page is a
+    Next.js SPA, but the per-fund marketing sites are static HTML
+    with embedded `"netAssets":<float>` JSON.
+
+    Franklin Templeton is dispatched in the SIBLING Playwright path
+    (`_scrape_issuer_aum_playwright`). Fidelity / ETF.com are
+    documented dead-ends — see issuer_extractors.py module docstring.
     """
     try:
         from core.etf_universe import load_universe
@@ -320,6 +338,43 @@ def _scrape_issuer_aum(ticker: str) -> tuple[Optional[float], Optional[str]]:
         return extract_issuer_aum(ticker, issuer)
     except Exception as exc:
         logger.info("issuer-site scraper failed for %s: %s", ticker, exc)
+        return (None, None)
+
+
+def _scrape_issuer_aum_playwright(
+    ticker: str,
+) -> tuple[Optional[float], Optional[str]]:
+    """
+    Issuer-site scraper, PLAYWRIGHT path (Sprint 2.7). Handles
+    JS-rendered issuer pages whose AUM tile is hydrated client-side.
+    Currently routes:
+      * Franklin / Franklin Templeton → product-detail SPA (works)
+      * Fidelity                       → datacenter-IP block (no-op)
+      * ETF.com                        → Cloudflare block (no-op)
+      * Bitwise                        → static-HTML preferred (no-op
+                                          here; static path runs first)
+
+    Critical: silently returns (None, None) if Playwright OR chromium
+    is unavailable (e.g. Streamlit Cloud cold-start before setup.sh
+    completes). Never raises — chain falls through cleanly to the
+    snapshot-fallback.
+    """
+    try:
+        from core.etf_universe import load_universe
+        from integrations.issuer_extractors_playwright import (
+            extract_issuer_aum_pw,
+            is_playwright_available,
+        )
+        if not is_playwright_available():
+            return (None, None)
+        universe = load_universe()
+        entry = next((e for e in universe if e.get("ticker") == ticker), None)
+        if not entry:
+            return (None, None)
+        issuer = entry.get("issuer", "") or ""
+        return extract_issuer_aum_pw(ticker, issuer)
+    except Exception as exc:
+        logger.info("issuer-site Playwright scraper failed for %s: %s", ticker, exc)
         return (None, None)
 
 
@@ -375,24 +430,93 @@ def get_etf_30d_net_flow(ticker: str) -> tuple[Optional[float], Optional[str]]:
 
 
 def _fetch_cryptorank_flow(ticker: str, api_key: str) -> Optional[float]:
-    """cryptorank.io ETF-flow endpoint. Key-gated."""
+    """cryptorank.io ETF-flow endpoint. Key-gated.
+
+    Sprint 2.7 dev-portal probe (2026-05-01) findings:
+
+      * The actual API base is `https://api.cryptorank.io/v2/`. The
+        Sprint 2.5 speculative `v1/etfs/<ticker>/flows` path was
+        wrong — v1 endpoints return 401 (key not valid for v1) and
+        all `/etfs/...` paths under v0/v1/v2 return 404 EXCEPT
+        `/v2/funds/etf` which returns:
+            403 {"statusCode":403,
+                 "message":"Endpoint is not available in your tariff plan",
+                 "error":"Forbidden"}
+
+      * Our key (loaded from .env at scan time) is on a tariff that
+        permits `/v0/coins`, `/v0/funds`, `/v2/currencies` (verified
+        live: 200 + JSON body). It does NOT permit `/v2/funds/etf`.
+        Per Cryptorank's pricing page, ETF flow data is gated to
+        higher-tier plans (Basic / Pro / Enterprise) — pricing not
+        publicly published; demo-request only.
+
+      * Probed endpoint variants exhaustively (24 URL+header combos
+        documented in scripts/refresh_etf_flow_production.py logs).
+        No working ETF flow endpoint is reachable on the current key
+        tier. This is a CLAUDE.md §22 "documented dead-end" rather
+        than a fabricated value.
+
+    Behavior: probe `/v2/funds/etf` and accept 200 (in case the key
+    is upgraded out-of-band). On 403 (still gated) or any other
+    failure, return None and let the chain fall through to SoSoValue
+    → Farside → N-PORT-derived → snapshot.
+
+    To re-enable when key tier is upgraded:
+      1. The endpoint shape is unknown without paid-tier docs access.
+         This implementation tries `?ticker=<TICKER>` first (most
+         common REST convention), then falls back to a path-segment
+         pattern. Verify the actual response shape and update the
+         key parsing once a 200 is observed.
+    """
     try:
         import requests
-        url = f"https://api.cryptorank.io/v1/etfs/{ticker.lower()}/flows"
         time.sleep(0.05)
+        # Try the documented (gated) v2 endpoint with ticker query param.
+        url = "https://api.cryptorank.io/v2/funds/etf"
         resp = requests.get(
             url, timeout=8,
-            params={"period": "30d"},
+            params={"ticker": ticker.upper()},
             headers={
                 "X-API-Key": api_key,
                 "User-Agent": "ETF-Advisor-Platform/0.1",
             },
         )
+        if resp.status_code == 403:
+            # Key tariff doesn't include this endpoint. Documented
+            # dead-end (Sprint 2.7) — chain falls through cleanly.
+            logger.info(
+                "cryptorank v2/funds/etf 403 (tariff-gated) — "
+                "falling through to next chain step for %s", ticker,
+            )
+            return None
         if resp.status_code != 200:
             return None
         data = resp.json()
-        v = data.get("net_flow_30d_usd") or data.get("net_flow") or data.get("data", {}).get("net_flow_30d_usd")
-        return float(v) if v is not None else None
+        # Response shape unknown without paid-tier observation.
+        # Best-effort key probe — try every plausible flow-USD field
+        # name and the common "data" envelope.
+        candidate_keys = (
+            "net_flow_30d_usd",
+            "net_flow",
+            "netFlow",
+            "flow_30d_usd",
+            "thirtyDayNetFlow",
+            "net_flows_30d",
+        )
+        envelopes: list[dict] = [data]
+        if isinstance(data, dict) and isinstance(data.get("data"), dict):
+            envelopes.append(data["data"])
+        if isinstance(data, dict) and isinstance(data.get("data"), list) and data["data"]:
+            envelopes.append(data["data"][0] if isinstance(data["data"][0], dict) else {})
+        for env in envelopes:
+            for k in candidate_keys:
+                v = env.get(k) if isinstance(env, dict) else None
+                if v is not None:
+                    try:
+                        return float(v)
+                    except (TypeError, ValueError):
+                        continue
+        return None
     except Exception as exc:
         logger.info("cryptorank flow fetch failed for %s: %s", ticker, exc)
         return None

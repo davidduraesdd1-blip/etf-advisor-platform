@@ -310,13 +310,19 @@ class TestDispatcher:
         assert v == pytest.approx(1_932_237_020.0)
         assert src == "issuer-site:proshares"
 
-    def test_bitwise_dispatch_returns_none_pair_gracefully(self):
-        """Bitwise is in the issuer-extractor registry only as a stub —
-        Sprint 2.7 will wire it. Until then, the dispatcher returns
-        (None, None) so the chain falls through cleanly to the
-        production snapshot."""
-        from integrations.issuer_extractors import extract_issuer_aum
-        v, src = extract_issuer_aum("BITB", "Bitwise")
+    def test_bitwise_dispatch_returns_none_when_fetch_fails(self, monkeypatch):
+        """Sprint 2.7 wired Bitwise via the per-fund-domain pattern
+        (e.g. https://bitbetf.com/). When the fetch fails (DNS error,
+        404, no JSON in body), the dispatcher returns (None, None) so
+        the chain falls through cleanly. We monkeypatch requests.get
+        to simulate a 404 and verify the graceful-None pair."""
+        from integrations import issuer_extractors as ie
+        import requests
+        monkeypatch.setattr(
+            requests, "get",
+            lambda url, headers=None, timeout=None: _MockResp(404, text="Not Found"),
+        )
+        v, src = ie.extract_issuer_aum("BITB", "Bitwise")
         assert v is None
         assert src is None
 

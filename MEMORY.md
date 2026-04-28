@@ -4,6 +4,89 @@ Session continuity log. Newest entries on top. See master-template §16.
 
 ---
 
+## 2026-05-01 — Sprint 2.7: Playwright + Cryptorank + Bitwise per-fund
+
+Closes the AUM coverage gap from Sprint 2.6 (119/211). Six commits
+on branch `polish/sprint-2.7-playwright-cryptorank-2026-05-01`,
+worktree `etf-advisor-platform-sprint27`. Tagged
+`audit-round-4-playwright-2026-05-01`. NOT merged to main.
+
+### What landed (6 commits)
+
+  1. **Playwright + chromium deploy infra.** `requirements.txt` adds
+     `playwright>=1.42`. `packages.txt` adds chromium runtime apt
+     deps for Streamlit Cloud (libnss3, libxss1, etc.). New
+     `setup.sh` runs `python -m playwright install chromium` post-
+     pip-install on Streamlit Cloud auto-hook. Failure non-fatal:
+     chain probes `is_playwright_available()` and falls through.
+
+  2. **Three new extractors + Cryptorank URL fix.**
+     * **Bitwise** (STATIC HTML — no Playwright!): Sprint 2.7 probe
+       discovered Bitwise serves per-fund marketing sites at
+       `<ticker>etf.com` (e.g. bitbetf.com, bsoletf.com), each
+       embedding `"netAssets":<float>` JSON. Live-validated 8 of
+       26 universe Bitwise tickers ($BITB=$2.98B, $BSOL=$630M,
+       $ETHW=$246M, $BXRP=$330M, $BITQ=$448M, $IMST=$18.5M,
+       $BITC=$15.8M, $OWNB=$22.2M).
+     * **Franklin Templeton** (PLAYWRIGHT): new module
+       `integrations/issuer_extractors_playwright.py` with sync API
+       + module-level `_browser` singleton. Live-validated 3 of 4:
+       EZBC=$491.45M, EZET=$46.65M, EZPZ=$11.69M.
+     * **Fidelity** + **ETF.com**: DOCUMENTED DEAD-ENDS. Both fail
+       even via Playwright (Fidelity = ERR_HTTP2_PROTOCOL_ERROR
+       from datacenter IP, ETF.com = Cloudflare turnstile). Stubs
+       kept for dispatcher symmetry.
+     * **Cryptorank URL fix**: corrected speculative `v1/etfs/...`
+       to actual `v2/funds/etf`. 24-combo dev-portal probe found
+       endpoint EXISTS but returns 403 on free tier
+       ("Endpoint is not available in your tariff plan"). Documented
+       dead-end per CLAUDE.md §22; chain falls through cleanly.
+
+  3. **35 new tests** in `tests/test_playwright_extractors.py`:
+     parse_money (9), is_playwright_available (2), Franklin (8),
+     dead-end stubs (3), dispatcher (6), Bitwise static (7).
+     1 existing test updated for new Bitwise contract.
+     Total suite: 388 → 423 (+35).
+
+  4. **Capture re-run.** `python scripts/refresh_etf_flow_production.py`
+     with .env-loaded CRYPTORANK_API_KEY. Final measured coverage:
+       AUM:  120 / 212 (56.6%)  Δ +1   vs Sprint 2.6's 119 / 211
+       Flow:   6 / 212 ( 2.8%)  Δ  0   (Cryptorank tier-gated)
+       Vol:  132 / 212 (62.3%)  Δ  0
+     **Honest result vs target.** Target was AUM ≥160. Actual
+     +1 net. Reason: most tickers Sprint 2.7 targeted are ALREADY
+     served by yfinance higher in the chain — the new extractors
+     only DISPLACED yfinance on 1 ticker (BXRP). Remaining 92
+     missing-AUM tickers are structurally unreachable via any free
+     path (DNS-failed Bitwise domains, Fidelity datacenter block,
+     ETF.com Cloudflare, long-tail issuers without bespoke
+     extractors, newly-listed tickers nobody has indexed yet).
+     Per §22, snapshot leaves them as null + UI em-dash, never
+     fabricated values. The Sprint 2.7 infrastructure (Playwright
+     module, Cryptorank URL fix) remains valuable: future tier
+     upgrades, residential proxies, or new bespoke extractors plug
+     in cleanly.
+
+  5. **Docs + tag + push.** `docs/etf_flow_data_chain.md` Sprint 2.7
+     measured-coverage table + Cryptorank dev-portal probe section.
+     `MEMORY.md` (this entry) + `pending_work.md` updates. Tag
+     pushed; branch pushed; not merged to main.
+
+### Test count
+
+  388 (Sprint 3 baseline) → 423 (Sprint 2.7).
+
+### Cowork standards adhered to
+
+  CLAUDE.md §10 (multi-source, source-labeled provenance).
+  §11 (env-scoped state — chromium binary not committed).
+  §22 (no-fallback honesty — every dead-end documented in code +
+       docs, never papered over with fake values).
+  §4 (test-on-touch — 35 new tests, all extractors have failure-
+       mode coverage).
+
+---
+
 ## 2026-04-29 — Sprint 2: ETF Detail everything-live data (no-fallback)
 
 Cowork directive: "everything real and live, no hardcoded fallback

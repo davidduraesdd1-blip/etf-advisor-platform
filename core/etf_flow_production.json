@@ -1,5 +1,5 @@
 {
-  "captured_at_utc": "2026-04-27T23:49:43.000476+00:00",
+  "captured_at_utc": "2026-04-28T00:56:31.214830+00:00",
   "method": "live multi-source fetch via integrations/etf_flow_data.py \u2014 AUM chain (yfinance \u2192 EDGAR N-PORT \u2192 ETF.com \u2192 issuer-site), Flow chain (cryptorank \u2192 SoSoValue \u2192 Farside \u2192 N-PORT-derived), Vol chain (yfinance 3M \u2192 10D \u2192 ETF.com \u2192 60D history mean)",
   "note": "Sprint 2 commit 2 bootstrap snapshot. Tickers without entries here will fall through to the live chain at render time. Schedule a refresh once yfinance + cryptorank rate limits cooperate.",
   "tickers": {
@@ -164,8 +164,8 @@
       "vol_source": "yfinance (3M avg)"
     },
     "BSOL": {
-      "aum_usd": 570592704.0,
-      "aum_source": "yfinance",
+      "aum_usd": 641326000.0,
+      "aum_source": "SEC EDGAR (facts)",
       "flow_30d_usd": null,
       "flow_source": null,
       "avg_daily_vol": 2414090.0,
@@ -220,16 +220,16 @@
       "vol_source": "yfinance (3M avg)"
     },
     "XRP": {
-      "aum_usd": 261453072.0,
-      "aum_source": "yfinance",
+      "aum_usd": 241394000.0,
+      "aum_source": "SEC EDGAR (facts)",
       "flow_30d_usd": null,
       "flow_source": null,
       "avg_daily_vol": 625109.0,
       "vol_source": "yfinance (3M avg)"
     },
     "BXRP": {
-      "aum_usd": null,
-      "aum_source": null,
+      "aum_usd": 318787446.94,
+      "aum_source": "issuer-site:bitwise",
       "flow_30d_usd": null,
       "flow_source": null,
       "avg_daily_vol": null,
@@ -1444,8 +1444,8 @@
       "vol_source": null
     },
     "GAVA": {
-      "aum_usd": 5486904.0,
-      "aum_source": "issuer-site:grayscale",
+      "aum_usd": 5309437.0,
+      "aum_source": "yfinance",
       "flow_30d_usd": null,
       "flow_source": null,
       "avg_daily_vol": 1864.0,
@@ -1684,6 +1684,14 @@
       "vol_source": "yfinance (3M avg)"
     },
     "MSSL": {
+      "aum_usd": null,
+      "aum_source": null,
+      "flow_30d_usd": null,
+      "flow_source": null,
+      "avg_daily_vol": null,
+      "vol_source": null
+    },
+    "QLEP": {
       "aum_usd": null,
       "aum_source": null,
       "flow_30d_usd": null,
