@@ -1,20 +1,28 @@
 """
 integrations/issuer_extractors.py — per-issuer AUM extractors.
 
-Polish round 5, Sprint 2.6 (2026-04-30). Implements the 3 extractors
-that the smoke-test probe validated as static-HTML reachable:
+Polish round 5, Sprint 2.6 + 2.7. Static-HTML extractors:
 
   - BlackRock iShares  via product-screener JSON endpoint (single fetch
                         for all iShares funds; we filter by ticker)
   - Grayscale          via etfs.grayscale.com/<ticker> + regex
   - ProShares          via /our-etfs/strategic|leveraged-and-inverse
                         dual-path fall-through + regex
+  - Bitwise            via per-fund domain pattern <ticker>etf.com +
+                        embedded JSON {"netAssets": <float>}
+                        (Sprint 2.7 — earlier Sprint 2.6 deferred this
+                        to Playwright; the per-fund-domain pattern was
+                        discovered during Sprint 2.7 probing and works
+                        WITHOUT Playwright)
 
-Deferred to Sprint 2.7 (Playwright):
-  - Bitwise            React SPA, no static HTML AUM
-  - Fidelity           JS-rendered, AUM not in static HTML
-  - Franklin Templeton JS-rendered, no public API
-  - ETF.com aggregator WAF blocks all UAs
+Deferred to Playwright path (integrations/issuer_extractors_playwright.py):
+  - Franklin Templeton JS-rendered, AUM tile populated client-side
+
+Documented dead-ends (even Playwright cannot reach):
+  - Fidelity   ERR_HTTP2_PROTOCOL_ERROR / connection-reset
+               from datacenter IPs (proxy required)
+  - ETF.com    Cloudflare turnstile interstitial blocks at edge
+               regardless of UA / browser fingerprint
 
 Each extractor returns Optional[float] (AUM in USD) or None on any
 failure. The `etf_flow_data.py` chain treats None as "fall through to
@@ -205,19 +213,95 @@ def extract_proshares_aum(ticker: str) -> Optional[float]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Bitwise — per-fund domain pattern (Sprint 2.7, 2026-05-01)
+#
+# Sprint 2.6 commit 0 deferred Bitwise to Playwright after probing
+# the canonical /crypto-funds/<ticker> URL (which 404s with a Next.js
+# error body). Sprint 2.7 probing found that Bitwise serves per-fund
+# marketing sites at <ticker>etf.com (e.g. https://bitbetf.com/,
+# https://bxrpetf.com/, https://bsoletf.com/). Each contains the
+# fund AUM in two static-HTML forms:
+#
+#   1. Embedded JSON:    "netAssets":2979872605.13
+#   2. Visible HTML:     <p class="...">$2,979,872,605</p>
+#                        immediately after a <h4>Net Assets (AUM)</h4>
+#
+# We prefer (1) because it carries decimal precision and is less
+# subject to copy-edit drift. (2) is a fallback regex if the JSON
+# pattern shifts.
+#
+# Coverage probe (2026-05-01): 8 of 26 universe Bitwise tickers
+# resolve via DNS (BITB, ETHW, BSOL, BXRP, BITQ, IMST, BITC, OWNB).
+# The other 18 either DNS-fail (no <ticker>etf.com domain registered)
+# or 404 / lack the JSON. New Bitwise tickers will progressively work
+# as they register their per-fund domain.
+# ═══════════════════════════════════════════════════════════════════════════
+
+_BITWISE_NETASSETS_RE = re.compile(r'"netAssets"\s*:\s*([\d.]+)')
+_BITWISE_HTML_RE = re.compile(
+    r'Net Assets[^<]*</h4>\s*<p[^>]*>\$([\d,]+(?:\.\d+)?)',
+    flags=re.I,
+)
+
+
+def extract_bitwise_aum(ticker: str) -> Optional[float]:
+    """Bitwise per-fund domain extractor. Returns AUM USD or None.
+
+    URL pattern: https://<ticker>etf.com/  (lowercase ticker).
+    First fetch tries the JSON pattern; falls through to the HTML
+    pattern if JSON is absent. Sanity-bound 1e6..1e12.
+    """
+    try:
+        import requests
+        url = f"https://{ticker.lower()}etf.com/"
+        resp = requests.get(
+            url, timeout=_TIMEOUT_SEC,
+            headers={"User-Agent": _USER_AGENT},
+        )
+        if resp.status_code != 200:
+            return None
+        body = resp.text
+        # Path 1: embedded JSON (preferred — decimal precision).
+        m = _BITWISE_NETASSETS_RE.search(body)
+        if m:
+            try:
+                v = float(m.group(1))
+                if 1e6 <= v <= 1e12:
+                    return v
+            except ValueError:
+                pass
+        # Path 2: visible HTML (fallback — integer dollars).
+        m2 = _BITWISE_HTML_RE.search(body)
+        if m2:
+            try:
+                v = float(m2.group(1).replace(",", ""))
+                if 1e6 <= v <= 1e12:
+                    return v
+            except ValueError:
+                pass
+        return None
+    except Exception as exc:
+        logger.info("Bitwise extract failed for %s: %s", ticker, exc)
+        return None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Public dispatcher — used by integrations.etf_flow_data._scrape_issuer_aum
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Issuer field (from the universe entry) → extractor callable.
-# Issuers NOT in this map fall through to None.
+# Issuers NOT in this map fall through to None — and the chain in
+# etf_flow_data._scrape_issuer_aum then tries the Playwright dispatch
+# in integrations/issuer_extractors_playwright.py.
 _DISPATCH = {
     "BlackRock iShares":  extract_blackrock_aum,
     "BlackRock":          extract_blackrock_aum,
     "Grayscale":          extract_grayscale_aum,
     "ProShares":          extract_proshares_aum,
-    # Bitwise / Fidelity / Franklin / Franklin Templeton intentionally
-    # absent — Sprint 2.6 commit 0 smoke-test confirmed they require
-    # Playwright (Sprint 2.7) or paid scraping infra.
+    "Bitwise":            extract_bitwise_aum,   # Sprint 2.7
+    # Franklin / Franklin Templeton dispatched via the Playwright
+    # sibling module (integrations/issuer_extractors_playwright.py).
+    # Fidelity / ETF.com are documented dead-ends — no extractor here.
 }
 
 
@@ -239,5 +323,6 @@ def extract_issuer_aum(ticker: str, issuer: str) -> tuple[Optional[float], Optio
         extract_blackrock_aum: "blackrock_ishares",
         extract_grayscale_aum: "grayscale",
         extract_proshares_aum: "proshares",
+        extract_bitwise_aum:   "bitwise",
     }.get(fn, "unknown")
     return (v, f"issuer-site:{label_key}")
