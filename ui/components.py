@@ -300,9 +300,14 @@ def tier_pill_selector(options: list[str], default_index: int = 2,
     Streamlit theme + design-system override). Selection persists in
     session_state[key] across reruns.
 
-    Replaces the previous st.radio implementation which rendered as
-    Streamlit's native radio (default-red dot, no number prefix, no
-    pill chrome) — Cowork walkthrough flagged the mismatch.
+    Audit-fix (2026-04-30): use `on_click=callback` pattern instead of
+    setting state AFTER the buttons render. The callback fires DURING
+    Streamlit's click-handling phase, before the script reruns — so on
+    the same rerun, the buttons render with the new state and the
+    correct one highlights immediately. The prior pattern was
+    "one-click-delayed" — user clicked tier 4, but tier 4 wouldn't
+    visually highlight until the NEXT click anywhere else triggered
+    a fresh rerun.
     """
     state_key = f"_{key}_value"
     if state_key not in st.session_state:
@@ -310,22 +315,24 @@ def tier_pill_selector(options: list[str], default_index: int = 2,
     if st.session_state[state_key] not in options:
         st.session_state[state_key] = options[default_index]
 
+    def _make_setter(value: str):
+        """Closure: returns a callback that sets state_key to `value`."""
+        def _setter() -> None:
+            st.session_state[state_key] = value
+        return _setter
+
     cols = st.columns(len(options))
-    new_selection: str | None = None
     for idx, (col, opt) in enumerate(zip(cols, options), start=1):
         with col:
             is_active = (opt == st.session_state[state_key])
             label = f"{idx}  {opt}"
-            if st.button(
+            st.button(
                 label,
                 key=f"{key}_btn_{idx}",
                 use_container_width=True,
                 type=("primary" if is_active else "secondary"),
-            ):
-                new_selection = opt
-
-    if new_selection is not None:
-        st.session_state[state_key] = new_selection
+                on_click=_make_setter(opt),
+            )
 
     return st.session_state[state_key]
 
