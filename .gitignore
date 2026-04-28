@@ -100,3 +100,7 @@ logs/
 # ── Sprint 3 client adapter — never check in real client data ────────────────
 data/clients_import.csv
 data/clients_import_*.csv
+
+# ── Sprint 4 Alpaca streaming — runtime cache, never committed ────────────────
+data/order_status_cache.json
+data/order_status_cache.json.tmp
