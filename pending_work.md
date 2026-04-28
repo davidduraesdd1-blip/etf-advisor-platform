@@ -2,6 +2,30 @@
 
 ---
 
+## Sprint 4 post-demo follow-ups (2026-05-01)
+
+- [ ] **Full-position streaming.** Subscribe to Alpaca's
+  `account_updates` WebSocket channel alongside the existing
+  `trade_updates` subscription so the Portfolio page can render
+  real-time NAV / buying-power / equity changes alongside order
+  status. Module: `integrations/alpaca_streaming.py` —
+  `_build_stream` adds `stream.subscribe_account_updates(...)` and
+  a parallel callback registry keyed off `account_id`. UI surface:
+  a "Live account" card on the Dashboard or top of Portfolio.
+  Backoff and reconnect strategy is shared with the existing
+  `trade_updates` loop.
+
+- [ ] **Crypto trading stream.** Alpaca's crypto endpoint is a
+  separate WebSocket: `paper-crypto-api.alpaca.markets/stream`,
+  not the same as the equities `paper-api.alpaca.markets/stream`.
+  When the ETF Advisor moves beyond spot-ETF wrappers (IBIT, FBTC,
+  ETHA, etc.) into native crypto custody, this needs its own
+  TradingStream wired in parallel — same backoff strategy, but a
+  second daemon thread + second callback registry. Current Sprint
+  4 module is equities-only by design.
+
+---
+
 ## Deployment Verification Findings — 2026-04-23
 
 Baseline pass of CLAUDE.md §25 (Deployment Verification Protocol).
