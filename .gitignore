@@ -96,3 +96,7 @@ logs/
 
 # ── Git internals ────────────────────────────────────────────────────────────
 .git-rewrite/
+
+# ── Sprint 3 client adapter — never check in real client data ────────────────
+data/clients_import.csv
+data/clients_import_*.csv

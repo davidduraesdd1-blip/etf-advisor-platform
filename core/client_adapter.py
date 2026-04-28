@@ -159,6 +159,20 @@ def get_adapter(provider: str) -> ClientAdapter:
     return cls()
 
 
+def get_active_clients() -> list[dict]:
+    """Convenience for legacy call sites that iterate the demo
+    client list as `[{...}, {...}]`. Returns the active adapter's
+    records as the legacy dict shape (asdict()), so existing
+    `c["name"]` / `c["id"]` access keeps working unchanged."""
+    return [r.to_dict() for r in get_active_adapter().list_clients()]
+
+
+def get_active_client(client_id: str) -> Optional[dict]:
+    """Per-client variant of get_active_clients()."""
+    rec = get_active_adapter().get_client(client_id)
+    return rec.to_dict() if rec is not None else None
+
+
 def get_active_adapter() -> ClientAdapter:
     """Return the active adapter per CLIENT_ADAPTER_PROVIDER env var.
     Defaults to "demo" when unset.

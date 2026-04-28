@@ -22,7 +22,14 @@ from config import (
 )
 from core.audit_log import recent_entries
 from core.data_source_state import snapshot as dss_snapshot
-from core.demo_clients import DEMO_CLIENTS
+# Sprint 3: client roster panel reads from the active adapter so a
+# CRM-connected deploy shows real clients, not the demo trio.
+from core.client_adapter import (
+    get_active_adapter,
+    get_active_clients,
+    get_adapter,
+    list_registered_providers,
+)
 from core.etf_universe import SCANNER_STALE_HOURS, get_scanner_health
 from integrations.data_feeds import circuit_breaker_state, reset_circuit_breaker
 from ui.components import card, data_sources_panel, section_header
@@ -129,6 +136,68 @@ def main() -> None:
 
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # Sprint 3: Client data source — pluggable adapter status panel
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    with card("Client data source"):
+        st.caption(level_text(
+                       advisor="Where the client roster comes from. Switch via the CLIENT_ADAPTER_PROVIDER env var (or Streamlit Cloud Secret) — the active provider is the one ticked below.",
+                       client="The connection to your client database.",
+                   ))
+        active = get_active_adapter()
+        st.markdown(
+            f"**Active provider:** `{active.provider_name()}` "
+            f"({len(get_active_clients())} clients loaded)"
+        )
+        # Status row per registered adapter.
+        st.markdown(
+            '<div style="font-size:11px;color:var(--text-muted);'
+            'text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px;">'
+            'Registered adapters</div>',
+            unsafe_allow_html=True,
+        )
+        for name in list_registered_providers():
+            try:
+                inst = get_adapter(name)
+                ok = inst.is_configured()
+            except Exception as exc:
+                ok = False
+            badge = "✓ configured" if ok else "○ not configured"
+            color = "var(--color-success)" if ok else "var(--text-muted)"
+            is_active = (name == active.provider_name())
+            active_marker = " · ACTIVE" if is_active else ""
+            st.markdown(
+                f'<div style="font-family:var(--font-mono);font-size:12px;'
+                f'padding:4px 0;color:{color};">'
+                f'{name:<16}  {badge}{active_marker}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        with st.expander("How to switch providers"):
+            st.markdown("""
+**Set `CLIENT_ADAPTER_PROVIDER`** to one of: `demo`, `csv_import`,
+`wealthbox`, `redtail`, `salesforce_fsc`. If unset, defaults to
+`demo`. If the requested provider isn't configured (no API key),
+the app falls back to `demo` automatically — the demo deploy
+never breaks.
+
+**Required env vars / secrets per provider:**
+
+- `csv_import` — places `data/clients_import.csv` (gitignored).
+  Optional `CLIENT_CSV_PATH` for a custom location.
+- `wealthbox` — `WEALTHBOX_API_KEY`.
+- `redtail` — `REDTAIL_API_KEY` *or* the
+  (`REDTAIL_USERKEY` + `REDTAIL_USERNAME` + `REDTAIL_PASSWORD`) triple.
+- `salesforce_fsc` — `SALESFORCE_FSC_INSTANCE_URL` *and*
+  `SALESFORCE_FSC_ACCESS_TOKEN`.
+
+For local dev, place values in `.env`. For production deploy, set
+them via Streamlit Cloud → Settings → Secrets. The app reads either
+location at startup; no code change needed to switch.
+            """)
+
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # Per-client auto-execute permissions
     # ═══════════════════════════════════════════════════════════════════════════
 
@@ -137,7 +206,7 @@ def main() -> None:
                        advisor="Per-client discretionary flag. Only honored when BROKER_PROVIDER is non-mock.",
                        client="Turn on auto-execute to let the app rebalance a client's basket on its own within their risk limits.",
                    ))
-        for c in DEMO_CLIENTS:
+        for c in get_active_clients():
             key = f"auto_exec_{c['id']}"
             st.checkbox(
                 f"{c['name']} — auto-execute rebalances",

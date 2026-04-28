@@ -64,19 +64,41 @@ def recalculate_all_portfolios(*, sleeve_basis: str = "default") -> dict[str, An
     gets logged + skipped so a partial bad universe entry can't break
     the whole nightly job.
     """
-    from core.demo_clients import DEMO_CLIENTS
+    from core.client_adapter import get_active_clients
     from core.etf_universe import load_universe_with_live_analytics
     from core.portfolio_engine import build_portfolio
 
     universe = load_universe_with_live_analytics()
+    # Sprint 3: client list now flows through the pluggable adapter
+    # (demo by default; can be Wealthbox / Redtail / Salesforce FSC /
+    # CSV import via CLIENT_ADAPTER_PROVIDER env var).
+    active_clients = get_active_clients()
     snapshot: dict[str, Any] = {
         "timestamp":     datetime.now(timezone.utc).isoformat(),
         "universe_size": len(universe),
         "clients":       {},
     }
 
-    for c in DEMO_CLIENTS:
+    for c in active_clients:
         try:
+            # Sprint 3 guard: CRM-imported clients ship with
+            # total_portfolio_usd=0 / assigned_tier="(unassigned)"
+            # until the advisor enters those values via the platform.
+            # Skip them rather than feeding $0 sleeves to build_portfolio.
+            if (
+                c.get("total_portfolio_usd", 0) <= 0
+                or c.get("assigned_tier", "(unassigned)") == "(unassigned)"
+            ):
+                snapshot["clients"][c["id"]] = {
+                    "name":   c["name"],
+                    "tier":   c.get("assigned_tier", "(unassigned)"),
+                    "sleeve_usd":    0.0,
+                    "n_holdings":    0,
+                    "skipped":       "import-incomplete",
+                    "metrics":       {},
+                    "top_holdings":  [],
+                }
+                continue
             sleeve = c["total_portfolio_usd"] * c["crypto_allocation_pct"] / 100.0
             p = build_portfolio(
                 c["assigned_tier"], universe,
