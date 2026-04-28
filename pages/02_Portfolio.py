@@ -831,6 +831,52 @@ def main() -> None:
                 result["summary"]["n_skipped_no_price"] = len(skipped)
                 result["summary"]["skipped_tickers"] = [o["ticker"] for o in skipped]
 
+                # Sprint 4 — register streaming callbacks for each child order
+                # so Alpaca trade-update events flow back into session_state and
+                # the "Recent submissions" expander renders live status. Only
+                # active when the alpaca_paper provider is selected AND the
+                # streaming module is configured (env vars set). For 'mock', this
+                # block is a no-op — broker_mock fills synchronously so streaming
+                # would have nothing to subscribe to. CLAUDE.md §22 — never
+                # fabricate; we only register if real streaming is live.
+                if _provider == "alpaca_paper":
+                    try:
+                        from integrations import alpaca_streaming as _streaming
+                        if _streaming.is_configured():
+                            _streaming.start_order_stream()
+                            if "order_status" not in st.session_state:
+                                st.session_state["order_status"] = {}
+                            for fill in result.get("fills", []):
+                                _coid = fill.get("order_id") or fill.get("client_order_id")
+                                if not _coid:
+                                    continue
+                                # Seed initial state so the expander has a row
+                                # to show even before the first WebSocket event
+                                # arrives.
+                                st.session_state["order_status"][_coid] = {
+                                    "status":          fill.get("status", "submitted"),
+                                    "symbol":          fill.get("ticker"),
+                                    "side":            fill.get("side"),
+                                    "fill_qty":        None,
+                                    "fill_price":      None,
+                                    "last_update_iso": result.get("submitted_at"),
+                                }
+
+                                # Closure factor needs default-arg trick to
+                                # capture _coid by value in the loop.
+                                def _make_cb(coid: str):
+                                    def _cb(status_row: dict) -> None:
+                                        try:
+                                            st.session_state["order_status"][coid] = status_row
+                                        except Exception:
+                                            pass
+                                    return _cb
+                                _streaming.register_order_callback(_coid, _make_cb(_coid))
+                    except Exception:
+                        # Streaming wiring must never block execution; the
+                        # Settings panel surfaces stream health for debugging.
+                        pass
+
                 st.session_state["last_execution"] = result
                 st.session_state["confirm_execute"] = False
                 # Audit-log write (Day-4 item I)
@@ -971,6 +1017,68 @@ def main() -> None:
                 f"${result['summary']['gross_usd']:,.2f} gross · "
                 f"avg slip {result['summary']['avg_slippage_bps']} bps",
                 language=None,
+            )
+
+    # ── Sprint 4 — Recent submissions (live order-status stream) ─────────────
+    # Surfaces the latest 10 orders with a status pill so the FA can watch
+    # paper-trading fills come back in real-time. Reads from the disk cache
+    # in integrations/alpaca_streaming so the panel survives Streamlit cold
+    # restart. Only renders when at least one order has been tracked, to
+    # avoid an empty card on first visit. CLAUDE.md §22 — every value shown
+    # comes from the streaming module; no fabricated rows.
+    try:
+        from integrations import alpaca_streaming as _streaming
+        _recent = _streaming.snapshot_recent(limit=10)
+    except Exception:
+        _recent = []
+
+    if _recent:
+        with st.expander(f"Recent submissions ({len(_recent)})", expanded=False):
+            _PILL_COLORS = {
+                "submitted":     ("#f59e0b", "Submitted"),
+                "new":           ("#f59e0b", "New"),
+                "pending_new":   ("#f59e0b", "Pending"),
+                "accepted":      ("#3b82f6", "Accepted"),
+                "partial_fill":  ("#3b82f6", "Partial"),
+                "fill":          ("#22c55e", "Filled"),
+                "filled":        ("#22c55e", "Filled"),
+                "rejected":      ("#ef4444", "Rejected"),
+                "canceled":      ("#9ca3af", "Canceled"),
+                "expired":       ("#9ca3af", "Expired"),
+            }
+            for row in _recent:
+                _status = str(row.get("status", "")).lower()
+                _color, _label = _PILL_COLORS.get(_status, ("#9ca3af", _status or "—"))
+                _coid = row.get("client_order_id", "—")
+                _sym = row.get("symbol") or "—"
+                _side = (row.get("side") or "").upper()
+                _qty = row.get("fill_qty")
+                _price = row.get("fill_price")
+                _qp = (
+                    f"{_qty} @ ${_price}" if _qty and _price
+                    else f"{_qty}" if _qty else "—"
+                )
+                st.markdown(
+                    f'<div style="display:flex;align-items:center;gap:12px;'
+                    f'padding:6px 0;border-bottom:1px solid var(--border);'
+                    f'font-family:var(--font-mono);font-size:12px;">'
+                    f'<span style="display:inline-block;padding:2px 10px;'
+                    f'border-radius:10px;background:{_color};color:#fff;'
+                    f'font-size:11px;font-weight:600;min-width:70px;'
+                    f'text-align:center;">▲ {_label}</span>'
+                    f'<span style="color:var(--text-primary);">{_sym}</span>'
+                    f'<span style="color:var(--text-secondary);">{_side}</span>'
+                    f'<span style="color:var(--text-muted);">{_qp}</span>'
+                    f'<span style="color:var(--text-muted);margin-left:auto;'
+                    f'font-size:11px;">{_coid[:16]}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            st.caption(
+                "Live updates via Alpaca trade-update WebSocket. Status "
+                "pill colors: amber=submitted/new, blue=accepted/partial, "
+                "green=filled, red=rejected, grey=canceled. Pair color "
+                "with the ▲ shape (CLAUDE.md §8 — never color-only)."
             )
 
 

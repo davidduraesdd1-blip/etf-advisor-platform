@@ -87,6 +87,90 @@ worktree `etf-advisor-platform-sprint27`. Tagged
 
 ---
 
+## 2026-05-01 — Sprint 4: Alpaca paper streaming (real-time order status)
+
+Replaces the fire-and-forget pattern in
+`integrations/broker_alpaca_paper.py::submit_basket` (which returned
+mid_price as the fill) with live order-status events streamed back
+from Alpaca's TradingStream WebSocket.
+
+### What landed (6 commits)
+
+  1. **integrations/alpaca_streaming.py** (NEW) — wraps
+     `alpaca.trading.stream.TradingStream` with:
+     - daemon-thread lifecycle (`start_order_stream`,
+       `stop_order_stream`, `is_streaming`)
+     - callback registry keyed by `client_order_id`
+     - on-disk cache `data/order_status_cache.json` (gitignored,
+       atomic write) so cold-restart preserves last-known status
+     - reconnect backoff `(1, 2, 4, 8, 16, 30)s` capped at 30s
+     - graceful no-op + INFO log when env vars unset
+     - accepts both spec names (`ALPACA_API_KEY_ID` /
+       `ALPACA_API_SECRET_KEY`) and legacy names
+       (`ALPACA_API_KEY` / `ALPACA_API_SECRET`).
+  2. **tests/test_alpaca_streaming.py** (NEW) — 16 tests, no
+     network. Coverage: configured/unconfigured, callback dispatch,
+     disk round-trip, multi-order independence, reconnect backoff,
+     idempotent start, graceful no-op, health snapshot, recent
+     snapshot. Module reload + tmp_path cache per test = full
+     isolation.
+  3. **pages/02_Portfolio.py** — when basket submits via
+     alpaca_paper AND streaming is configured, registers a callback
+     per child order; seeds `st.session_state.order_status` with
+     "submitted" rows; renders "Recent submissions (N)" expander
+     with status pills (amber/blue/green/red/grey + ▲ shape per
+     §8). All wrapped in try/except so streaming wiring never
+     blocks the click.
+  4. **pages/99_Settings.py** — new "Live order streaming" card
+     directly under "Broker routing": status pill, last event
+     timestamp, tracked-orders count, reconnect counter, last
+     error, Start/Stop buttons. Configured-state detection drives
+     button enable/disable.
+  5. **docs/alpaca_streaming.md** (NEW) — architecture diagram,
+     env-var config, public API, status schema, reconnect strategy,
+     failure modes, demo readiness checklist, post-demo follow-ups.
+  6. **MEMORY.md + pending_work.md** — Sprint 4 entry + two
+     post-demo follow-ups (full-position streaming, crypto trading
+     stream).
+
+### Test count
+
+  388 (Sprint-3 baseline) + 16 = **404 passing** (commit 6).
+
+### Decisions
+
+  - **Both env-var name pairs accepted**: spec uses
+    `ALPACA_API_KEY_ID/SECRET_KEY`, but `config.py` already shipped
+    `ALPACA_API_KEY/SECRET`. Existing operator Streamlit Cloud
+    Secrets must keep working without reconfiguration, so the
+    module reads either pair (spec name preferred).
+  - **No streaming import in mock path**: confirmed by introspecting
+    `sys.modules` after `submit_basket_via('mock', ...)` — the
+    streaming module never loads when BROKER_PROVIDER=mock.
+  - **CLAUDE.md §22 compliance**: streaming failures surface loud
+    `st.error` rows in Settings; we never fabricate fills.
+  - **Daemon thread**: one per process. Streamlit Cloud single-
+    worker by default, so this matches deployment topology.
+
+### Files touched
+
+  - `integrations/alpaca_streaming.py` (NEW, 380 LOC)
+  - `tests/test_alpaca_streaming.py` (NEW, 280 LOC, 16 tests)
+  - `pages/02_Portfolio.py` (+108 LOC)
+  - `pages/99_Settings.py` (+103 LOC)
+  - `docs/alpaca_streaming.md` (NEW)
+  - `.gitignore` (+3 lines for cache file)
+  - `MEMORY.md` + `pending_work.md`
+
+### Tag
+
+`audit-round-4-alpaca-streaming-2026-05-01` on
+`polish/sprint-4-alpaca-streaming-2026-05-01` branch (NOT merged
+to main yet — parent session merges after both parallel sprints
+land).
+
+---
+
 ## 2026-04-29 — Sprint 2: ETF Detail everything-live data (no-fallback)
 
 Cowork directive: "everything real and live, no hardcoded fallback

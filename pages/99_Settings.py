@@ -136,6 +136,109 @@ def main() -> None:
 
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # Sprint 4 — Live order streaming (Alpaca TradingStream WebSocket)
+    # Surfaces real-time order status events back into the Portfolio page's
+    # Recent submissions expander. Configured iff ALPACA_API_KEY_ID +
+    # ALPACA_API_SECRET_KEY (or legacy ALPACA_API_KEY/ALPACA_API_SECRET) are
+    # both set. Buttons let the FA Start / Stop the daemon thread without
+    # restarting the app.
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    with card("Live order streaming"):
+        try:
+            from integrations import alpaca_streaming as _streaming
+            _health = _streaming.get_stream_health()
+        except Exception as exc:
+            st.error(
+                "Streaming module failed to import — "
+                f"`{type(exc).__name__}: {exc}`. "
+                "Check `requirements.txt` includes `alpaca-py>=0.30.0`."
+            )
+            _health = None
+
+        if _health is not None:
+            st.caption(level_text(
+                advisor=(
+                    "Real-time order status via Alpaca's TradingStream "
+                    "WebSocket. Configured when both ALPACA_API_KEY_ID and "
+                    "ALPACA_API_SECRET_KEY are set in env / Streamlit Secrets. "
+                    "Daemon thread reconnects automatically with exponential "
+                    "backoff (1, 2, 4, 8, 16, 30s)."
+                ),
+                client=(
+                    "Watches paper-trading orders in real time so fills "
+                    "appear without refreshing."
+                ),
+            ))
+
+            # Status pill row
+            _on = _health["streaming"]
+            _conf = _health["configured"]
+            if not _conf:
+                _pill_color, _pill_label = "#9ca3af", "Not configured"
+            elif _on:
+                _pill_color, _pill_label = "#22c55e", "Streaming"
+            else:
+                _pill_color, _pill_label = "#f59e0b", "Stopped"
+
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:14px;'
+                f'padding:8px 0;font-family:var(--font-mono);font-size:13px;">'
+                f'<span style="display:inline-block;padding:3px 12px;'
+                f'border-radius:12px;background:{_pill_color};color:#fff;'
+                f'font-size:11px;font-weight:600;">■ {_pill_label}</span>'
+                f'<span style="color:var(--text-secondary);">'
+                f'Last event: <code>{_health["last_event_iso"] or "—"}</code></span>'
+                f'<span style="color:var(--text-secondary);">'
+                f'Tracked orders: <code>{_health["tracked_orders"]}</code></span>'
+                f'<span style="color:var(--text-muted);">'
+                f'Reconnects: <code>{_health["reconnect_attempts"]}</code></span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+            # Surface the last error explicitly per CLAUDE.md §22 — never
+            # silently fall back; if streaming failed, the FA must see why.
+            if _health.get("last_error"):
+                st.error(f"Last stream error: `{_health['last_error']}`")
+
+            # Start / Stop controls
+            _c_start, _c_stop = st.columns(2)
+            with _c_start:
+                if st.button(
+                    "Start streaming",
+                    width="stretch",
+                    disabled=(not _conf) or _on,
+                    help=(
+                        "Set ALPACA_API_KEY_ID + ALPACA_API_SECRET_KEY to enable."
+                        if not _conf else
+                        "Already streaming." if _on else
+                        "Start the TradingStream daemon thread."
+                    ),
+                ):
+                    _streaming.start_order_stream()
+                    st.rerun()
+            with _c_stop:
+                if st.button(
+                    "Stop streaming",
+                    width="stretch",
+                    disabled=not _on,
+                    help="Gracefully stop the streaming thread.",
+                ):
+                    _streaming.stop_order_stream()
+                    st.rerun()
+
+            if not _conf:
+                st.info(
+                    "**Not configured** — set both `ALPACA_API_KEY_ID` and "
+                    "`ALPACA_API_SECRET_KEY` in your environment / Streamlit "
+                    "Cloud Secrets to enable live streaming. Legacy names "
+                    "`ALPACA_API_KEY` / `ALPACA_API_SECRET` are also accepted "
+                    "for backward compatibility."
+                )
+
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # Sprint 3: Client data source — pluggable adapter status panel
     # ═══════════════════════════════════════════════════════════════════════════
 
