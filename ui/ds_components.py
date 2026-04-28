@@ -93,36 +93,45 @@ def render_top_bar(
         )
 
     if show_level:
+        # Audit-fix (2026-04-30): use on_click callbacks instead of an
+        # explicit st.rerun() inside the button handler. On Streamlit
+        # Cloud's multipage app the explicit st.rerun() can lose the
+        # page context and fall through to the default route (Home),
+        # showing the user a "fallback" screen. The callback pattern
+        # below sets session_state DURING button-handling and lets
+        # Streamlit's natural button-click rerun complete on the
+        # current page — URL preserved.
+        def _set_advisor() -> None:
+            st.session_state["user_level"] = "Advisor"
+        def _set_client() -> None:
+            st.session_state["user_level"] = "Client"
         with advisor_col:
-            if st.button(
+            st.button(
                 "Advisor",
                 key="topbar_mode_advisor",
                 use_container_width=True,
                 type=("primary" if active == "Advisor" else "secondary"),
-            ):
-                st.session_state["user_level"] = "Advisor"
-                st.rerun()
+                on_click=_set_advisor,
+            )
         with client_col:
-            if st.button(
+            st.button(
                 "Client",
                 key="topbar_mode_client",
                 use_container_width=True,
                 type=("primary" if active == "Client" else "secondary"),
-            ):
-                st.session_state["user_level"] = "Client"
-                st.rerun()
+                on_click=_set_client,
+            )
 
     if show_refresh:
         with refresh_col:
-            if st.button(
-                "↻ Refresh",
-                key="topbar_refresh",
-                use_container_width=True,
-                help="Clear all data caches and reload the page.",
-            ):
-                # Clear both cache layers + reset the data-source state
-                # registry so the next page render sees fresh fetches and
-                # the data-source badges flip back to LIVE on success.
+            # Audit-fix (2026-04-30): on_click callback pattern so the
+            # cache-clear + rerun preserves the page route on Streamlit
+            # Cloud's multipage app. Same fix as the level + theme
+            # toggles. The button click itself triggers the rerun;
+            # the callback sets state during click handling so the
+            # rest of the page sees cleared caches + the new
+            # last_refresh_ts.
+            def _on_refresh() -> None:
                 try:
                     st.cache_data.clear()
                 except Exception:
@@ -136,19 +145,19 @@ def render_top_bar(
                     reset_circuit_breaker()
                 except Exception:
                     pass
-                # Two-channel feedback so the user can see the click fired:
-                #   1. Toast at the bottom-right (auto-dismiss, ~3s).
-                #   2. session_state["last_refresh_ts"] which the topbar
-                #      itself reads on the NEXT render and shows as a
-                #      "Refreshed Xs ago" caption directly under the
-                #      Refresh button (persists until next refresh).
-                import time
-                st.session_state["last_refresh_ts"] = time.time()
+                import time as _refresh_time
+                st.session_state["last_refresh_ts"] = _refresh_time.time()
                 try:
                     st.toast("Caches cleared — refetching live data", icon="✓")
                 except Exception:
                     pass
-                st.rerun()
+            st.button(
+                "↻ Refresh",
+                key="topbar_refresh",
+                use_container_width=True,
+                help="Clear all data caches and reload the page.",
+                on_click=_on_refresh,
+            )
 
             # "Refreshed Xs ago" caption, only when a recent refresh fired.
             # Renders directly below the Refresh button so the feedback is
@@ -173,16 +182,19 @@ def render_top_bar(
         with theme_col:
             cur_theme = st.session_state.get("theme", "dark")
             label = "☼ Light" if cur_theme == "dark" else "☾ Dark"
-            if st.button(
+            # Audit-fix (2026-04-30): same on_click pattern as the level
+            # toggle so theme switches don't lose the page-route on
+            # Streamlit Cloud's multipage app.
+            def _toggle_theme() -> None:
+                _cur = st.session_state.get("theme", "dark")
+                st.session_state["theme"] = "light" if _cur == "dark" else "dark"
+            st.button(
                 label,
                 key="topbar_theme",
                 use_container_width=True,
                 help="Toggle between dark and light mode.",
-            ):
-                st.session_state["theme"] = (
-                    "light" if cur_theme == "dark" else "dark"
-                )
-                st.rerun()
+                on_click=_toggle_theme,
+            )
 
 
 def page_header(

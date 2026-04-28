@@ -226,18 +226,21 @@ def main() -> None:
                         "Already streaming." if _on else
                         "Start the TradingStream daemon thread."
                     ),
+                    # Audit-fix: on_click callback so cache+state mutate
+                    # under Streamlit's natural button-click rerun and
+                    # the page route is preserved on Streamlit Cloud.
+                    on_click=_streaming.start_order_stream,
                 ):
-                    _streaming.start_order_stream()
-                    st.rerun()
+                    pass
             with _c_stop:
                 if st.button(
                     "Stop streaming",
                     width="stretch",
                     disabled=not _on,
                     help="Gracefully stop the streaming thread.",
+                    on_click=_streaming.stop_order_stream,
                 ):
-                    _streaming.stop_order_stream()
-                    st.rerun()
+                    pass
 
             if not _conf:
                 st.info(
