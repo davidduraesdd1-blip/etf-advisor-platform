@@ -1,17 +1,85 @@
 # ETF flow data chain — full specification
 
 Polish round 5, Sprint 2 (2026-04-29) + Sprint 2.5 (2026-04-29) +
-Sprint 2.6 (2026-04-30). Cowork directive: "everything real and
-live, no hardcoded fallback values."
+Sprint 2.6 (2026-04-30) + Sprint 2.7 (2026-05-01). Cowork directive:
+"everything real and live, no hardcoded fallback values."
 
-## Measured coverage (Sprint 2.6 capture run, 2026-04-30)
+## Measured coverage (Sprint 2.7 capture run, 2026-05-01)
 
-| Field | Sprint 2.5 (2026-04-29) | Sprint 2.6 (2026-04-30) | Δ |
-|---|---|---|---|
-| AUM           | 113 / 211 (53.6%) | 119 / 211 (56.4%) | +6 |
-| 30D net flow  |   6 / 211 ( 2.8%) |   6 / 211 ( 2.8%) | — |
-| Avg daily vol | 124 / 211 (58.8%) | 132 / 211 (62.6%) | +8 |
-| Errors        |   0 / 211         |   0 / 211         |  0 |
+| Field | Sprint 2.5 (04-29) | Sprint 2.6 (04-30) | Sprint 2.7 (05-01) | Δ vs 2.6 |
+|---|---|---|---|---|
+| AUM           | 113 / 211 (53.6%) | 119 / 211 (56.4%) | 120 / 212 (56.6%) | +1 |
+| 30D net flow  |   6 / 211 ( 2.8%) |   6 / 211 ( 2.8%) |   6 / 212 ( 2.8%) |  0 |
+| Avg daily vol | 124 / 211 (58.8%) | 132 / 211 (62.6%) | 132 / 212 (62.3%) |  0 |
+| Errors        |   0 / 211         |   0 / 211         |   0 / 212         |  0 |
+
+(Universe gained 1 ticker between 2.6 and 2.7 captures — denominator
+moved 211 → 212. Sprint 2.7 capture per-source distribution:
+yfinance=106, SEC EDGAR (facts)=7, reference (bootstrap)=6,
+issuer-site:bitwise=1, None=92.)
+
+**Honest assessment.** Sprint 2.7 target was AUM ≥160/212; actual
+landed at 120. The new Bitwise + Franklin extractors verified WORKING
+on 8 + 3 = 11 tickers respectively in unit / live tests, but most
+of those tickers are ALREADY served by yfinance higher in the chain.
+The Sprint 2.7 extractors only displaced yfinance on ONE ticker
+(BXRP, where yfinance returns 404). The remaining 92 missing-AUM
+tickers are structurally unreachable via any free path:
+  * DNS-failed Bitwise per-fund domains (~17 tickers — domains
+    not yet registered)
+  * Fidelity datacenter-IP block (3 tickers)
+  * ETF.com Cloudflare turnstile (cross-cutting)
+  * Long-tail issuers (21Shares / Canary / Calamos / Hashdex /
+    Roundhill / etc.) without bespoke extractors — post-demo work
+  * Newly-listed tickers that yfinance hasn't indexed AND whose
+    issuer pages either 404 or are JS-rendered
+
+Per CLAUDE.md §22 no-fallback honesty, the snapshot leaves these
+92 tickers with `aum_usd: null` and the UI renders an em-dash —
+never a fabricated value.
+
+## Sprint 2.7 changes (2026-05-01)
+
+Three new chain capabilities + one documented dead-end:
+
+  1. **Bitwise STATIC HTML extractor** (no Playwright needed).
+     Sprint 2.6 deferred Bitwise to Playwright after probing
+     `bitwiseinvestments.com/crypto-funds/<ticker>` (404 / SPA).
+     Sprint 2.7 probing discovered Bitwise serves per-fund marketing
+     sites at `<ticker>etf.com` (e.g. bitbetf.com, bxrpetf.com,
+     bsoletf.com) with embedded `"netAssets":<float>` JSON. 8 of 26
+     universe Bitwise tickers reachable via this path.
+
+  2. **Franklin Templeton PLAYWRIGHT extractor** (new module
+     `integrations/issuer_extractors_playwright.py`).
+     Franklin product pages are Vue SPAs; the AUM tile hydrates
+     client-side. Headless chromium waits 5s for hydration, then
+     regex-extracts the `Total Net Assets` `<dd>`. Live-validated:
+     EZBC=$491.45M, EZET=$46.65M, EZPZ=$11.69M.
+
+  3. **Cryptorank endpoint URL fix.**
+     The Sprint 2.5 path `v1/etfs/<ticker>/flows` was speculative and
+     returned 401. Sprint 2.7 dev-portal probe (24 endpoint+header
+     combos) confirmed:
+       * Real ETF endpoint: `/v2/funds/etf` — gated to paid tariff.
+       * Free-tier key returns `403 {"message":"Endpoint is not
+         available in your tariff plan"}`.
+       * No working ETF flow endpoint reachable on current tier.
+     The endpoint URL is now correct (`/v2/funds/etf`) so any tier
+     upgrade activates it without code change. CLAUDE.md §22
+     documented dead-end.
+
+  4. **Fidelity DOCUMENTED DEAD-END.**
+     Both static HTTP and Playwright fail with
+     `ERR_HTTP2_PROTOCOL_ERROR` / `ERR_CONNECTION_RESET` from
+     datacenter IPs across all probed URLs. Only residential
+     proxies (paid) succeed. Stub kept for dispatcher symmetry.
+
+  5. **ETF.com DOCUMENTED DEAD-END.**
+     Cloudflare turnstile blocks both static and Playwright fetches
+     (status 403 + "Just a moment..." HTML). Defeating turnstile
+     requires residential-proxy + browser-fingerprinting infra.
+     Stub kept for dispatcher symmetry.
 
 Sprint 2.6 source distribution (AUM):
   yfinance:                107
@@ -24,22 +92,24 @@ VS Cowork's ≥150 acceptance gate from amendment 3 of Sprint 2.6:
 119/211 misses by 31 tickers. Per amendment 3 the contingency was
 "Sprint 2.7 with Playwright" rather than re-tuning 2.6.
 
-## Why coverage stops at 119/211 (Sprint 2.6 commit 7 per amendment 5)
+## Why coverage stops at current level — Sprint 2.7 update
 
-The 92 unavailable-from-any-free-source tickers concentrate by issuer:
+The remaining unavailable-from-any-free-source tickers concentrate
+by issuer (Sprint 2.6 → 2.7 status):
 
-| Issuer | Unavail | Sprint 2.6 status | Path to coverage |
+| Issuer | Sprint 2.6 unavail | Sprint 2.7 status | Sprint 2.7 path |
 |---|---|---|---|
-| Bitwise            | 17 | DEFERRED        | Sprint 2.7 — Playwright (React SPA, no static HTML AUM) |
-| Grayscale          | 13 | partial         | Most are tickers whose `etfs.grayscale.com/<ticker>` URL 404s. Not a fix; URL discovery for newly-listed slugs is per-ticker work |
-| 21Shares           |  9 | not yet wired   | Sprint 2.7 — issuer extractor (next priority after Playwright trio) |
-| Canary             |  6 | not yet wired   | Sprint 2.7 |
-| Calamos            |  6 | not yet wired   | Sprint 2.7 |
-| Franklin Templeton |  4 | DEFERRED        | Sprint 2.7 — Playwright (JS-rendered SPA) |
-| BlackRock iShares  |  3 | partial         | IDOG/ILTC/ISOL/IXRP not in the iShares product-screener JSON yet (newly listed) |
-| Fidelity           |  3 | DEFERRED        | Sprint 2.7 — Playwright (JS-rendered) |
-| ProShares          |  1 | partial         | EETU not in their public sitemap |
-| (15 other issuers) | 30 | not yet wired   | Long tail; Sprint 2.7+ |
+| Bitwise            | 17 | live (8 of 26 reachable) | static HTML via `<ticker>etf.com` per-fund domains; remaining 18 either DNS-fail (no domain registered) or page lacks JSON pattern |
+| Grayscale          | 13 | unchanged (tickers 404 on URL pattern) | per-ticker URL discovery — out of Sprint 2.7 scope |
+| 21Shares           |  9 | unchanged (not yet wired) | post-demo issuer extractor |
+| Canary             |  6 | unchanged | post-demo |
+| Calamos            |  6 | unchanged | post-demo |
+| Franklin Templeton |  4 | live (3 of 4 reachable) | Playwright on long product URLs; remaining tickers (FSUI/EZSO/EZXR/EZDG) not yet listed on Franklin's index page |
+| BlackRock iShares  |  3 | unchanged | newly-listed tickers not yet in iShares product-screener JSON |
+| Fidelity           |  3 | DEAD-END | datacenter-IP block defeats both static AND Playwright; needs paid residential proxies |
+| ProShares          |  1 | unchanged | EETU not in public sitemap |
+| ETF.com aggregator | (cross-cutting) | DEAD-END | Cloudflare turnstile defeats both static AND Playwright |
+| (15 other issuers) | 30 | unchanged | long tail; Sprint 2.7+ |
 
 The deeper structural reason: yfinance's coverage failure correlates
 with issuer-site coverage failure. Newly-listed funds that yfinance
@@ -49,19 +119,41 @@ hasn't indexed yet are also the funds whose static issuer pages
 catches up; issuers publish static AUM tiles) or a render path that
 can execute the SPA (Playwright in Sprint 2.7).
 
-## Cryptorank silent-failure (Sprint 2.6 finding)
+## Cryptorank — Sprint 2.7 dev-portal probe finding
 
-`_fetch_cryptorank_flow` in `integrations/etf_flow_data.py` calls
-`https://api.cryptorank.io/v1/etfs/<ticker>/flows` with `X-API-Key`
-header. The endpoint URL is speculative — Cryptorank's actual API
-schema is at `/v0/...` with different path structure. Their key-
-gated step returned non-200 silently for every ticker in the
-Sprint 2.6 capture run, contributing 0 net flow values.
+`_fetch_cryptorank_flow` in `integrations/etf_flow_data.py` was
+previously calling the speculative path
+`https://api.cryptorank.io/v1/etfs/<ticker>/flows`, which returned
+401 silently (v1 auth scheme rejects our key).
 
-Fixing this requires looking up the correct cryptorank.io endpoint
-in their dev portal docs (David's key has portal access on the
-Basic/Free tier). Flagged for Sprint 2.7 as a separate (cheap)
-commit since it's a single endpoint URL fix, not infrastructure.
+Sprint 2.7 dev-portal probe (24 endpoint+header combos, documented
+in the function docstring) findings:
+
+  * The actual API base is `https://api.cryptorank.io/v2/`. v0 and
+    v1 still serve some endpoints but use different auth.
+  * Endpoints reachable with our X-API-Key header on the free tier:
+      `/v0/coins`, `/v0/funds`, `/v2/currencies`
+  * The ETF endpoint exists: `/v2/funds/etf`. Calling it returns:
+      `403 {"statusCode":403,
+            "message":"Endpoint is not available in your tariff plan",
+            "error":"Forbidden"}`
+  * Per Cryptorank's pricing page, ETF flow data is gated to paid
+    tiers (Basic / Pro / Enterprise). Pricing is demo-request only;
+    no public dollar amount.
+  * **No working ETF flow endpoint reachable on the current key
+    tier.** This is a CLAUDE.md §22 documented dead-end.
+
+The fix landed in Sprint 2.7 commit 2:
+  * Calls the correct `v2/funds/etf` (not the wrong v1 path).
+  * Logs INFO + returns None on 403 → chain falls through cleanly.
+  * Tries plausible response-key variants (net_flow_30d_usd,
+    netFlow, flow_30d_usd, thirtyDayNetFlow) so a tier upgrade
+    activates flow capture without further code changes.
+
+Re-test path: when the key tier is upgraded, observe a 200 from
+`/v2/funds/etf?ticker=IBIT`, document the actual response shape in
+the function docstring, and (if the existing key probes don't
+match) update the parsing.
 
 
 Demo-critical 20 BTC/ETH spot ETFs (IBIT/FBTC/BITB/ARKB/BTCO/EZBC/
@@ -145,9 +237,10 @@ provenance.
 | 1 | `yfinance.Ticker.info["totalAssets"]` | live | Fast, broad coverage; same path as portfolio_engine AUM tiebreaker. |
 | 2 | SEC EDGAR N-PORT `total_value_usd` | live | Authoritative; covers IBIT/ETHA/FBTC/FETH today; expands as more issuers file. |
 | 3 | ETF.com public-page scrape | live | Respectful UA, ~1 req/sec. Regex-extracts "AUM: $X.XB" pattern. |
-| 4 | Issuer-site extractor | scaffold | Top 6 issuers (BlackRock, Bitwise, Grayscale, ProShares, Fidelity, Franklin). Per-issuer DOM parsers stubbed pending bespoke implementation. |
+| 4 | Issuer-site extractor — STATIC HTML | live | BlackRock screener JSON, Grayscale regex, ProShares dual-path, Bitwise per-fund-domain (Sprint 2.7). |
+| 5 | Issuer-site extractor — PLAYWRIGHT | live | Franklin Templeton (Sprint 2.7). Silently no-ops if Playwright/chromium unavailable on Streamlit Cloud cold-start. |
 
-If all 4 live steps fail → production snapshot → `(None, None)`.
+If all 5 live steps fail → production snapshot → `(None, None)`.
 
 ## 30-day net flow chain
 
@@ -240,18 +333,15 @@ indicator:
 
 ## Issuer-extractor registry
 
-| Issuer | Extractor key | Status |
-|---|---|---|
-| BlackRock iShares | `blackrock_ishares` | scaffold (returns None) |
-| Bitwise | `bitwise` | scaffold |
-| Grayscale | `grayscale` | scaffold |
-| ProShares | `proshares` | scaffold |
-| Fidelity | `fidelity` | scaffold |
-| Franklin Templeton | `franklin` | scaffold |
-
-Per-issuer DOM parsers land in a follow-up PR. Each issuer's site has
-distinct structure + rate-limit posture; the scaffold lets the chain
-fall through cleanly until each is implemented.
+| Issuer | Extractor key | Path | Status |
+|---|---|---|---|
+| BlackRock iShares  | `blackrock_ishares` | static HTML  | live (Sprint 2.6) |
+| Grayscale          | `grayscale`         | static HTML  | live (Sprint 2.6) |
+| ProShares          | `proshares`         | static HTML  | live (Sprint 2.6) |
+| Bitwise            | `bitwise`           | static HTML  | live (Sprint 2.7) |
+| Franklin Templeton | `franklin`          | Playwright   | live (Sprint 2.7) |
+| Fidelity           | `fidelity`          | dead-end     | datacenter-IP block (Sprint 2.7) |
+| ETF.com aggregator | `etfcom`            | dead-end     | Cloudflare turnstile (Sprint 2.7) |
 
 Issuers 7+ (VanEck, 21Shares, Hashdex, Canary, Roundhill, Defiance,
 Direxion, etc.) are NOT in the registry — post-demo work. The
