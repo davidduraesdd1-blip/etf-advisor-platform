@@ -540,35 +540,54 @@ location at startup; no code change needed to switch.
                                 key=f"rq_notes_{_acc}",
                                 help="Free-form. Stored on the queue entry for audit.",
                             )
+                            # Audit-fix (2026-04-30): on_click callback pattern
+                            # so the rerun preserves the page route on
+                            # Streamlit Cloud's multipage app. Closures
+                            # capture the per-iteration values cleanly.
+                            def _make_approve(_acc_=_acc, _ticker_=_ticker,
+                                              _category_=_category,
+                                              _underlying_=_underlying,
+                                              _notes_=_notes):
+                                def _do_approve() -> None:
+                                    approve_entry(
+                                        _acc_,
+                                        ticker_override=_ticker_.strip().upper() or None,
+                                        category_override=_category_,
+                                        underlying_override=_underlying_,
+                                        notes=_notes_,
+                                    )
+                                    try:
+                                        st.toast(
+                                            f"Approved {_ticker_ or 'filing'} — "
+                                            f"will appear in universe after refresh."
+                                        )
+                                    except Exception:
+                                        pass
+                                return _do_approve
+                            def _make_reject(_acc_=_acc, _notes_=_notes):
+                                def _do_reject() -> None:
+                                    reject_entry(_acc_, notes=_notes_)
+                                    try:
+                                        st.toast("Rejected — won't be re-flagged.")
+                                    except Exception:
+                                        pass
+                                return _do_reject
                             _btn_cols = st.columns([1, 1, 4])
                             with _btn_cols[0]:
-                                if st.button(
+                                st.button(
                                     "✓ Approve",
                                     key=f"rq_approve_{_acc}",
                                     type="primary",
                                     use_container_width=True,
-                                ):
-                                    approve_entry(
-                                        _acc,
-                                        ticker_override=_ticker.strip().upper() or None,
-                                        category_override=_category,
-                                        underlying_override=_underlying,
-                                        notes=_notes,
-                                    )
-                                    st.toast(
-                                        f"Approved {_ticker or 'filing'} — "
-                                        f"will appear in universe after refresh."
-                                    )
-                                    st.rerun()
+                                    on_click=_make_approve(),
+                                )
                             with _btn_cols[1]:
-                                if st.button(
+                                st.button(
                                     "✗ Reject",
                                     key=f"rq_reject_{_acc}",
                                     use_container_width=True,
-                                ):
-                                    reject_entry(_acc, notes=_notes)
-                                    st.toast(f"Rejected — won't be re-flagged.")
-                                    st.rerun()
+                                    on_click=_make_reject(),
+                                )
 
                     if len(_pending) > 10:
                         st.caption(
@@ -577,10 +596,18 @@ location at startup; no code change needed to switch.
                             "candidates surface on next render."
                         )
             except Exception as _rq_exc:
+                # Audit-fix (HIGH): per CLAUDE.md §8 never expose Python
+                # exception detail directly. Plain-English summary first,
+                # diagnostic detail behind an "Advanced diagnostics"
+                # expander for operator debugging. Mirrors the streaming-
+                # import pattern earlier on this page.
                 st.warning(
-                    f"Review queue unavailable ({type(_rq_exc).__name__}: {_rq_exc}). "
-                    "Scanner findings will still log; approval workflow is offline."
+                    "Review queue is temporarily unavailable. Scanner "
+                    "findings still log to disk and the approval workflow "
+                    "will resume on next deploy."
                 )
+                with st.expander("Advanced diagnostics — review queue failure"):
+                    st.code(f"{type(_rq_exc).__name__}: {_rq_exc}", language="text")
 
 
     # ═══════════════════════════════════════════════════════════════════════════

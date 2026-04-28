@@ -12,6 +12,12 @@ yfinance>=0.2.40
 feedparser>=6.0.10
 fpdf2>=2.7.9
 openpyxl>=3.1.2
+# Audit-fix (2026-04-30 MEDIUM): pinned for the Farside flow parser in
+# integrations/etf_flow_data.py. Without bs4 the parser silently
+# degrades to a less-precise regex fallback (still works, but the
+# deterministic table walk is preferred). bs4 is already a yfinance
+# transitive on local; pinning it makes the deploy path explicit.
+beautifulsoup4>=4.12.0
 # 2026-04-26 audit-round-1: real broker wiring. Optional at runtime —
 # integrations/broker_alpaca_paper.py falls back to mock if missing.
 alpaca-py>=0.30.0
